@@ -1,0 +1,24 @@
+diff --git a/dist/cli/build/bundle-server.js b/dist/cli/build/bundle-server.js
+index f59e677181f1d0007993e36e05901f1f012689f9..bb067ee896447a3a88b97ff37a0254410e8c0228 100644
+--- a/dist/cli/build/bundle-server.js
++++ b/dist/cli/build/bundle-server.js
+@@ -71,6 +71,7 @@ export async function bundleServer(buildOpts, projectOpts) {
+         minifySyntax: projectOpts.minify && !debug,
+         legalComments: "none",
+         metafile: true,
++        nodePaths: [path.join(appPath, "node_modules"), path.join(monorepoRoot, "node_modules")].filter(Boolean),
+         // Next traces files using the default conditions from `nft` (`node`, `require`, `import` and `default`)
+         //
+         // Because we use the `node` platform for this build, the "module" condition is used when no conditions are defined.
+diff --git a/dist/cli/build/open-next/bundle-node-middleware.js b/dist/cli/build/open-next/bundle-node-middleware.js
+index 6cc1cb15b8b5cf8aaa8ef2c922bff499b35f9704..2e57b57160aada3b18157d2012763592ce61eba2 100644
+--- a/dist/cli/build/open-next/bundle-node-middleware.js
++++ b/dist/cli/build/open-next/bundle-node-middleware.js
+@@ -180,6 +180,7 @@ export async function bundleNodeMiddleware(options) {
+         treeShaking: true,
+         conditions: ["module"],
+         mainFields: ["module", "main"],
++        nodePaths: [path.join(options.appBuildOutputPath, "node_modules"), path.join(options.monorepoRoot || options.appBuildOutputPath, "node_modules")].filter(Boolean),
+         external: ["node:*", "./open-next.config.mjs"],
+         define: {
+             // The base of the middleware compiled by Next.js is runtime agnostic. "edge" selects its
