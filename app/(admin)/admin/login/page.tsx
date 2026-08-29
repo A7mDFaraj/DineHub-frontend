@@ -50,8 +50,10 @@ export default function AdminLogin() {
         console.warn("Could not find token in response:", data);
       }
       
-      router.push("/admin");
-      router.refresh();
+      // Use window.location.href instead of router.push to force a full page reload.
+      // This bypasses the Next.js client-side router cache, which often incorrectly 
+      // remembers the previous unauthenticated redirect and traps you on the login page.
+      window.location.href = "/admin";
     } catch (err) {
       setError("An unexpected error occurred. Please check if backend is running.");
     }
