@@ -28,17 +28,26 @@ export default function AdminLogin() {
     resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = async (data: LoginFormValues) => {
+  const onSubmit = async (formData: LoginFormValues) => {
     setError(null);
     try {
-      const { error: signInError } = await authClient.signIn.email({
-        email: data.email,
-        password: data.password,
+      const { data, error: signInError } = await authClient.signIn.email({
+        email: formData.email,
+        password: formData.password,
       });
 
       if (signInError) {
         setError(signInError.message || "Invalid credentials");
         return;
+      }
+      
+      // Fix for cross-domain auth: set the token as a cookie on the frontend domain 
+      // so the Next.js middleware.ts can read it and allow access to /admin
+      const sessionToken = data?.token || (data as any)?.session?.token;
+      if (sessionToken) {
+        document.cookie = `better-auth.session_token=${sessionToken}; path=/; max-age=2592000; SameSite=Lax;`;
+      } else {
+        console.warn("Could not find token in response:", data);
       }
       
       router.push("/admin");

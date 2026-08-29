@@ -21,6 +21,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     await authClient.signOut();
+    // Clear the manual frontend cookie
+    document.cookie = "better-auth.session_token=; path=/; max-age=0;";
     router.push("/admin/login");
     router.refresh();
   };
