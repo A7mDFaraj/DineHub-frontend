@@ -44,3 +44,5 @@ next-env.d.ts
 .open-next/
 .wrangler/
 
+# local design-agent context
+.superdesign/

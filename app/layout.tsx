@@ -1,10 +1,24 @@
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Alexandria, Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
+const thmanyahSans = localFont({
+  src: [
+    { path: "../public/fonts/thmanyahsans-Light.woff2", weight: "300" },
+    { path: "../public/fonts/thmanyahsans-Regular.woff2", weight: "400" },
+    { path: "../public/fonts/thmanyahsans-Medium.woff2", weight: "500" },
+    { path: "../public/fonts/thmanyahsans-Bold.woff2", weight: "700" },
+    { path: "../public/fonts/thmanyahsans-Black.woff2", weight: "900" },
+  ],
+  variable: "--font-thmanyah",
+  display: "swap",
+});
+
+const alexandria = Alexandria({
+  variable: "--font-arabic",
+  subsets: ["arabic", "latin"],
+  display: "swap",
 });
 
 const outfit = Outfit({
@@ -13,8 +27,12 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "DineHub - Premium Restaurant Management",
-  description: "Modern SaaS platform for restaurants with digital menus.",
+  title: {
+    default: "DineHub | الطلب يبدأ بمسح، والتشغيل يبقى تحت سيطرتك",
+    template: "%s | DineHub",
+  },
+  description:
+    "منصة طلبات رقمية عبر QR تمنح عملاءك تجربة سريعة، وتمنح فريقك إدارة الفروع والقوائم والطلبات والتحليلات من مكان واحد.",
 };
 
 export default function RootLayout({
@@ -23,7 +41,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable} h-full antialiased dark`}>
+    <html
+      lang="ar"
+      dir="rtl"
+      className={`${alexandria.variable} ${outfit.variable} ${thmanyahSans.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

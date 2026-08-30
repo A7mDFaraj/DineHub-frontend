@@ -1,45 +1,117 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, Users, ShoppingBag, TrendingUp } from "lucide-react"
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle2,
+  ClipboardList,
+  QrCode,
+  Sparkles,
+  UtensilsCrossed,
+} from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import styles from "./dashboard.module.css";
+
+export const metadata: Metadata = {
+  title: "نظرة الإدارة",
+  description: "ابدأ إعداد فروع DineHub وقائمتك ورموز الطلب.",
+};
+
+const setupSteps = [
+  {
+    number: "01",
+    title: "أضف أول فرع",
+    description: "عرّف موقع الخدمة الذي ستتصل به القائمة والطاولات.",
+    href: "/admin/branches",
+    icon: Building2,
+    tone: "teal",
+  },
+  {
+    number: "02",
+    title: "ابنِ القائمة",
+    description: "رتّب التصنيفات والمنتجات بالطريقة التي يراها العميل.",
+    href: "/admin/categories",
+    icon: UtensilsCrossed,
+    tone: "lilac",
+  },
+  {
+    number: "03",
+    title: "انشر نقطة الطلب",
+    description: "أنشئ رمز QR للطاولة أو الاستلام وابدأ استقبال الطلبات.",
+    href: "/admin/qr-code",
+    icon: QrCode,
+    tone: "coral",
+  },
+] as const;
 
 export default function AdminDashboard() {
-  const stats = [
-    { title: "Total Revenue", value: "SAR 12,450", icon: DollarSign, trend: "+12.5%" },
-    { title: "Active Orders", value: "24", icon: ShoppingBag, trend: "+5.2%" },
-    { title: "Total Customers", value: "1,245", icon: Users, trend: "+18.1%" },
-    { title: "Avg. Order Value", value: "SAR 45", icon: TrendingUp, trend: "+2.4%" },
-  ]
-
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold font-outfit">Dashboard Overview</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <Card key={index} className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-zinc-400">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className="w-4 h-4 text-primary-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-emerald-500 mt-1">
-                {stat.trend} from last month
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <div className={styles.page}>
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <p className={styles.eyebrow}><span aria-hidden="true" />مسار الإعداد</p>
+          <h1>حوّل المكان إلى خط خدمة متصل.</h1>
+          <p>ابدأ بالفرع، مرّر القائمة إلى العميل، ثم اجعل كل طلب واضحًا للفريق.</p>
+          <Link className={styles.primaryAction} href="/admin/branches">
+            <span>ابدأ بأول فرع</span>
+            <ArrowLeft aria-hidden="true" size={19} />
+          </Link>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <Card className="bg-white/5 border-white/10 h-[400px] flex items-center justify-center">
-          <p className="text-zinc-500">Revenue Chart (Coming Soon)</p>
-        </Card>
-        <Card className="bg-white/5 border-white/10 h-[400px] flex items-center justify-center">
-          <p className="text-zinc-500">Popular Items (Coming Soon)</p>
-        </Card>
-      </div>
+        <div className={styles.signalMap} aria-label="مسار الطلب من العميل إلى غرفة التشغيل">
+          <div className={styles.signalLine} aria-hidden="true" />
+          <div className={styles.signalDot} aria-hidden="true" />
+          <div className={styles.mapNode} data-position="customer">
+            <span><QrCode aria-hidden="true" size={22} /></span>
+            <small>العميل</small>
+          </div>
+          <div className={styles.mapNode} data-position="order">
+            <span><ClipboardList aria-hidden="true" size={22} /></span>
+            <small>الطلب</small>
+          </div>
+          <div className={styles.mapNode} data-position="team">
+            <span><CheckCircle2 aria-hidden="true" size={22} /></span>
+            <small>الفريق</small>
+          </div>
+          <div className={styles.mapCore}>
+            <Sparkles aria-hidden="true" size={20} />
+            <strong>غرفة واحدة</strong>
+            <small>كل إشارة في مكانها</small>
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.setupSection} aria-labelledby="setup-title">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p>ابدأ بخطوات حقيقية</p>
+            <h2 id="setup-title">ثلاث محطات إلى أول طلب</h2>
+          </div>
+          <span>كل محطة تفتح التي بعدها</span>
+        </div>
+
+        <div className={styles.setupTrack}>
+          {setupSteps.map((step) => (
+            <Link className={styles.setupCard} data-tone={step.tone} href={step.href} key={step.href}>
+              <div className={styles.stepTop}>
+                <span className={styles.stepIcon}><step.icon aria-hidden="true" size={21} strokeWidth={1.7} /></span>
+                <small>{step.number}</small>
+              </div>
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
+              <span className={styles.cardAction}>افتح المحطة <ArrowLeft aria-hidden="true" size={17} /></span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.emptyStage} aria-labelledby="today-title">
+        <div>
+          <p><i aria-hidden="true" />اليوم</p>
+          <h2 id="today-title">هنا ستظهر نبضات الخدمة.</h2>
+          <span>عندما يبدأ العملاء بالطلب، ستجد الحالة والتوقيت والفرع دون أرقام تجريبية.</span>
+        </div>
+        <Link href="/admin/menu">راجع القائمة <ArrowLeft aria-hidden="true" size={18} /></Link>
+      </section>
     </div>
-  )
+  );
 }

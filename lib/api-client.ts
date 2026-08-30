@@ -10,18 +10,6 @@ export const apiClient = axios.create({
   },
 });
 
-// Intercept requests to inject the token from cookies (for cross-origin requests)
-apiClient.interceptors.request.use((config) => {
-  if (typeof document !== 'undefined') {
-    const match = document.cookie.match(new RegExp('(^| )better-auth\\.session_token=([^;]+)'));
-    if (match && match[2]) {
-      config.headers.Authorization = `Bearer ${match[2]}`;
-    }
-  }
-  return config;
-});
-
-// Optionally add interceptors here for handling 401s globally
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
