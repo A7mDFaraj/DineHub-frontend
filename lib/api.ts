@@ -1,4 +1,5 @@
 import axios from "axios";
+import { installBearerAuth } from "./auth-token";
 import { installAxiosObservability } from "./observability";
 
 const isServer = typeof window === "undefined";
@@ -14,4 +15,5 @@ export const api = axios.create({
   },
 });
 
+installBearerAuth(api);
 installAxiosObservability(api);

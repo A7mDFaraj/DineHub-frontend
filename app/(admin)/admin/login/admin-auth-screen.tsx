@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
@@ -46,6 +45,35 @@ type AuthMode = "sign-in" | "sign-up";
 type SignInValues = z.infer<typeof signInSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
 type AuthError = { code?: string; message?: string };
+
+const SESSION_CONFIRMATION_ATTEMPTS = 3;
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+async function confirmSession() {
+  for (let attempt = 0; attempt < SESSION_CONFIRMATION_ATTEMPTS; attempt += 1) {
+    const { data } = await authClient.getSession({
+      query: { disableCookieCache: true },
+      fetchOptions: { cache: "no-store" },
+    });
+
+    if (data?.user) {
+      return data;
+    }
+
+    if (attempt < SESSION_CONFIRMATION_ATTEMPTS - 1) {
+      await wait(150 * (attempt + 1));
+    }
+  }
+
+  return null;
+}
+
+function openAuthenticatedArea(role: string | undefined) {
+  window.location.replace(role === "admin" ? "/admin" : "/staff");
+}
 
 function getAuthError(error: AuthError | null) {
   const message = error?.message?.toLowerCase() ?? "";
@@ -109,7 +137,6 @@ function PasswordField({
 }
 
 function SignInForm() {
-  const router = useRouter();
   const [requestError, setRequestError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
@@ -124,11 +151,29 @@ function SignInForm() {
         password: values.password,
       });
       if (error) {
+        reportClientIncident({
+          level: "warn",
+          event: "auth.sign_in_rejected",
+          message: error.message ?? "Sign-in was rejected",
+          metadata: { errorCode: error.code ?? "unknown" },
+        });
         setRequestError(getAuthError(error));
         return;
       }
-      router.replace(data?.user.role === "admin" ? "/admin" : "/staff");
-      router.refresh();
+
+      const session = await confirmSession();
+      if (!session) {
+        reportClientIncident({
+          level: "error",
+          event: "auth.session_confirmation_failed",
+          message: "Sign-in succeeded but the session could not be confirmed",
+          metadata: { flow: "sign-in" },
+        });
+        setRequestError("تم قبول بيانات الدخول، لكن تعذّر تثبيت الجلسة. حاول مرة أخرى.");
+        return;
+      }
+
+      openAuthenticatedArea(session.user.role ?? data?.user.role);
     } catch (error) {
       const reason = error instanceof Error ? error : new Error("Sign-in network request failed");
       reportClientIncident({
@@ -196,7 +241,6 @@ function SignInForm() {
 }
 
 function SignUpForm() {
-  const router = useRouter();
   const [requestError, setRequestError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
@@ -212,11 +256,29 @@ function SignUpForm() {
         password: values.password,
       });
       if (error) {
+        reportClientIncident({
+          level: "warn",
+          event: "auth.sign_up_rejected",
+          message: error.message ?? "Sign-up was rejected",
+          metadata: { errorCode: error.code ?? "unknown" },
+        });
         setRequestError(getAuthError(error));
         return;
       }
-      router.replace("/staff");
-      router.refresh();
+
+      const session = await confirmSession();
+      if (!session) {
+        reportClientIncident({
+          level: "error",
+          event: "auth.session_confirmation_failed",
+          message: "Sign-up succeeded but the session could not be confirmed",
+          metadata: { flow: "sign-up" },
+        });
+        setRequestError("تم إنشاء الحساب، لكن تعذّر تثبيت الجلسة. سجّل الدخول للمتابعة.");
+        return;
+      }
+
+      openAuthenticatedArea(session.user.role);
     } catch (error) {
       const reason = error instanceof Error ? error : new Error("Sign-up network request failed");
       reportClientIncident({

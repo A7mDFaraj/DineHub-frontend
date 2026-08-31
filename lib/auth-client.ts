@@ -1,8 +1,26 @@
 import { inferAdditionalFields } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
+import { clearAuthToken, getAuthToken, storeAuthToken } from "./auth-token";
+
+const authServerUrl = (
+  process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? "http://localhost:3000"
+).replace(/\/+$/, "");
 
 export const authClient = createAuthClient({
-  baseURL: `${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/api/auth`,
+  baseURL: `${authServerUrl}/api/auth`,
+  fetchOptions: {
+    credentials: "include",
+    auth: {
+      type: "Bearer",
+      token: getAuthToken,
+    },
+    onSuccess(context) {
+      const token = context.response.headers.get("set-auth-token");
+      if (token) {
+        storeAuthToken(token);
+      }
+    },
+  },
   plugins: [
     inferAdditionalFields({
       user: {
@@ -20,4 +38,12 @@ export const authClient = createAuthClient({
   ],
 });
 
-export const { signIn, signUp, useSession, signOut } = authClient;
+export const { signIn, signUp, useSession } = authClient;
+
+export async function signOut() {
+  try {
+    return await authClient.signOut();
+  } finally {
+    clearAuthToken();
+  }
+}

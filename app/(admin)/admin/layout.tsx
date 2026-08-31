@@ -23,7 +23,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AdminGuideTrigger, AdminOnboardingGuide } from "@/components/admin/admin-onboarding-guide";
-import { authClient } from "@/lib/auth-client";
+import { authClient, signOut } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import logo from "@/public/brand/dinehub-logo-3d.png";
 import styles from "./admin-shell.module.css";
@@ -154,7 +154,7 @@ function AuthenticatedAdminShell({
   const handleLogout = async () => {
     setIsSigningOut(true);
     try {
-      await authClient.signOut();
+      await signOut();
       router.replace("/admin/login");
       router.refresh();
     } finally {
