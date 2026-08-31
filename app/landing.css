@@ -115,20 +115,17 @@
 }
 
 .brand-mark {
-  width: 46px;
-  height: 46px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 14px;
-  background: white;
-  box-shadow: 0 8px 20px rgba(34, 24, 42, 0.12), inset 0 0 0 1px rgba(34, 24, 42, 0.07);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
 .brand-mark img {
-  width: 43px;
-  height: 43px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(34, 24, 42, 0.16));
 }
 
 .brand-word {
@@ -1272,20 +1269,16 @@
 }
 
 .venue-core-logo {
-  width: 58px;
-  height: 58px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 18px;
-  background: white;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .venue-core-logo img {
-  width: 56px;
-  height: 56px;
+  width: 62px;
+  height: 62px;
   object-fit: contain;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.35));
 }
 
 .venue-core-kicker {
@@ -1769,10 +1762,10 @@
 
 .brand-lockup--footer { color: white; }
 
-.brand-lockup--footer .brand-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
+.brand-lockup--footer .brand-mark img {
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
 }
 
 .footer-grid > div > p {
@@ -2015,10 +2008,9 @@
     border-radius: 20px;
   }
 
-  .brand-mark {
-    width: 42px;
-    height: 42px;
-    border-radius: 13px;
+  .brand-mark img {
+    width: 38px;
+    height: 38px;
   }
 
   .brand-word { font-size: 1.08rem; }
