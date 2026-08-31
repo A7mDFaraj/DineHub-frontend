@@ -5,7 +5,7 @@ import { apiClient } from "@/lib/api-client"
 import { OrderCard, Order } from "@/components/staff/order-card"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { AnimatePresence } from "framer-motion"
-import { Building2, Filter, Layers } from "lucide-react"
+import { Building2, Layers } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Branch {
@@ -38,31 +38,55 @@ export default function StaffDashboard() {
     }
   }
 
+  const normalizeOrders = (rawOrders: any[]): Order[] => {
+    return rawOrders.map((o: any) => ({
+      id: o.id,
+      tableId: o.table?.number ? o.table.number.toString() : (o.tableId || "1"),
+      status: o.status || "pending",
+      note: o.notes || o.note || "",
+      createdAt: o.createdAt || new Date().toISOString(),
+      items: Array.isArray(o.items) ? o.items.map((i: any) => ({
+        productId: i.productId || i.id,
+        nameEn: i.product?.nameAr || i.product?.nameEn || i.nameEn || i.name || "Menu Item",
+        quantity: i.quantity || 1,
+        note: i.note,
+        selectedAttributes: i.selectedAttributes || []
+      })) : []
+    }))
+  }
+
   const fetchOrders = async (branchId?: string) => {
     const targetBranchId = branchId || selectedBranchId
     if (!targetBranchId) return
 
     try {
-      const res = await apiClient.get(`/staff/orders/${targetBranchId}`)
-      const rawOrders = Array.isArray(res.data) ? res.data : res.data?.data || res.data?.orders || []
-      
-      // Normalize backend orders to Order interface
-      const normalizedOrders: Order[] = rawOrders.map((o: any) => ({
-        id: o.id,
-        tableId: o.table?.number ? o.table.number.toString() : (o.tableId || "1"),
-        status: o.status || "pending",
-        note: o.notes || o.note || "",
-        createdAt: o.createdAt || new Date().toISOString(),
-        items: Array.isArray(o.items) ? o.items.map((i: any) => ({
-          productId: i.productId || i.id,
-          nameEn: i.product?.nameAr || i.product?.nameEn || i.nameEn || i.name || "Menu Item",
-          quantity: i.quantity || 1,
-          note: i.note,
-          selectedAttributes: i.selectedAttributes || []
-        })) : []
-      }))
+      // Fetch both live active orders and delivered history from production backend
+      const [liveRes, historyRes] = await Promise.allSettled([
+        apiClient.get(`/staff/orders/${targetBranchId}`),
+        apiClient.get(`/staff/orders/${targetBranchId}/history`),
+      ])
 
-      setOrders(normalizedOrders)
+      let combinedRaw: any[] = []
+
+      if (liveRes.status === "fulfilled") {
+        const liveList = Array.isArray(liveRes.value.data) 
+          ? liveRes.value.data 
+          : liveRes.value.data?.data || liveRes.value.data?.orders || []
+        combinedRaw = [...combinedRaw, ...liveList]
+      }
+
+      if (historyRes.status === "fulfilled") {
+        const histList = Array.isArray(historyRes.value.data) 
+          ? historyRes.value.data 
+          : historyRes.value.data?.data || historyRes.value.data?.orders || []
+        
+        // Avoid duplicates if any overlap
+        const existingIds = new Set(combinedRaw.map(o => o.id))
+        const uniqueHist = histList.filter((o: any) => !existingIds.has(o.id))
+        combinedRaw = [...combinedRaw, ...uniqueHist]
+      }
+
+      setOrders(normalizeOrders(combinedRaw))
       setError("")
     } catch (err: any) {
       console.error("Failed to fetch live orders:", err)
@@ -130,7 +154,7 @@ export default function StaffDashboard() {
       if (statusWeight[a.status] !== statusWeight[b.status]) {
         return statusWeight[a.status] - statusWeight[b.status]
       }
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
 
   return (
@@ -175,7 +199,7 @@ export default function StaffDashboard() {
           { id: "pending", label: "New (Pending)", count: counts.pending },
           { id: "preparing", label: "Preparing", count: counts.preparing },
           { id: "ready", label: "Ready to Serve", count: counts.ready },
-          { id: "delivered", label: "Delivered", count: counts.delivered },
+          { id: "delivered", label: "Delivered (History)", count: counts.delivered },
           { id: "all", label: "All Orders", count: counts.all },
         ].map((tab) => (
           <button
@@ -229,8 +253,12 @@ export default function StaffDashboard() {
           
           {filteredOrders.length === 0 && (
             <div className="col-span-full py-20 text-center text-neutral-400 glass-panel rounded-2xl border border-white/10">
-              <p className="text-lg font-medium text-white mb-1">No orders found in this view 👨‍🍳</p>
-              <p className="text-sm text-zinc-500">Orders placed by customers via table QR codes will appear here instantly.</p>
+              <p className="text-lg font-medium text-white mb-1">No orders in this section 👨‍🍳</p>
+              <p className="text-sm text-zinc-500">
+                {statusFilter === 'delivered' 
+                  ? 'Orders marked as Delivered will appear in this history list.' 
+                  : 'Orders placed by customers via table QR codes will appear here instantly.'}
+              </p>
             </div>
           )}
         </div>
