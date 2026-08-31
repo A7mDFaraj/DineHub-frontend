@@ -1,23 +1,37 @@
 "use client"
 
 import { useSession } from "@/lib/auth-client"
-import { redirect } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { ChefHat, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signOut } from "@/lib/auth-client"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { useEffect, useState } from "react"
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
   const { data: session, isPending } = useSession()
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
-  // In a real app, you'd protect routes in middleware as well
-  if (!isPending && !session) {
-    // redirect("/login")
-    // For MVP demonstration, we won't strictly block if there's no auth server running
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.replace("/admin/login")
+    }
+  }, [isPending, router, session])
+
+  if (isPending || !session) {
+    return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>
   }
 
-  if (isPending) {
-    return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>
+  const handleLogout = async () => {
+    setIsSigningOut(true)
+    try {
+      await signOut()
+      router.replace("/admin/login")
+      router.refresh()
+    } finally {
+      setIsSigningOut(false)
+    }
   }
 
   return (
@@ -35,7 +49,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => signOut().then(() => redirect("/login"))}
+            onClick={handleLogout}
+            disabled={isSigningOut}
+            aria-label="تسجيل الخروج"
           >
             <LogOut size={18} />
           </Button>

@@ -1,0 +1,21 @@
+.theme {
+  --admin-ink: #22182a;
+  --admin-plum: #4b2f51;
+  --admin-coral: #f2644b;
+  --admin-coral-strong: #be4936;
+  --admin-teal: #47aaa1;
+  --admin-lilac: #dfd2eb;
+  --admin-night: #201827;
+  --admin-footer: #19131f;
+  --admin-text: #fffdf9;
+  --admin-muted: #b9aebd;
+  --admin-border: rgba(223, 210, 235, 0.13);
+  --admin-glass: rgba(25, 19, 31, 0.62);
+  --admin-focus: 0 0 0 4px rgba(242, 100, 75, 0.2);
+  --admin-radius-sm: 13px;
+  --admin-radius-md: 18px;
+  --admin-radius-lg: 26px;
+  --admin-shadow: 0 28px 70px rgba(0, 0, 0, 0.2);
+  --admin-motion-fast: 140ms ease-out;
+  --admin-motion-press: 150ms ease-out;
+}

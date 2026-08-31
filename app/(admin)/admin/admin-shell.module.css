@@ -1,11 +1,4 @@
 .shell {
-  --admin-ink: #22182a;
-  --admin-plum: #4b2f51;
-  --admin-coral: #f2644b;
-  --admin-teal: #47aaa1;
-  --admin-lilac: #dfd2eb;
-  --admin-night: #201827;
-  --admin-footer: #19131f;
   min-height: 100svh;
   display: grid;
   grid-template-columns: 272px minmax(0, 1fr);

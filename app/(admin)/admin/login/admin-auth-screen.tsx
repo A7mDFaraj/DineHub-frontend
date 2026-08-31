@@ -118,7 +118,7 @@ function SignInForm() {
   const onSubmit = async (values: SignInValues) => {
     setRequestError(null);
     try {
-      const { error } = await authClient.signIn.email({
+      const { data, error } = await authClient.signIn.email({
         email: values.email,
         password: values.password,
       });
@@ -126,7 +126,7 @@ function SignInForm() {
         setRequestError(getAuthError(error));
         return;
       }
-      router.push("/admin");
+      router.replace(data?.user.role === "admin" ? "/admin" : "/staff");
       router.refresh();
     } catch {
       setRequestError(getAuthError(null));
@@ -206,7 +206,7 @@ function SignUpForm() {
         setRequestError(getAuthError(error));
         return;
       }
-      router.push("/admin");
+      router.replace("/staff");
       router.refresh();
     } catch {
       setRequestError(getAuthError(null));

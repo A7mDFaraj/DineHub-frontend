@@ -14,6 +14,7 @@ import {
   Settings,
   Tags,
   UtensilsCrossed,
+  UsersRound,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -25,6 +26,7 @@ import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import logo from "@/public/brand/dinehub-logo-3d.png";
 import styles from "./admin-shell.module.css";
+import tokenStyles from "./admin-tokens.module.css";
 
 const navigation = [
   { name: "نظرة عامة", href: "/admin", icon: LayoutDashboard },
@@ -32,6 +34,7 @@ const navigation = [
   { name: "التصنيفات", href: "/admin/categories", icon: Tags },
   { name: "القائمة", href: "/admin/menu", icon: UtensilsCrossed },
   { name: "رموز QR", href: "/admin/qr-code", icon: QrCode },
+  { name: "المستخدمون", href: "/admin/users", icon: UsersRound },
   { name: "طلبات المطبخ", href: "/staff", icon: ChefHat },
   { name: "الإعدادات", href: "/admin/settings", icon: Settings },
 ] as const;
@@ -118,6 +121,11 @@ function AuthenticatedAdminShell({
   useEffect(() => {
     if (!isPending && !session && !error) {
       router.replace("/admin/login");
+      return;
+    }
+
+    if (!isPending && session && session.user.role !== "admin") {
+      router.replace("/staff");
     }
   }, [error, isPending, router, session]);
 
@@ -130,6 +138,10 @@ function AuthenticatedAdminShell({
   }
 
   if (!session) {
+    return <SessionLoading />;
+  }
+
+  if (session.user.role !== "admin") {
     return <SessionLoading />;
   }
 
@@ -149,7 +161,7 @@ function AuthenticatedAdminShell({
   };
 
   return (
-    <div className={styles.shell}>
+    <div className={cn(tokenStyles.theme, styles.shell)}>
       <a className={styles.skipLink} href="#admin-main">انتقل إلى المحتوى</a>
 
       <aside className={styles.sidebar}>
