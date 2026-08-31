@@ -5,9 +5,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true, // Important for better-auth cookies/session
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 apiClient.interceptors.response.use(

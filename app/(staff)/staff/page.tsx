@@ -27,7 +27,7 @@ export default function StaffDashboard() {
 
   const fetchBranches = async () => {
     try {
-      const { data } = await apiClient.get("/admin/branches")
+      const { data } = await apiClient.get("/staff/branches")
       const list = Array.isArray(data) ? data : data?.data || data?.branches || []
       setBranches(list)
       if (list.length > 0 && !selectedBranchId) {
