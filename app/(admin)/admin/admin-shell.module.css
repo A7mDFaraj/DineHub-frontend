@@ -126,8 +126,12 @@
 
 .navigation {
   display: grid;
+  min-height: 0;
+  overflow-y: auto;
   gap: 6px;
   padding: 0 12px;
+  scrollbar-color: rgba(223, 210, 235, 0.2) transparent;
+  scrollbar-width: thin;
 }
 
 .navLink {

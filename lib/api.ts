@@ -1,4 +1,5 @@
 import axios from "axios";
+import { installAxiosObservability } from "./observability";
 
 const isServer = typeof window === "undefined";
 const API_BASE_URL = isServer
@@ -12,3 +13,5 @@ export const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+installAxiosObservability(api);

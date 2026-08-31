@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
 import { authClient } from "@/lib/auth-client";
+import { reportClientIncident } from "@/lib/observability";
 import logo from "@/public/brand/dinehub-logo-3d.png";
 import styles from "./auth.module.css";
 
@@ -128,7 +129,15 @@ function SignInForm() {
       }
       router.replace(data?.user.role === "admin" ? "/admin" : "/staff");
       router.refresh();
-    } catch {
+    } catch (error) {
+      const reason = error instanceof Error ? error : new Error("Sign-in network request failed");
+      reportClientIncident({
+        level: "error",
+        event: "auth.sign_in_network_error",
+        message: reason.message,
+        stack: reason.stack,
+        metadata: { errorName: reason.name },
+      });
       setRequestError(getAuthError(null));
     }
   };
@@ -208,7 +217,15 @@ function SignUpForm() {
       }
       router.replace("/staff");
       router.refresh();
-    } catch {
+    } catch (error) {
+      const reason = error instanceof Error ? error : new Error("Sign-up network request failed");
+      reportClientIncident({
+        level: "error",
+        event: "auth.sign_up_network_error",
+        message: reason.message,
+        stack: reason.stack,
+        metadata: { errorName: reason.name },
+      });
       setRequestError(getAuthError(null));
     }
   };

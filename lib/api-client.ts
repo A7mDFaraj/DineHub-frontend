@@ -1,4 +1,5 @@
 import axios from "axios";
+import { installAxiosObservability } from "./observability";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -7,10 +8,4 @@ export const apiClient = axios.create({
   withCredentials: true, // Important for better-auth cookies/session
 });
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // If not authenticated, we could redirect to login for admin/staff
-    return Promise.reject(error);
-  }
-);
+installAxiosObservability(apiClient);

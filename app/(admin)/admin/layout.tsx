@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   QrCode,
+  ScrollText,
   Settings,
   Tags,
   UtensilsCrossed,
@@ -35,6 +36,7 @@ const navigation = [
   { name: "القائمة", href: "/admin/menu", icon: UtensilsCrossed },
   { name: "رموز QR", href: "/admin/qr-code", icon: QrCode },
   { name: "المستخدمون", href: "/admin/users", icon: UsersRound },
+  { name: "سجل النظام", href: "/admin/logs", icon: ScrollText },
   { name: "طلبات المطبخ", href: "/staff", icon: ChefHat },
   { name: "الإعدادات", href: "/admin/settings", icon: Settings },
 ] as const;
