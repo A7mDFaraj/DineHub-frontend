@@ -252,7 +252,7 @@
 .statePanel p { margin: 0 0 16px; color: #8d8093; font-size: 0.84rem; }
 
 .dialogOverlay { position: fixed; z-index: 80; inset: 0; background: rgba(10, 7, 13, 0.75); backdrop-filter: blur(8px); }
-.dialogContent { position: fixed; z-index: 81; inset-block: 24px; inset-inline-start: 50%; width: min(760px, calc(100vw - 32px)); overflow-y: auto; transform: translateX(-50%); border: 1px solid rgba(223, 210, 235, 0.16); border-radius: 24px; outline: none; background: #1d1624; color: #fffdf9; padding: 24px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5); }
+.dialogContent { position: fixed; z-index: 81; top: 50%; left: 50%; box-sizing: border-box; width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; transform: translate(-50%, -50%); border: 1px solid rgba(223, 210, 235, 0.16); border-radius: 24px; outline: none; background: #1d1624; color: #fffdf9; padding: 24px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5); }
 .dialogHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(223, 210, 235, 0.1); }
 .dialogHeader p { display: flex; align-items: center; gap: 8px; margin: 0 0 7px; color: #8d8093; font-size: 0.72rem; }
 .dialogHeader p span { border-radius: 999px; padding: 3px 8px; background: rgba(255,255,255,.06); }
@@ -261,6 +261,7 @@
 .dialogHeader h2 { margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 1.15rem; direction: ltr; text-align: right; }
 .dialogHeader > div > p:last-child { margin: 8px 0 0; color: #c9bdcd; font-size: 0.84rem; line-height: 1.7; }
 .dialogHeader > button { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(255,255,255,.05); color: #b9aebd; cursor: pointer; }
+.dialogHeader > button:focus-visible { outline: 3px solid #8cd1ca; outline-offset: 3px; }
 
 .detailGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
 .detailGrid > div { min-width: 0; border: 1px solid rgba(223, 210, 235, 0.08); border-radius: 14px; background: rgba(255,255,255,.025); padding: 12px; }
@@ -297,7 +298,7 @@
   .logTime { grid-column: 2; justify-items: start; text-align: start; }
   .detailGrid { grid-template-columns: 1fr; }
   .detailGrid .wideDetail { grid-column: auto; }
-  .dialogContent { inset-block: 10px; width: calc(100vw - 20px); border-radius: 20px; padding: 18px; }
+  .dialogContent { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); border-radius: 20px; padding: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
