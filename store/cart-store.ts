@@ -1,26 +1,46 @@
 import { create } from 'zustand'
 
 export interface CartItem {
+  id: string // Unique identifier per configuration
   productId: string
   nameAr: string
   nameEn: string
   price: number
   quantity: number
   imageUrl?: string
+  selectedAttributes?: string[]
+  itemNote?: string
+}
+
+export interface AddCartItemInput {
+  productId: string
+  nameAr: string
+  nameEn: string
+  price: number
+  quantity?: number
+  imageUrl?: string
+  selectedAttributes?: string[]
+  itemNote?: string
 }
 
 interface CartStore {
   items: CartItem[]
   note: string
   isCartOpen: boolean
-  addItem: (item: Omit<CartItem, "quantity">) => void
-  removeItem: (productId: string) => void
-  updateQuantity: (productId: string, quantity: number) => void
+  addItem: (item: AddCartItemInput) => void
+  removeItem: (idOrProductId: string) => void
+  updateQuantity: (idOrProductId: string, quantity: number) => void
   setNote: (note: string) => void
   clearCart: () => void
   toggleCart: () => void
   totalAmount: () => number
   totalItems: () => number
+}
+
+function generateCartItemId(item: AddCartItemInput): string {
+  const attrs = (item.selectedAttributes || []).slice().sort().join('|')
+  const note = (item.itemNote || '').trim()
+  return `${item.productId}::${attrs}::${note}`
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
@@ -30,33 +50,53 @@ export const useCartStore = create<CartStore>((set, get) => ({
   
   addItem: (newItem) => {
     const { items } = get()
-    const existingItem = items.find((item) => item.productId === newItem.productId)
+    const configId = generateCartItemId(newItem)
+    const quantityToAdd = newItem.quantity && newItem.quantity > 0 ? newItem.quantity : 1
     
-    if (existingItem) {
+    const existingIndex = items.findIndex((item) => item.id === configId)
+    
+    if (existingIndex > -1) {
       set({
-        items: items.map((item) =>
-          item.productId === newItem.productId
-            ? { ...item, quantity: item.quantity + 1 }
+        items: items.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantity: item.quantity + quantityToAdd }
             : item
         ),
       })
     } else {
-      set({ items: [...items, { ...newItem, quantity: 1 }] })
+      const fullItem: CartItem = {
+        id: configId,
+        productId: newItem.productId,
+        nameAr: newItem.nameAr,
+        nameEn: newItem.nameEn,
+        price: newItem.price,
+        quantity: quantityToAdd,
+        imageUrl: newItem.imageUrl,
+        selectedAttributes: newItem.selectedAttributes || [],
+        itemNote: newItem.itemNote?.trim() || undefined,
+      }
+      set({ items: [...items, fullItem] })
     }
   },
   
-  removeItem: (productId) => {
-    set({ items: get().items.filter((item) => item.productId !== productId) })
+  removeItem: (idOrProductId) => {
+    set({
+      items: get().items.filter(
+        (item) => item.id !== idOrProductId && item.productId !== idOrProductId
+      ),
+    })
   },
   
-  updateQuantity: (productId, quantity) => {
+  updateQuantity: (idOrProductId, quantity) => {
     if (quantity <= 0) {
-      get().removeItem(productId)
+      get().removeItem(idOrProductId)
       return
     }
     set({
       items: get().items.map((item) =>
-        item.productId === productId ? { ...item, quantity } : item
+        item.id === idOrProductId || item.productId === idOrProductId
+          ? { ...item, quantity }
+          : item
       ),
     })
   },

@@ -138,7 +138,7 @@ export default function OrderTrackingPage({
       </Card>
 
       <div className="text-center">
-         <Link href={`/menu/${resolvedParams.branchId}/1`}>
+         <Link href={`/menu/${resolvedParams.branchId}/${(order as any)?.table?.number || (order as any)?.tableNumber || 1}`}>
             <Button variant="ghost" className="text-neutral-400">
               Return to Menu
             </Button>

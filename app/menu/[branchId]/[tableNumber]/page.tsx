@@ -5,9 +5,10 @@ import { apiClient } from "@/lib/api-client"
 import { useCartStore } from "@/store/cart-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Plus, Check, UtensilsCrossed, Sparkles } from "lucide-react"
+import { Plus, UtensilsCrossed, Sparkles, SlidersHorizontal } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CartDrawer } from "@/components/customer/cart-drawer"
+import { ProductModal, ModalProduct } from "@/components/customer/product-modal"
 
 interface Attribute {
   id: string
@@ -57,6 +58,8 @@ export default function MenuPage({
   const [tableInfo, setTableInfo] = useState<TableInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [selectedProductForModal, setSelectedProductForModal] = useState<ModalProduct | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const { addItem, items } = useCartStore()
 
   useEffect(() => {
@@ -93,6 +96,25 @@ export default function MenuPage({
     
     fetchMenuAndTable()
   }, [resolvedParams.branchId, resolvedParams.tableNumber])
+
+  const handleOpenProductModal = (product: Product) => {
+    if (product.isAvailable === false) return
+    setSelectedProductForModal(product)
+    setIsModalOpen(true)
+  }
+
+  const handleAddToCartFromModal = (customizedItem: {
+    productId: string
+    nameAr: string
+    nameEn: string
+    price: number
+    quantity: number
+    imageUrl?: string
+    selectedAttributes: string[]
+    itemNote?: string
+  }) => {
+    addItem(customizedItem)
+  }
 
   if (loading) {
     return (
@@ -160,24 +182,41 @@ export default function MenuPage({
                 
                 <div className="grid grid-cols-1 gap-4">
                   {prods.map((product) => {
-                    const inCart = items.some(i => i.productId === product.id)
+                    const productCartCount = items
+                      .filter((i) => i.productId === product.id)
+                      .reduce((sum, i) => sum + i.quantity, 0)
+                    const inCart = productCartCount > 0
                     const prodName = product.nameAr || product.nameEn || product.name || "Item";
                     const prodSecondary = (product.nameEn && product.nameAr && product.nameEn !== prodName) 
                       ? product.nameEn 
                       : null;
                     const prodDesc = product.descriptionAr || product.descriptionEn || "";
                     const isAvailable = product.isAvailable !== false;
+                    const hasAttributes = Boolean(product.attributes && product.attributes.length > 0);
 
                     return (
-                      <div key={product.id} className="glass-panel p-4 rounded-2xl flex gap-4 overflow-hidden relative group hover:border-white/15 transition-all">
+                      <div 
+                        key={product.id} 
+                        onClick={() => handleOpenProductModal(product)}
+                        className={`glass-panel p-4 rounded-2xl flex gap-4 overflow-hidden relative group border transition-all ${
+                          isAvailable 
+                            ? "cursor-pointer hover:border-white/20 active:scale-[0.99]" 
+                            : "opacity-60 cursor-not-allowed border-white/5"
+                        }`}
+                      >
                         {/* Image */}
                         {product.imageUrl ? (
-                          <div className="w-24 h-24 rounded-xl overflow-hidden shrink-0 bg-neutral-800 border border-white/5">
+                          <div className="w-24 h-24 rounded-xl overflow-hidden shrink-0 bg-neutral-800 border border-white/5 relative">
                             <img 
                               src={product.imageUrl} 
                               alt={prodName}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
+                            {inCart && (
+                              <div className="absolute top-1 right-1 bg-primary-500 text-black text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                                {productCartCount}
+                              </div>
+                            )}
                           </div>
                         ) : null}
                         
@@ -185,9 +224,11 @@ export default function MenuPage({
                         <div className="flex-1 flex flex-col justify-between min-w-0">
                           <div>
                             <div className="flex justify-between items-start mb-1 gap-2">
-                              <h3 className="font-semibold text-white leading-tight">{prodName}</h3>
-                              <span className="text-primary-400 font-bold ml-2 shrink-0 font-mono">
-                                ${Number(product.price).toFixed(2)}
+                              <h3 className="font-semibold text-white leading-tight group-hover:text-primary-400 transition-colors">
+                                {prodName}
+                              </h3>
+                              <span className="text-primary-400 font-bold ml-2 shrink-0 font-mono text-sm">
+                                SAR {Number(product.price).toFixed(2)}
                               </span>
                             </div>
                             
@@ -201,10 +242,10 @@ export default function MenuPage({
                               </p>
                             )}
                             
-                            {/* Attributes */}
-                            {product.attributes && product.attributes.length > 0 && (
+                            {/* Attribute Badges */}
+                            {hasAttributes && (
                               <div className="flex flex-wrap gap-1.5 mb-2">
-                                {product.attributes.map(attr => {
+                                {product.attributes!.map((attr) => {
                                   const label = attr.attribute.labelAr || attr.attribute.labelEn;
                                   return (
                                     <Badge key={attr.attribute.id} variant="secondary" className="text-[10px] px-2 py-0.5 bg-white/5 border border-white/10 text-zinc-300">
@@ -216,36 +257,44 @@ export default function MenuPage({
                             )}
                           </div>
                           
-                          {/* Add Button */}
-                          <div className="flex justify-end mt-2">
-                            <Button
-                              size="sm"
-                              variant={inCart ? "secondary" : "primary"}
-                              className={`rounded-xl h-8 px-4 font-semibold text-xs transition-all ${inCart ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30' : ''}`}
-                              onClick={() => {
-                                if (!isAvailable) return
-                                addItem({
-                                  productId: product.id,
-                                  nameEn: prodName,
-                                  nameAr: product.nameAr || prodName,
-                                  price: Number(product.price),
-                                  imageUrl: product.imageUrl,
-                                })
-                              }}
-                              disabled={!isAvailable}
-                            >
-                              {inCart ? (
-                                <>
-                                  <Check size={14} className="mr-1.5" /> Added
-                                </>
-                              ) : isAvailable ? (
-                                <>
-                                  <Plus size={14} className="mr-1.5" /> Add
-                                </>
-                              ) : (
-                                "Sold Out"
-                              )}
-                            </Button>
+                          {/* Action Button */}
+                          <div className="flex justify-end items-center gap-2 mt-2">
+                            {isAvailable ? (
+                              <Button
+                                size="sm"
+                                variant={inCart ? "secondary" : "primary"}
+                                className={`rounded-xl h-8 px-3 font-semibold text-xs transition-all flex items-center gap-1 ${
+                                  inCart 
+                                    ? "bg-primary-500/20 text-primary-300 border border-primary-500/30 hover:bg-primary-500/30" 
+                                    : ""
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleOpenProductModal(product)
+                                }}
+                              >
+                                {hasAttributes ? (
+                                  <>
+                                    <SlidersHorizontal size={13} />
+                                    <span>{inCart ? `Custom (${productCartCount})` : "Customize"}</span>
+                                  </>
+                                ) : inCart ? (
+                                  <>
+                                    <Plus size={13} />
+                                    <span>Add ({productCartCount})</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus size={13} />
+                                    <span>Add</span>
+                                  </>
+                                )}
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-zinc-500 font-medium px-2 py-1 bg-white/5 rounded-lg border border-white/5">
+                                Sold Out
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -257,6 +306,17 @@ export default function MenuPage({
           })}
         </div>
       )}
+
+      {/* Product Customization Modal */}
+      <ProductModal
+        product={selectedProductForModal}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedProductForModal(null)
+        }}
+        onAddToCart={handleAddToCartFromModal}
+      />
 
       {/* Cart Drawer Component */}
       <CartDrawer branchId={resolvedParams.branchId} tableId={tableInfo?.id} />

@@ -53,7 +53,8 @@ export default function StaffDashboard() {
           productId: i.productId || i.id,
           nameEn: i.product?.nameAr || i.product?.nameEn || i.nameEn || i.name || "Menu Item",
           quantity: i.quantity || 1,
-          note: i.note
+          note: i.note,
+          selectedAttributes: i.selectedAttributes || []
         })) : []
       }))
 
