@@ -7,16 +7,53 @@ import {
   Building2,
   Check,
   ClipboardList,
+  HelpCircle,
   QrCode,
+  Sparkles,
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import styles from "./admin-onboarding-guide.module.css";
 
 const GUIDE_COOKIE = "dinehub_admin_guide";
 const GUIDE_VERSION = "v1";
 const TEN_YEARS = 60 * 60 * 24 * 365 * 10;
+
+export function openAdminGuide() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("dinehub:open-guide"));
+  }
+}
+
+export function AdminGuideTrigger({
+  className,
+  onClick,
+  children,
+}: {
+  className?: string;
+  onClick?: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => {
+        onClick?.();
+        openAdminGuide();
+      }}
+      aria-label="فتح دليل البدء السريع"
+    >
+      {children ?? (
+        <>
+          <Sparkles aria-hidden="true" size={18} />
+          <span>دليل البدء السريع</span>
+        </>
+      )}
+    </button>
+  );
+}
 
 const steps = [
   {
@@ -42,7 +79,7 @@ const steps = [
   },
   {
     title: "تابع الإشارة حتى التسليم",
-    description: "بعد النشر، ستجتمع الطلبات وحالة الخدمة في غرفة تشغيل واحدة.",
+    description: "بعد النشر، ستجتمع الطلبات وحالة الخدمة في لوحة تحكم واحدة.",
     action: "التشغيل",
     icon: ClipboardList,
     tone: "teal",
@@ -71,20 +108,38 @@ export function AdminOnboardingGuide() {
     () => true,
   );
   const [dismissed, setDismissed] = useState(false);
+  const [explicitOpen, setExplicitOpen] = useState<boolean | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    const handleOpen = () => {
+      setStepIndex(0);
+      setDismissed(false);
+      setExplicitOpen(true);
+    };
+    window.addEventListener("dinehub:open-guide", handleOpen);
+    return () => window.removeEventListener("dinehub:open-guide", handleOpen);
+  }, []);
+
   const step = steps[stepIndex];
   const isLastStep = stepIndex === steps.length - 1;
   const StepIcon = step.icon;
 
-  const open = !hasCompleted && !dismissed;
+  const open = explicitOpen !== null ? explicitOpen : (!hasCompleted && !dismissed);
 
   const completeGuide = () => {
     rememberGuideCompletion();
     setDismissed(true);
+    setExplicitOpen(false);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    setDismissed(!nextOpen);
+    if (!nextOpen) {
+      setDismissed(true);
+      setExplicitOpen(false);
+    } else {
+      setExplicitOpen(true);
+    }
   };
 
   return (
@@ -121,7 +176,7 @@ export function AdminOnboardingGuide() {
           </div>
 
           <div className={styles.content}>
-            <button className={styles.closeButton} type="button" onClick={completeGuide} aria-label="تخطي الدليل">
+            <button className={styles.closeButton} type="button" onClick={completeGuide} aria-label="إغلاق الدليل">
               <X aria-hidden="true" size={20} />
             </button>
 
@@ -158,12 +213,12 @@ export function AdminOnboardingGuide() {
                 </button>
               ) : (
                 <button className={styles.secondaryAction} type="button" onClick={completeGuide}>
-                  تخطَّ الدليل
+                  إغلاق الدليل
                 </button>
               )}
             </div>
 
-            <p className={styles.memoryNote}>بعد الإكمال لن يظهر هذا الدليل مرة أخرى على هذا المتصفح.</p>
+            <p className={styles.memoryNote}>يمكنك إعادة فتح هذا الدليل في أي وقت من القائمة الجانبية.</p>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

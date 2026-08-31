@@ -1,30 +1,42 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, MoreVertical, Filter, Loader2, X, Image as ImageIcon } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Filter, Loader2, X, Image as ImageIcon, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 
+interface Branch {
+  id: string;
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
+}
+
 interface Category {
   id: string;
-  nameEn: string;
-  nameAr: string;
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
 }
 
 interface Product {
   id: string;
-  nameEn: string;
   nameAr: string;
+  nameEn?: string;
+  name?: string;
   descriptionEn?: string;
   descriptionAr?: string;
   price: number;
   imageUrl?: string;
-  isAvailable: boolean;
+  isAvailable?: boolean;
+  isHidden?: boolean;
   categoryId: string;
   category?: Category;
 }
 
 export default function MenuManagement() {
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,22 +57,41 @@ export default function MenuManagement() {
     isAvailable: true,
   });
 
-  const fetchData = async () => {
+  const fetchBranchData = async (branchId: string) => {
     try {
-      setIsLoading(true);
-      const [productsRes, categoriesRes] = await Promise.all([
-        apiClient.get("/admin/menu"),
-        apiClient.get("/admin/categories")
+      const [categoriesRes, productsRes] = await Promise.all([
+        apiClient.get(`/admin/categories/${branchId}`),
+        apiClient.get(`/admin/products/branch/${branchId}`),
       ]);
-      setProducts(productsRes.data);
-      setCategories(categoriesRes.data);
-      
-      if (categoriesRes.data.length > 0) {
-        setFormData(prev => ({ ...prev, categoryId: categoriesRes.data[0].id }));
+      const catList = Array.isArray(categoriesRes.data) ? categoriesRes.data : categoriesRes.data?.data || [];
+      const prodList = Array.isArray(productsRes.data) ? productsRes.data : productsRes.data?.data || [];
+      setCategories(catList);
+      setProducts(prodList);
+      if (catList.length > 0) {
+        setFormData((prev) => ({ ...prev, categoryId: catList[0].id }));
       }
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch menu data.");
+      setError("Failed to fetch menu items for this branch.");
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      const { data } = await apiClient.get("/admin/branches");
+      const branchList = Array.isArray(data) ? data : data?.data || data?.branches || [];
+      setBranches(branchList);
+
+      if (branchList.length > 0) {
+        const activeId = selectedBranchId || branchList[0].id;
+        setSelectedBranchId(activeId);
+        await fetchBranchData(activeId);
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch branches.");
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +100,11 @@ export default function MenuManagement() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleBranchChange = async (branchId: string) => {
+    setSelectedBranchId(branchId);
+    await fetchBranchData(branchId);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,9 +115,16 @@ export default function MenuManagement() {
 
     try {
       setIsCreating(true);
-      await apiClient.post("/admin/menu", {
-        ...formData,
+      setError("");
+      await apiClient.post("/admin/products", {
+        categoryId: formData.categoryId,
+        nameAr: formData.nameAr || formData.nameEn,
+        nameEn: formData.nameEn || undefined,
+        descriptionAr: formData.descriptionAr || undefined,
+        descriptionEn: formData.descriptionEn || undefined,
         price: parseFloat(formData.price),
+        imageUrl: formData.imageUrl || undefined,
+        isAvailable: formData.isAvailable,
       });
       setIsModalOpen(false);
       setFormData({
@@ -94,7 +137,9 @@ export default function MenuManagement() {
         imageUrl: "",
         isAvailable: true,
       });
-      fetchData();
+      if (selectedBranchId) {
+        await fetchBranchData(selectedBranchId);
+      }
     } catch (err) {
       console.error(err);
       setError("Failed to create menu item.");
@@ -103,10 +148,12 @@ export default function MenuManagement() {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    p.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.nameAr.includes(searchQuery)
-  );
+  const filteredProducts = products.filter(p => {
+    const pEn = (p.nameEn || p.name || "").toLowerCase();
+    const pAr = p.nameAr || "";
+    const query = searchQuery.toLowerCase();
+    return pEn.includes(query) || pAr.includes(query);
+  });
 
   return (
     <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
@@ -116,13 +163,34 @@ export default function MenuManagement() {
           <p className="text-zinc-400 mt-1">Manage your restaurant&apos;s categories and items.</p>
         </div>
         
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary-500 hover:bg-primary-600 text-black font-semibold py-2.5 px-5 rounded-xl flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-primary-500/20 active:scale-95"
-        >
-          <Plus className="w-5 h-5" />
-          Add New Item
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Branch Selector */}
+          {branches.length > 0 && (
+            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-2 px-4">
+              <Building2 className="w-5 h-5 text-zinc-400" />
+              <select 
+                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none"
+                value={selectedBranchId}
+                onChange={(e) => handleBranchChange(e.target.value)}
+              >
+                {branches.map(b => (
+                  <option key={b.id} value={b.id} className="bg-zinc-900 text-white">
+                    {b.name || b.nameEn || b.nameAr || "Branch"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            disabled={categories.length === 0}
+            className="bg-primary-500 hover:bg-primary-600 text-black font-semibold py-2.5 px-5 rounded-xl flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-primary-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-5 h-5" />
+            Add New Item
+          </button>
+        </div>
       </div>
 
       {error && !isModalOpen && (
@@ -131,106 +199,112 @@ export default function MenuManagement() {
         </div>
       )}
 
-      <div className="glass-panel rounded-2xl flex-1 flex flex-col overflow-hidden border border-white/5 shadow-none relative z-10">
-        {/* Toolbar */}
-        <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row gap-4 justify-between">
-          <div className="relative max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-            <input 
-              type="text"
-              placeholder="Search menu items..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-zinc-300 focus:outline-none focus:border-primary-500/50 transition-colors"
-            />
+      {branches.length === 0 ? (
+        <div className="glass-panel p-12 text-center flex flex-col items-center justify-center">
+          <Building2 className="w-12 h-12 text-zinc-500 mb-4" />
+          <h3 className="text-xl font-medium text-white mb-2">No branches available</h3>
+          <p className="text-zinc-400">You need to create a branch first before managing menu items.</p>
+        </div>
+      ) : (
+        <div className="glass-panel rounded-2xl flex-1 flex flex-col overflow-hidden border border-white/5 shadow-none relative z-10">
+          {/* Toolbar */}
+          <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row gap-4 justify-between">
+            <div className="relative max-w-md w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <input 
+                type="text"
+                placeholder="Search menu items..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-zinc-300 focus:outline-none focus:border-primary-500/50 transition-colors"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
+              <span>{filteredProducts.length} items</span>
+            </div>
           </div>
-          
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-zinc-300 transition-colors">
-            <Filter className="w-5 h-5" />
-            Filter
-          </button>
-        </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-zinc-400">
-              <p>No menu items found.</p>
-            </div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/5 bg-black/20">
-                  <th className="px-6 py-4 text-sm font-medium text-zinc-400">Item</th>
-                  <th className="px-6 py-4 text-sm font-medium text-zinc-400">Category</th>
-                  <th className="px-6 py-4 text-sm font-medium text-zinc-400">Price</th>
-                  <th className="px-6 py-4 text-sm font-medium text-zinc-400">Status</th>
-                  <th className="px-6 py-4 text-sm font-medium text-zinc-400 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredProducts.map((item) => {
-                  const categoryName = categories.find(c => c.id === item.categoryId)?.nameEn || "Unknown";
-                  return (
-                  <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-xl shadow-inner border border-white/5 overflow-hidden">
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.nameEn} className="w-full h-full object-cover" />
-                          ) : (
-                            <ImageIcon className="w-5 h-5 text-zinc-500" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-white group-hover:text-primary-400 transition-colors">{item.nameEn}</div>
-                          <div className="text-xs text-zinc-500 font-arabic">{item.nameAr}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 rounded-full bg-white/5 text-zinc-300 text-xs font-medium border border-white/10">
-                        {categoryName}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-zinc-200">
-                      ${Number(item.price).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 w-fit",
-                        item.isAvailable 
-                          ? "bg-green-500/10 text-green-400 border border-green-500/20" 
-                          : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
-                      )}>
-                        <div className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          item.isAvailable ? "bg-green-400" : "bg-zinc-400"
-                        )} />
-                        {item.isAvailable ? "Available" : "Unavailable"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition-colors" title="Edit">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 hover:bg-red-500/10 rounded-lg text-zinc-400 hover:text-red-400 transition-colors" title="Delete">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+          {/* Table */}
+          <div className="flex-1 overflow-auto">
+            {isLoading ? (
+              <div className="flex h-full items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-zinc-400">
+                <p>No menu items found for this branch.</p>
+                {categories.length === 0 && (
+                  <p className="text-xs text-zinc-500 mt-2">Create categories first in the Categories section.</p>
+                )}
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 bg-black/20">
+                    <th className="px-6 py-4 text-sm font-medium text-zinc-400">Item</th>
+                    <th className="px-6 py-4 text-sm font-medium text-zinc-400">Category</th>
+                    <th className="px-6 py-4 text-sm font-medium text-zinc-400">Price</th>
+                    <th className="px-6 py-4 text-sm font-medium text-zinc-400">Status</th>
                   </tr>
-                )})}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredProducts.map((item) => {
+                    const categoryObj = categories.find(c => c.id === item.categoryId);
+                    const categoryName = categoryObj ? (categoryObj.name || categoryObj.nameEn || categoryObj.nameAr || "Category") : "General";
+                    const primaryName = item.nameAr || item.nameEn || item.name || "Untitled Item";
+                    const secondaryName = (item.nameEn && item.nameAr) ? item.nameEn : null;
+
+                    return (
+                      <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-xl shadow-inner border border-white/5 overflow-hidden">
+                              {item.imageUrl ? (
+                                <img src={item.imageUrl} alt={primaryName} className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon className="w-5 h-5 text-zinc-500" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-medium text-white group-hover:text-primary-400 transition-colors">{primaryName}</div>
+                              {secondaryName && secondaryName !== primaryName ? (
+                                <div className="text-xs text-zinc-500">{secondaryName}</div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-3 py-1 rounded-full bg-white/5 text-zinc-300 text-xs font-medium border border-white/10">
+                            {categoryName}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-medium text-zinc-200">
+                          ${Number(item.price).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 w-fit",
+                            item.isAvailable !== false
+                              ? "bg-green-500/10 text-green-400 border border-green-500/20" 
+                              : "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
+                          )}>
+                            <div className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              item.isAvailable !== false ? "bg-green-400" : "bg-zinc-400"
+                            )} />
+                            {item.isAvailable !== false ? "Available" : "Unavailable"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Create Product Modal */}
       {isModalOpen && (
@@ -255,59 +329,63 @@ export default function MenuManagement() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-300">Name (English)</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all"
-                    value={formData.nameEn}
-                    onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-300">Name (Arabic)</label>
+                  <label className="text-sm font-medium text-zinc-300">Name (Arabic - Required)</label>
                   <input
                     type="text"
                     required
                     dir="rtl"
                     className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all font-arabic"
+                    placeholder="مثال: برجر دجاج مقرمش"
                     value={formData.nameAr}
                     onChange={(e) => setFormData({ ...formData, nameAr: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-300">Name (English - Optional)</label>
+                  <input
+                    type="text"
+                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all"
+                    placeholder="e.g. Crispy Chicken Burger"
+                    value={formData.nameEn}
+                    onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-300">Description (English)</label>
-                  <textarea
-                    rows={2}
-                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all resize-none"
-                    value={formData.descriptionEn}
-                    onChange={(e) => setFormData({ ...formData, descriptionEn: e.target.value })}
-                  />
-                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-300">Description (Arabic)</label>
                   <textarea
                     rows={2}
                     dir="rtl"
                     className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all resize-none font-arabic"
+                    placeholder="وصف مختصر للمنتج"
                     value={formData.descriptionAr}
                     onChange={(e) => setFormData({ ...formData, descriptionAr: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-300">Description (English)</label>
+                  <textarea
+                    rows={2}
+                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all resize-none"
+                    placeholder="Short product description"
+                    value={formData.descriptionEn}
+                    onChange={(e) => setFormData({ ...formData, descriptionEn: e.target.value })}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-300">Price</label>
+                  <label className="text-sm font-medium text-zinc-300">Price (Required)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
                     <input
                       type="number"
                       step="0.01"
                       required
+                      placeholder="0.00"
                       className="w-full bg-black/20 border border-white/10 rounded-xl pl-8 pr-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all"
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -315,7 +393,7 @@ export default function MenuManagement() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-300">Category</label>
+                  <label className="text-sm font-medium text-zinc-300">Category (Required)</label>
                   <select
                     required
                     className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary-500/50 transition-all appearance-none cursor-pointer"
@@ -324,14 +402,16 @@ export default function MenuManagement() {
                   >
                     {categories.length === 0 && <option value="">No categories available</option>}
                     {categories.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-zinc-900">{c.nameEn}</option>
+                      <option key={c.id} value={c.id} className="bg-zinc-900 text-white">
+                        {c.name || c.nameEn || c.nameAr || "Category"}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Image URL</label>
+                <label className="text-sm font-medium text-zinc-300">Image URL (Optional)</label>
                 <input
                   type="url"
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all"

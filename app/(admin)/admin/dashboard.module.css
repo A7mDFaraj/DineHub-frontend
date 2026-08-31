@@ -8,33 +8,23 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(310px, 0.82fr) minmax(430px, 1.18fr);
-  min-height: 440px;
+  grid-template-columns: minmax(340px, 1.1fr) minmax(320px, 0.9fr);
+  min-height: 380px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 30px;
-  background: #22182a;
-  box-shadow: 0 28px 66px rgba(0, 0, 0, 0.22);
-}
-
-.hero::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  opacity: 0.18;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 28px;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
-  background-size: 46px 46px;
-  mask-image: linear-gradient(90deg, transparent, black);
+    radial-gradient(circle at 85% 20%, rgba(71, 170, 161, 0.14), transparent 40%),
+    radial-gradient(circle at 15% 85%, rgba(242, 100, 75, 0.12), transparent 40%),
+    #22182a;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
 }
 
 .heroCopy {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: clamp(28px, 5vw, 62px);
+  padding: clamp(28px, 4vw, 48px);
 }
 
 .eyebrow {
@@ -48,45 +38,52 @@
 }
 
 .eyebrow span {
-  width: 28px;
+  width: 24px;
   height: 2px;
   border-radius: 99px;
   background: currentColor;
 }
 
 .hero h1 {
-  max-width: 540px;
+  max-width: 520px;
   margin: 0;
   color: white;
-  font-size: clamp(2.4rem, 4.6vw, 4.8rem);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.045em;
+  font-size: clamp(1.75rem, 2.6vw, 2.35rem);
+  font-weight: 750;
+  line-height: 1.35;
   text-wrap: balance;
 }
 
-.heroCopy > p:not(.eyebrow) {
-  max-width: 510px;
-  margin: 18px 0 0;
+.heroLead {
+  max-width: 500px;
+  margin: 14px 0 0;
   color: #cbbfce;
-  font-size: 1rem;
-  line-height: 1.8;
+  font-size: 0.98rem;
+  line-height: 1.75;
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-block-start: 24px;
+  flex-wrap: wrap;
 }
 
 .primaryAction {
   display: inline-flex;
   width: fit-content;
-  min-height: 50px;
+  min-height: 48px;
   align-items: center;
   gap: 9px;
-  margin-block-start: 28px;
   border-radius: 999px;
   background: white;
   color: #22182a;
-  padding: 0 21px;
+  padding: 0 22px;
+  font-size: 0.9rem;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
   transition: background-color 140ms ease-out, transform 150ms ease-out;
 }
 
@@ -98,7 +95,35 @@
   transform: scale(0.96);
 }
 
+.guideAction {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(223, 210, 235, 0.2);
+  border-radius: 999px;
+  background: rgba(223, 210, 235, 0.08);
+  color: #dfd2eb;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out, transform 150ms ease-out;
+}
+
+.guideAction:hover {
+  border-color: rgba(223, 210, 235, 0.38);
+  background: rgba(223, 210, 235, 0.16);
+  color: white;
+}
+
+.guideAction:active {
+  transform: scale(0.96);
+}
+
 .primaryAction:focus-visible,
+.guideAction:focus-visible,
 .setupCard:focus-visible,
 .emptyStage a:focus-visible {
   outline: 3px solid #f2644b;
@@ -169,29 +194,6 @@
 .mapNode[data-position="team"] {
   inset-inline-end: 8%;
   color: #ff9d8c;
-}
-
-.mapCore {
-  position: absolute;
-  inset-inline-end: 8%;
-  inset-block-start: 50px;
-  display: grid;
-  gap: 3px;
-  border: 1px solid rgba(71, 170, 161, 0.28);
-  border-radius: 18px;
-  background: rgba(71, 170, 161, 0.09);
-  color: #8bd3cc;
-  padding: 14px 16px;
-}
-
-.mapCore strong {
-  color: white;
-  font-size: 0.82rem;
-}
-
-.mapCore small {
-  color: #aaa0af;
-  font-size: 0.68rem;
 }
 
 .setupSection {
@@ -409,8 +411,10 @@
 @media (max-width: 620px) {
   .page { gap: 26px; }
   .hero { border-radius: 24px; }
-  .heroCopy { padding: 28px 22px; }
-  .hero h1 { font-size: clamp(2.25rem, 13vw, 3.6rem); }
+  .heroCopy { padding: 24px 18px; }
+  .hero h1 { font-size: 1.55rem; }
+  .heroActions { flex-direction: column; align-items: stretch; }
+  .primaryAction, .guideAction { width: 100%; justify-content: center; }
   .signalMap { min-height: 240px; }
   .mapNode span { width: 58px; height: 58px; border-radius: 18px; }
   .mapNode { inset-block-start: calc(48% - 29px); }
@@ -425,6 +429,7 @@
 @media (prefers-reduced-motion: reduce) {
   .signalDot { animation: none; inset-inline-start: calc(50% - 6px); }
   .primaryAction,
+  .guideAction,
   .setupCard,
   .emptyStage a { transition-duration: 0.01ms; }
 }

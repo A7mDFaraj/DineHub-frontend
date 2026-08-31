@@ -7,7 +7,9 @@ import { apiClient } from "@/lib/api-client";
 
 interface Branch {
   id: string;
-  nameEn: string;
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
 }
 
 interface Table {
@@ -26,18 +28,28 @@ export default function QrCodePage() {
   const [newTableNumber, setNewTableNumber] = useState("");
   const [error, setError] = useState("");
 
+  const fetchTables = async (branchId: string) => {
+    try {
+      const { data } = await apiClient.get(`/admin/tables/${branchId}`);
+      setTables(Array.isArray(data) ? data : data?.data || data?.tables || []);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch tables for this branch.");
+    }
+  };
+
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [branchesRes, tablesRes] = await Promise.all([
-        apiClient.get("/admin/branches"),
-        apiClient.get("/admin/tables")
-      ]);
-      setBranches(branchesRes.data);
-      setTables(tablesRes.data);
+      setError("");
+      const { data } = await apiClient.get("/admin/branches");
+      const branchList = Array.isArray(data) ? data : data?.data || data?.branches || [];
+      setBranches(branchList);
       
-      if (branchesRes.data.length > 0 && !selectedBranchId) {
-        setSelectedBranchId(branchesRes.data[0].id);
+      if (branchList.length > 0) {
+        const activeId = selectedBranchId || branchList[0].id;
+        setSelectedBranchId(activeId);
+        await fetchTables(activeId);
       }
     } catch (err) {
       console.error(err);
@@ -51,6 +63,11 @@ export default function QrCodePage() {
     fetchData();
   }, []);
 
+  const handleBranchChange = async (branchId: string) => {
+    setSelectedBranchId(branchId);
+    await fetchTables(branchId);
+  };
+
   const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) {
@@ -60,15 +77,13 @@ export default function QrCodePage() {
     
     try {
       setIsCreating(true);
+      setError("");
       await apiClient.post("/admin/tables", {
         number: parseInt(newTableNumber, 10),
         branchId: selectedBranchId
       });
       setNewTableNumber("");
-      
-      // Refresh tables
-      const { data } = await apiClient.get("/admin/tables");
-      setTables(data);
+      await fetchTables(selectedBranchId);
     } catch (err) {
       console.error(err);
       setError("Failed to create table. It may already exist.");
@@ -84,9 +99,7 @@ export default function QrCodePage() {
     return `https://dinehub.app/${branchId}?table=${tableNumber}`;
   };
 
-  const filteredTables = tables
-    .filter(t => t.branchId === selectedBranchId)
-    .sort((a, b) => a.number - b.number);
+  const filteredTables = tables.sort((a, b) => a.number - b.number);
 
   return (
     <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -110,11 +123,11 @@ export default function QrCodePage() {
             <select 
               className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none"
               value={selectedBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
+              onChange={(e) => handleBranchChange(e.target.value)}
             >
               {branches.map(b => (
                 <option key={b.id} value={b.id} className="bg-zinc-900 text-white">
-                  {b.nameEn}
+                  {b.name || b.nameEn || b.nameAr || "Branch"}
                 </option>
               ))}
             </select>

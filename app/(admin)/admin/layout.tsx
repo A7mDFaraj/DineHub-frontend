@@ -4,6 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import {
   Building2,
   CircleAlert,
+  HelpCircle,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -18,7 +19,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { AdminOnboardingGuide } from "@/components/admin/admin-onboarding-guide";
+import { AdminGuideTrigger, AdminOnboardingGuide } from "@/components/admin/admin-onboarding-guide";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import logo from "@/public/brand/dinehub-logo-3d.png";
@@ -67,11 +68,11 @@ function NavigationLinks({
 
 function BrandLockup() {
   return (
-    <Link className={styles.brand} href="/admin" aria-label="DineHub، نظرة الإدارة">
+    <Link className={styles.brand} href="/" aria-label="DineHub، الصفحة الرئيسية">
       <Image src={logo} alt="" width={58} priority />
       <span>
         <strong dir="ltr">DineHub</strong>
-        <small>غرفة التشغيل</small>
+        <small>لوحة التحكم</small>
       </span>
     </Link>
   );
@@ -84,7 +85,7 @@ function SessionLoading() {
         <Image src={logo} alt="" width={72} priority />
         <span><Loader2 aria-hidden="true" size={20} /></span>
       </div>
-      <p>نصل إشارتك بغرفة التشغيل…</p>
+      <p>نصل إشارتك بلوحة التحكم…</p>
     </main>
   );
 }
@@ -162,6 +163,11 @@ function AuthenticatedAdminShell({
         <NavigationLinks pathname={pathname} />
 
         <div className={styles.sidebarFoot}>
+          <AdminGuideTrigger className={styles.guideButton}>
+            <HelpCircle aria-hidden="true" size={17} strokeWidth={1.8} />
+            <span>الدليل الإرشادي</span>
+          </AdminGuideTrigger>
+
           <div className={styles.userCard}>
             <span aria-hidden="true">{session.user.name.slice(0, 1).toUpperCase()}</span>
             <div>
@@ -195,10 +201,19 @@ function AuthenticatedAdminShell({
                   </Dialog.Close>
                 </div>
                 <NavigationLinks pathname={pathname} onNavigate={() => setMobileNavOpen(false)} />
-                <button className={styles.logoutButton} type="button" onClick={handleLogout} disabled={isSigningOut}>
-                  <LogOut aria-hidden="true" size={19} />
-                  <span>تسجيل الخروج</span>
-                </button>
+                <div className={styles.drawerFoot}>
+                  <AdminGuideTrigger
+                    className={styles.guideButton}
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    <HelpCircle aria-hidden="true" size={17} strokeWidth={1.8} />
+                    <span>الدليل الإرشادي</span>
+                  </AdminGuideTrigger>
+                  <button className={styles.logoutButton} type="button" onClick={handleLogout} disabled={isSigningOut}>
+                    <LogOut aria-hidden="true" size={19} />
+                    <span>تسجيل الخروج</span>
+                  </button>
+                </div>
               </Dialog.Content>
             </Dialog.Portal>
           </Dialog.Root>

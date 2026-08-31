@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AdminGuideTrigger } from "@/components/admin/admin-onboarding-guide";
 import styles from "./dashboard.module.css";
 
 export const metadata: Metadata = {
@@ -50,14 +51,20 @@ export default function AdminDashboard() {
         <div className={styles.heroCopy}>
           <p className={styles.eyebrow}><span aria-hidden="true" />مسار الإعداد</p>
           <h1>حوّل المكان إلى خط خدمة متصل.</h1>
-          <p>ابدأ بالفرع، مرّر القائمة إلى العميل، ثم اجعل كل طلب واضحًا للفريق.</p>
-          <Link className={styles.primaryAction} href="/admin/branches">
-            <span>ابدأ بأول فرع</span>
-            <ArrowLeft aria-hidden="true" size={19} />
-          </Link>
+          <p className={styles.heroLead}>ابدأ بالفرع، مرّر القائمة إلى العميل، ثم اجعل كل طلب واضحًا للفريق.</p>
+          <div className={styles.heroActions}>
+            <Link className={styles.primaryAction} href="/admin/branches">
+              <span>ابدأ بأول فرع</span>
+              <ArrowLeft aria-hidden="true" size={19} />
+            </Link>
+            <AdminGuideTrigger className={styles.guideAction}>
+              <Sparkles aria-hidden="true" size={18} />
+              <span>دليل البدء السريع</span>
+            </AdminGuideTrigger>
+          </div>
         </div>
 
-        <div className={styles.signalMap} aria-label="مسار الطلب من العميل إلى غرفة التشغيل">
+        <div className={styles.signalMap} aria-label="مسار الطلب من العميل إلى لوحة التحكم">
           <div className={styles.signalLine} aria-hidden="true" />
           <div className={styles.signalDot} aria-hidden="true" />
           <div className={styles.mapNode} data-position="customer">
@@ -71,11 +78,6 @@ export default function AdminDashboard() {
           <div className={styles.mapNode} data-position="team">
             <span><CheckCircle2 aria-hidden="true" size={22} /></span>
             <small>الفريق</small>
-          </div>
-          <div className={styles.mapCore}>
-            <Sparkles aria-hidden="true" size={20} />
-            <strong>غرفة واحدة</strong>
-            <small>كل إشارة في مكانها</small>
           </div>
         </div>
       </section>

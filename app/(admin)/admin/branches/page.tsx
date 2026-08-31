@@ -6,11 +6,13 @@ import { apiClient } from "@/lib/api-client";
 
 interface Branch {
   id: string;
-  nameEn: string;
-  nameAr: string;
-  addressEn: string;
-  addressAr: string;
-  phone: string;
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
+  address?: string;
+  addressEn?: string;
+  addressAr?: string;
+  phone?: string;
 }
 
 export default function BranchesPage() {
@@ -20,18 +22,15 @@ export default function BranchesPage() {
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
-    nameEn: "",
-    nameAr: "",
-    addressEn: "",
-    addressAr: "",
-    phone: "",
+    name: "",
+    address: "",
   });
 
   const fetchBranches = async () => {
     try {
       setIsLoading(true);
       const { data } = await apiClient.get("/admin/branches");
-      setBranches(data);
+      setBranches(Array.isArray(data) ? data : data?.data || data?.branches || []);
     } catch (err) {
       console.error(err);
       setError("Failed to fetch branches.");
@@ -48,13 +47,13 @@ export default function BranchesPage() {
     e.preventDefault();
     try {
       setIsCreating(true);
-      await apiClient.post("/admin/branches", formData);
+      await apiClient.post("/admin/branches", {
+        name: formData.name.trim(),
+        address: formData.address.trim() || undefined,
+      });
       setFormData({
-        nameEn: "",
-        nameAr: "",
-        addressEn: "",
-        addressAr: "",
-        phone: "",
+        name: "",
+        address: "",
       });
       fetchBranches();
     } catch (err) {
@@ -99,34 +98,46 @@ export default function BranchesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {branches.map((branch) => (
-                <div key={branch.id} className="glass-panel p-5 flex flex-col gap-3 group hover:border-primary-500/30 transition-all">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-bold text-white group-hover:text-primary-400 transition-colors">
-                        {branch.nameEn}
-                      </h3>
-                      <p className="text-sm text-zinc-400 font-arabic">{branch.nameAr}</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-primary-500/10 flex items-center justify-center">
-                      <Store className="w-5 h-5 text-primary-500" />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2 mt-2">
-                    <div className="flex items-center gap-2 text-sm text-zinc-400">
-                      <MapPin className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">{branch.addressEn}</span>
-                    </div>
-                    {branch.phone && (
-                      <div className="flex items-center gap-2 text-sm text-zinc-400">
-                        <Phone className="w-4 h-4 flex-shrink-0" />
-                        <span>{branch.phone}</span>
+              {branches.map((branch) => {
+                const primaryName = branch.name || branch.nameEn || branch.nameAr || "Branch";
+                const secondaryName = (branch.nameEn && branch.nameAr)
+                  ? (branch.name === branch.nameEn ? branch.nameAr : branch.nameEn)
+                  : (branch.nameAr || branch.nameEn || null);
+                const displayAddress = branch.address || branch.addressEn || branch.addressAr;
+
+                return (
+                  <div key={branch.id} className="glass-panel p-5 flex flex-col gap-3 group hover:border-primary-500/30 transition-all">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-white group-hover:text-primary-400 transition-colors">
+                          {primaryName}
+                        </h3>
+                        {secondaryName && secondaryName !== primaryName ? (
+                          <p className="text-sm text-zinc-400 font-arabic">{secondaryName}</p>
+                        ) : null}
                       </div>
-                    )}
+                      <div className="w-10 h-10 rounded-full bg-primary-500/10 flex items-center justify-center">
+                        <Store className="w-5 h-5 text-primary-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 mt-2">
+                      {displayAddress ? (
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                          <MapPin className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{displayAddress}</span>
+                        </div>
+                      ) : null}
+                      {branch.phone ? (
+                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+                          <Phone className="w-4 h-4 flex-shrink-0" />
+                          <span>{branch.phone}</span>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -137,61 +148,25 @@ export default function BranchesPage() {
             <h2 className="text-xl font-bold text-white mb-4">Add New Branch</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Name (English)</label>
+                <label className="text-sm font-medium text-zinc-300">Branch Name</label>
                 <input
                   type="text"
                   required
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all"
-                  placeholder="e.g. Downtown Branch"
-                  value={formData.nameEn}
-                  onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Name (Arabic)</label>
-                <input
-                  type="text"
-                  required
-                  dir="rtl"
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all font-arabic"
-                  placeholder="مثال: فرع وسط البلد"
-                  value={formData.nameAr}
-                  onChange={(e) => setFormData({ ...formData, nameAr: e.target.value })}
+                  placeholder="e.g. DineHub Downtown"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Address (English)</label>
+                <label className="text-sm font-medium text-zinc-300">Address (Optional)</label>
                 <input
                   type="text"
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all"
-                  placeholder="Full address"
-                  value={formData.addressEn}
-                  onChange={(e) => setFormData({ ...formData, addressEn: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Address (Arabic)</label>
-                <input
-                  type="text"
-                  dir="rtl"
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all font-arabic"
-                  placeholder="العنوان الكامل"
-                  value={formData.addressAr}
-                  onChange={(e) => setFormData({ ...formData, addressAr: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Phone</label>
-                <input
-                  type="text"
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all"
-                  placeholder="+1 234 567 890"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="e.g. 123 Main St, City Center"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 />
               </div>
 

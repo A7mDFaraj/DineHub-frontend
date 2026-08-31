@@ -173,7 +173,7 @@ function SignInForm() {
         {isSubmitting ? (
           <>
             <Loader2 className={styles.spinner} aria-hidden="true" size={20} />
-            <span>جارٍ فتح غرفة التشغيل…</span>
+            <span>جارٍ الدخول إلى لوحة التحكم…</span>
           </>
         ) : (
           <>
@@ -308,7 +308,7 @@ export function AdminAuthScreen() {
           </div>
 
           <div className={styles.authHeader}>
-            <p className={styles.eyebrow}><span aria-hidden="true" />غرفة التشغيل</p>
+            <p className={styles.eyebrow}><span aria-hidden="true" />لوحة التحكم</p>
             <h1 id="auth-title">
               {isSignIn ? "أهلاً بعودتك إلى خط الخدمة." : "ابدأ مسار طلباتك من مكان واحد."}
             </h1>

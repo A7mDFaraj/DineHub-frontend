@@ -6,16 +6,18 @@ import { apiClient } from "@/lib/api-client";
 
 interface Branch {
   id: string;
-  nameEn: string;
-  nameAr: string;
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
 }
 
 interface Category {
   id: string;
-  nameEn: string;
-  nameAr: string;
-  sortOrder: number;
-  branchId: string;
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
+  sortOrder?: number;
+  branchId?: string;
 }
 
 export default function CategoriesPage() {
@@ -33,18 +35,28 @@ export default function CategoriesPage() {
     sortOrder: 0,
   });
 
+  const fetchCategories = async (branchId: string) => {
+    try {
+      const { data } = await apiClient.get(`/admin/categories/${branchId}`);
+      setCategories(Array.isArray(data) ? data : data?.data || data?.categories || []);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch categories for this branch.");
+    }
+  };
+
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [branchesRes, categoriesRes] = await Promise.all([
-        apiClient.get("/admin/branches"),
-        apiClient.get("/admin/categories")
-      ]);
-      setBranches(branchesRes.data);
-      setCategories(categoriesRes.data);
+      setError("");
+      const { data } = await apiClient.get("/admin/branches");
+      const branchList = Array.isArray(data) ? data : data?.data || data?.branches || [];
+      setBranches(branchList);
       
-      if (branchesRes.data.length > 0 && !selectedBranchId) {
-        setSelectedBranchId(branchesRes.data[0].id);
+      if (branchList.length > 0) {
+        const activeId = selectedBranchId || branchList[0].id;
+        setSelectedBranchId(activeId);
+        await fetchCategories(activeId);
       }
     } catch (err) {
       console.error(err);
@@ -58,6 +70,11 @@ export default function CategoriesPage() {
     fetchData();
   }, []);
 
+  const handleBranchChange = async (branchId: string) => {
+    setSelectedBranchId(branchId);
+    await fetchCategories(branchId);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) {
@@ -67,18 +84,20 @@ export default function CategoriesPage() {
     
     try {
       setIsCreating(true);
+      setError("");
       await apiClient.post("/admin/categories", {
-        ...formData,
-        branchId: selectedBranchId
+        branchId: selectedBranchId,
+        name: formData.nameEn || formData.nameAr,
+        nameEn: formData.nameEn || undefined,
+        nameAr: formData.nameAr || undefined,
+        sortOrder: categories.length,
       });
       setFormData({
         nameEn: "",
         nameAr: "",
-        sortOrder: categories.length, // Put it at the end
+        sortOrder: 0,
       });
-      // Refresh categories
-      const { data } = await apiClient.get("/admin/categories");
-      setCategories(data);
+      await fetchCategories(selectedBranchId);
     } catch (err) {
       console.error(err);
       setError("Failed to create category.");
@@ -95,11 +114,6 @@ export default function CategoriesPage() {
     );
   }
 
-  // Filter categories by selected branch
-  const filteredCategories = categories
-    .filter(c => c.branchId === selectedBranchId)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -115,11 +129,11 @@ export default function CategoriesPage() {
             <select 
               className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none"
               value={selectedBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
+              onChange={(e) => handleBranchChange(e.target.value)}
             >
               {branches.map(b => (
                 <option key={b.id} value={b.id} className="bg-zinc-900 text-white">
-                  {b.nameEn}
+                  {b.name || b.nameEn || b.nameAr || "Branch"}
                 </option>
               ))}
             </select>
@@ -143,7 +157,7 @@ export default function CategoriesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Categories List */}
           <div className="lg:col-span-2 space-y-4">
-            {filteredCategories.length === 0 ? (
+            {categories.length === 0 ? (
               <div className="glass-panel p-12 text-center flex flex-col items-center justify-center">
                 <Tags className="w-12 h-12 text-zinc-500 mb-4" />
                 <h3 className="text-xl font-medium text-white mb-2">No categories yet</h3>
@@ -151,24 +165,31 @@ export default function CategoriesPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredCategories.map((category) => (
-                  <div key={category.id} className="glass-panel p-4 flex items-center justify-between group hover:border-primary-500/30 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="cursor-grab text-zinc-600 hover:text-white transition-colors">
-                        <GripVertical className="w-5 h-5" />
+                {categories.map((category) => {
+                  const primaryName = category.name || category.nameEn || category.nameAr || "Untitled Category";
+                  const secondaryName = (category.nameEn && category.nameAr) ? category.nameAr : null;
+
+                  return (
+                    <div key={category.id} className="glass-panel p-4 flex items-center justify-between group hover:border-primary-500/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="cursor-grab text-zinc-600 hover:text-white transition-colors">
+                          <GripVertical className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white">
+                            {primaryName}
+                          </h3>
+                          {secondaryName && secondaryName !== primaryName ? (
+                            <p className="text-sm text-zinc-400 font-arabic">{secondaryName}</p>
+                          ) : null}
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-white">
-                          {category.nameEn}
-                        </h3>
-                        <p className="text-sm text-zinc-400 font-arabic">{category.nameAr}</p>
+                      <div className="text-sm text-zinc-500 bg-white/5 px-3 py-1 rounded-full">
+                        Order: {category.sortOrder ?? 0}
                       </div>
                     </div>
-                    <div className="text-sm text-zinc-500 bg-white/5 px-3 py-1 rounded-full">
-                      Order: {category.sortOrder}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -194,7 +215,6 @@ export default function CategoriesPage() {
                   <label className="text-sm font-medium text-zinc-300">Name (Arabic)</label>
                   <input
                     type="text"
-                    required
                     dir="rtl"
                     className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all font-arabic"
                     placeholder="مثال: الأطباق الرئيسية"
