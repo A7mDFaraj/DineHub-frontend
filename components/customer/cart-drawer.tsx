@@ -9,11 +9,12 @@ import { apiClient } from "@/lib/api-client"
 import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 
-export function CartDrawer({ branchId }: { branchId: string }) {
+export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: string }) {
   const { items, isCartOpen, toggleCart, updateQuantity, totalAmount, note, setNote, clearCart, totalItems } = useCartStore()
   const params = useParams()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
   const tableNumber = params?.tableNumber as string
 
   if (!isCartOpen && items.length === 0) return null;
@@ -25,29 +26,42 @@ export function CartDrawer({ branchId }: { branchId: string }) {
     }
     
     setIsSubmitting(true)
+    setSubmitError("")
+
     try {
+      let resolvedTableId = tableId
+
+      // If table UUID wasn't passed down, fetch it via the public endpoint
+      if (!resolvedTableId) {
+        const tableRes = await apiClient.get(`/table/${branchId}/${tableNumber}`)
+        resolvedTableId = tableRes.data?.id
+      }
+
+      if (!resolvedTableId) {
+        throw new Error("Unable to identify table. Please refresh and try again.")
+      }
+
       const res = await apiClient.post("/orders", {
         branchId,
-        tableId: tableNumber, // Using tableNumber as ID for MVP simplicity or you'd need the real table UUID
-        note,
+        tableId: resolvedTableId,
+        notes: note?.trim() || undefined,
         items: items.map(i => ({
           productId: i.productId,
           quantity: i.quantity,
-          priceAtOrder: i.price
         }))
       })
       
-      const orderId = res.data.id || res.data.order?.id || "mock-id-123" // Fallback if API is slightly different
-      clearCart()
-      toggleCart()
-      router.push(`/menu/${branchId}/order/${orderId}`)
-    } catch (error) {
-      console.error(error)
-      // Mock success if backend isn't ready
-      const mockId = Math.random().toString(36).substring(7)
-      clearCart()
-      toggleCart()
-      router.push(`/menu/${branchId}/order/${mockId}`)
+      const orderId = res.data?.id || res.data?.order?.id
+      if (orderId) {
+        clearCart()
+        toggleCart()
+        router.push(`/menu/${branchId}/order/${orderId}`)
+      } else {
+        throw new Error("Order was submitted but no order confirmation was received.")
+      }
+    } catch (error: any) {
+      console.error("Order error:", error)
+      setSubmitError(error?.response?.data?.message || error?.message || "Failed to place order. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -160,23 +174,28 @@ export function CartDrawer({ branchId }: { branchId: string }) {
               )}
             </div>
 
-            {items.length > 0 && (
-              <div className="p-4 border-t border-white/10 bg-neutral-900">
-                <div className="flex justify-between mb-4 font-semibold text-lg">
-                  <span>Total</span>
-                  <span className="text-amber-500">SAR {totalAmount().toFixed(2)}</span>
+              {items.length > 0 && (
+                <div className="p-4 border-t border-white/10 bg-neutral-900">
+                  {submitError && (
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-2.5 rounded-xl mb-3">
+                      {submitError}
+                    </div>
+                  )}
+                  <div className="flex justify-between mb-4 font-semibold text-lg">
+                    <span>Total</span>
+                    <span className="text-amber-500">SAR {totalAmount().toFixed(2)}</span>
+                  </div>
+                  <Button 
+                    onClick={handleSubmitOrder}
+                    disabled={isSubmitting}
+                    variant="primary" 
+                    size="lg" 
+                    className="w-full rounded-xl"
+                  >
+                    {isSubmitting ? "Sending Order..." : "Place Order Now"}
+                  </Button>
                 </div>
-                <Button 
-                  onClick={handleSubmitOrder}
-                  disabled={isSubmitting}
-                  variant="primary" 
-                  size="lg" 
-                  className="w-full rounded-xl"
-                >
-                  {isSubmitting ? "Sending Order..." : "Place Order Now"}
-                </Button>
-              </div>
-            )}
+              )}
           </motion.div>
         )}
       </AnimatePresence>

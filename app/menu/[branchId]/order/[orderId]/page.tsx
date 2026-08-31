@@ -39,36 +39,21 @@ export default function OrderTrackingPage({
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        // const res = await apiClient.get(`/orders/${resolvedParams.orderId}`)
-        // setOrder(res.data)
-        
-        // Mocking for UI demonstration
-        setOrder(prev => {
-          if (!prev) {
-            return {
-              id: resolvedParams.orderId,
-              status: "pending",
-              total: 45.0,
-              items: [{ nameEn: "Classic Burger", quantity: 1 }]
-            }
-          }
-          // Simulate status progression for demonstration
-          const currentIndex = statusOrder.indexOf(prev.status)
-          if (currentIndex < statusOrder.length - 1 && Math.random() > 0.5) {
-             return { ...prev, status: statusOrder[currentIndex + 1] }
-          }
-          return prev
-        })
+        const res = await apiClient.get(`/orders/${resolvedParams.orderId}`)
+        if (res.data) {
+          setOrder(res.data)
+        }
         setLoading(false)
       } catch (error) {
-        console.error("Failed to load order", error)
+        console.error("Failed to load order:", error)
+        setLoading(false)
       }
     }
 
     fetchOrder() // initial fetch
     
-    // Polling every 5 seconds as requested in PRD
-    const intervalId = setInterval(fetchOrder, 5000)
+    // Polling every 4 seconds for real-time status updates
+    const intervalId = setInterval(fetchOrder, 4000)
 
     return () => clearInterval(intervalId)
   }, [resolvedParams.orderId])

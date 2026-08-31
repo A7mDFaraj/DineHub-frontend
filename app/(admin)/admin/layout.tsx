@@ -3,6 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Building2,
+  ChefHat,
   CircleAlert,
   HelpCircle,
   LayoutDashboard,
@@ -31,6 +32,7 @@ const navigation = [
   { name: "التصنيفات", href: "/admin/categories", icon: Tags },
   { name: "القائمة", href: "/admin/menu", icon: UtensilsCrossed },
   { name: "رموز QR", href: "/admin/qr-code", icon: QrCode },
+  { name: "طلبات المطبخ", href: "/staff", icon: ChefHat },
   { name: "الإعدادات", href: "/admin/settings", icon: Settings },
 ] as const;
 

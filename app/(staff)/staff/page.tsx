@@ -5,119 +5,182 @@ import { apiClient } from "@/lib/api-client"
 import { OrderCard, Order } from "@/components/staff/order-card"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { AnimatePresence } from "framer-motion"
+import { Building2, RefreshCw } from "lucide-react"
+
+interface Branch {
+  id: string
+  name?: string
+  nameEn?: string
+  nameAr?: string
+}
 
 export default function StaffDashboard() {
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("")
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  const fetchOrders = async () => {
+  const fetchBranches = async () => {
     try {
-      // const res = await apiClient.get('/staff/orders')
-      // setOrders(res.data)
+      const { data } = await apiClient.get("/admin/branches")
+      const list = Array.isArray(data) ? data : data?.data || data?.branches || []
+      setBranches(list)
+      if (list.length > 0 && !selectedBranchId) {
+        setSelectedBranchId(list[0].id)
+      }
+    } catch (err) {
+      console.error("Failed to load branches:", err)
+    }
+  }
+
+  const fetchOrders = async (branchId?: string) => {
+    const targetBranchId = branchId || selectedBranchId
+    if (!targetBranchId) return
+
+    try {
+      const res = await apiClient.get(`/staff/orders/${targetBranchId}`)
+      const rawOrders = Array.isArray(res.data) ? res.data : res.data?.data || res.data?.orders || []
       
-      // Mock data for UI demonstration
-      setTimeout(() => {
-        setOrders(prev => {
-          if (prev.length === 0) {
-            return [
-              {
-                id: "ord-1a",
-                tableId: "4",
-                status: "pending",
-                note: "No onions in the burger please",
-                createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-                items: [
-                  { productId: "p1", nameEn: "Classic Burger", quantity: 2 },
-                  { productId: "p2", nameEn: "Cola", quantity: 2 }
-                ]
-              },
-              {
-                id: "ord-2b",
-                tableId: "12",
-                status: "preparing",
-                note: "",
-                createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-                items: [
-                  { productId: "p3", nameEn: "Margherita Pizza", quantity: 1 }
-                ]
-              }
-            ]
-          }
-          return prev
-        })
-      }, 100)
-    } catch (error) {
-      console.error(error)
+      // Normalize backend orders to Order interface
+      const normalizedOrders: Order[] = rawOrders.map((o: any) => ({
+        id: o.id,
+        tableId: o.table?.number ? o.table.number.toString() : (o.tableId || "1"),
+        status: o.status || "pending",
+        note: o.notes || o.note || "",
+        createdAt: o.createdAt || new Date().toISOString(),
+        items: Array.isArray(o.items) ? o.items.map((i: any) => ({
+          productId: i.productId || i.id,
+          nameEn: i.product?.nameAr || i.product?.nameEn || i.nameEn || i.name || "Menu Item",
+          quantity: i.quantity || 1,
+          note: i.note
+        })) : []
+      }))
+
+      setOrders(normalizedOrders)
+      setError("")
+    } catch (err: any) {
+      console.error("Failed to fetch live orders:", err)
+      setError(err?.response?.data?.message || "Failed to load live orders.")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchOrders()
-    const intervalId = setInterval(fetchOrders, 5000)
-    return () => clearInterval(intervalId)
+    fetchBranches()
   }, [])
+
+  useEffect(() => {
+    if (selectedBranchId) {
+      setLoading(true)
+      fetchOrders(selectedBranchId)
+      
+      // Polling every 5 seconds for live kitchen updates
+      const intervalId = setInterval(() => {
+        fetchOrders(selectedBranchId)
+      }, 5000)
+
+      return () => clearInterval(intervalId)
+    }
+  }, [selectedBranchId])
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     // Optimistic UI update
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus as Order["status"] } : o))
     
     try {
-      // await apiClient.patch(`/staff/orders/${orderId}/status`, { status: newStatus })
+      await apiClient.patch(`/staff/orders/${orderId}/status`, { status: newStatus })
+      if (selectedBranchId) {
+        await fetchOrders(selectedBranchId)
+      }
     } catch (error) {
-      console.error("Failed to update status", error)
-      // Revert on failure
-      fetchOrders()
+      console.error("Failed to update order status:", error)
+      if (selectedBranchId) {
+        fetchOrders(selectedBranchId)
+      }
     }
   }
 
-  if (loading && orders.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    )
-  }
+  const activeOrders = orders
+    .filter(o => o.status !== 'delivered')
+    .sort((a, b) => {
+      const statusWeight = { pending: 1, preparing: 2, ready: 3, delivered: 4 }
+      if (statusWeight[a.status] !== statusWeight[b.status]) {
+        return statusWeight[a.status] - statusWeight[b.status]
+      }
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    })
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Live Kitchen Orders</h1>
-        <div className="flex items-center gap-2 text-sm text-neutral-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Live updates active
+    <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold font-outfit text-white">Live Kitchen Orders</h1>
+          <p className="text-zinc-400 text-sm mt-1">Real-time incoming orders from customer table QR scans.</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Branch Selector */}
+          {branches.length > 0 && (
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              <Building2 className="w-4 h-4 text-primary-400" />
+              <select 
+                value={selectedBranchId} 
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-transparent text-sm text-white font-medium focus:outline-none cursor-pointer"
+              >
+                {branches.map(b => (
+                  <option key={b.id} value={b.id} className="bg-zinc-900 text-white">
+                    {b.name || b.nameEn || b.nameAr || "Branch"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded-xl">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Live Polling Active</span>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
-        <AnimatePresence>
-          {orders
-            .sort((a, b) => {
-              // Sort logic: pending first, then preparing, then ready. 
-              // Within same status, sort by oldest first.
-              const statusWeight = { pending: 1, preparing: 2, ready: 3, delivered: 4 }
-              if (statusWeight[a.status] !== statusWeight[b.status]) {
-                return statusWeight[a.status] - statusWeight[b.status]
-              }
-              return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            })
-            .filter(o => o.status !== 'delivered') // hide delivered from active view
-            .map((order) => (
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
+          {error}
+        </div>
+      )}
+
+      {loading && orders.length === 0 ? (
+        <div className="flex h-64 items-center justify-center">
+          <LoadingSpinner size={36} />
+        </div>
+      ) : branches.length === 0 ? (
+        <div className="glass-panel p-12 text-center rounded-2xl">
+          <p className="text-zinc-400">No branches found. Please create a branch in the Admin portal.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+          <AnimatePresence>
+            {activeOrders.map((order) => (
               <OrderCard 
                 key={order.id} 
                 order={order} 
                 onStatusChange={handleStatusChange} 
               />
-          ))}
-        </AnimatePresence>
-        
-        {orders.filter(o => o.status !== 'delivered').length === 0 && (
-          <div className="col-span-full py-20 text-center text-neutral-500 glass-panel rounded-2xl">
-            No active orders right now. Kitchen is clear! 👨‍🍳
-          </div>
-        )}
-      </div>
+            ))}
+          </AnimatePresence>
+          
+          {activeOrders.length === 0 && (
+            <div className="col-span-full py-20 text-center text-neutral-400 glass-panel rounded-2xl border border-white/10">
+              <p className="text-lg font-medium text-white mb-1">No active orders right now 👨‍🍳</p>
+              <p className="text-sm text-zinc-500">Orders placed by customers via table QR codes will appear here instantly.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

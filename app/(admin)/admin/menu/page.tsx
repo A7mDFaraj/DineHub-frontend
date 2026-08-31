@@ -156,20 +156,20 @@ export default function MenuManagement() {
   });
 
   return (
-    <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-outfit text-white">Menu Management</h1>
-          <p className="text-zinc-400 mt-1">Manage your restaurant&apos;s categories and items.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold font-outfit text-white">Menu Management</h1>
+          <p className="text-zinc-400 mt-1 text-xs sm:text-sm">Manage your restaurant&apos;s categories and items.</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {/* Branch Selector */}
           {branches.length > 0 && (
-            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-2 px-4">
-              <Building2 className="w-5 h-5 text-zinc-400" />
+            <div className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl p-2 px-3 flex-1 sm:flex-initial">
+              <Building2 className="w-4 h-4 text-primary-400 shrink-0" />
               <select 
-                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none"
+                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none text-sm w-full"
                 value={selectedBranchId}
                 onChange={(e) => handleBranchChange(e.target.value)}
               >
@@ -185,48 +185,50 @@ export default function MenuManagement() {
           <button 
             onClick={() => setIsModalOpen(true)}
             disabled={categories.length === 0}
-            className="bg-primary-500 hover:bg-primary-600 text-black font-semibold py-2.5 px-5 rounded-xl flex items-center gap-2 transition-all hover:shadow-lg hover:shadow-primary-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-primary-500 hover:bg-primary-600 text-black font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm transition-all hover:shadow-lg hover:shadow-primary-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
-            <Plus className="w-5 h-5" />
-            Add New Item
+            <Plus className="w-4 h-4" />
+            Add Item
           </button>
         </div>
       </div>
 
       {error && !isModalOpen && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-xl mb-4">
+        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
           {error}
         </div>
       )}
 
       {branches.length === 0 ? (
-        <div className="glass-panel p-12 text-center flex flex-col items-center justify-center">
+        <div className="glass-panel p-8 sm:p-12 text-center flex flex-col items-center justify-center rounded-2xl">
           <Building2 className="w-12 h-12 text-zinc-500 mb-4" />
           <h3 className="text-xl font-medium text-white mb-2">No branches available</h3>
-          <p className="text-zinc-400">You need to create a branch first before managing menu items.</p>
+          <p className="text-zinc-400 text-sm">You need to create a branch first before managing menu items.</p>
         </div>
       ) : (
-        <div className="glass-panel rounded-2xl flex-1 flex flex-col overflow-hidden border border-white/5 shadow-none relative z-10">
+        <div className="glass-panel rounded-2xl flex flex-col border border-white/10 overflow-hidden shadow-sm">
           {/* Toolbar */}
-          <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row gap-4 justify-between">
+          <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
             <div className="relative max-w-md w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input 
                 type="text"
                 placeholder="Search menu items..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-zinc-300 focus:outline-none focus:border-primary-500/50 transition-colors"
+                className="w-full bg-black/30 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-200 focus:outline-none focus:border-primary-500/50 transition-colors"
               />
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-zinc-400">
-              <span>{filteredProducts.length} items</span>
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <span className="bg-white/5 px-2.5 py-1 rounded-full border border-white/10 text-zinc-300 font-mono">
+                {filteredProducts.length} {filteredProducts.length === 1 ? "Item" : "Items"}
+              </span>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="flex-1 overflow-auto">
+          {/* Table with responsive horizontal overflow */}
+          <div className="w-full overflow-x-auto">
             {isLoading ? (
               <div className="flex h-full items-center justify-center py-16">
                 <Loader2 className="w-8 h-8 animate-spin text-primary-500" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, use } from "react";
 import { Search, ShoppingBag, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +13,8 @@ const MOCK_MENU = [
   { id: 4, name: "Wagyu Steak", category: "Mains", description: "8oz A5 Wagyu, roasted garlic, sea salt", price: 45.00, image: "🥩" },
 ];
 
-export default function CustomerMenu({ params }: { params: { storeId: string } }) {
+export default function CustomerMenu({ params }: { params: Promise<{ storeId: string }> }) {
+  const resolvedParams = use(params);
   const [activeCategory, setActiveCategory] = useState("All");
 
   const filteredMenu = activeCategory === "All" 
@@ -27,7 +28,7 @@ export default function CustomerMenu({ params }: { params: { storeId: string } }
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold font-outfit text-primary-500">DineHub</h1>
-            <p className="text-xs text-zinc-400">Store #{params.storeId}</p>
+            <p className="text-xs text-zinc-400">Store #{resolvedParams.storeId}</p>
           </div>
           <button className="relative p-2 bg-white/5 rounded-full border border-white/10">
             <ShoppingBag className="w-5 h-5" />
