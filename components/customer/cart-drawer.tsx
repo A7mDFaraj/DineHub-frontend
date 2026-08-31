@@ -9,7 +9,15 @@ import { apiClient } from "@/lib/api-client"
 import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 
-export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: string }) {
+export function CartDrawer({ 
+  branchId, 
+  tableId, 
+  themeColor = "#D4AF37" 
+}: { 
+  branchId: string; 
+  tableId?: string;
+  themeColor?: string;
+}) {
   const { items, isCartOpen, toggleCart, updateQuantity, totalAmount, note, setNote, clearCart, totalItems } = useCartStore()
   const params = useParams()
   const router = useRouter()
@@ -120,10 +128,10 @@ export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: 
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md"
           >
-            <Button 
+            <button 
               onClick={toggleCart}
-              variant="primary" 
-              className="w-full rounded-full h-14 text-base sm:text-lg font-bold shadow-2xl flex items-center justify-between px-6 bg-gradient-to-r from-primary-500 to-amber-500 text-black border border-primary-400/40"
+              style={{ backgroundColor: themeColor }}
+              className="w-full rounded-full h-14 text-base sm:text-lg font-bold shadow-2xl flex items-center justify-between px-6 text-black border border-white/20 transition-transform active:scale-[0.98] hover:opacity-95"
             >
               <div className="flex items-center gap-2.5">
                 <div className="bg-black/25 w-8 h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-white">
@@ -131,10 +139,10 @@ export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: 
                 </div>
                 <span>View Cart / مراجعة الطلب</span>
               </div>
-              <span className="font-mono text-sm sm:text-base font-extrabold">
+              <span className="font-mono text-sm sm:text-base font-black">
                 SAR {totalAmount().toFixed(2)}
               </span>
-            </Button>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -160,11 +168,11 @@ export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: 
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 26, stiffness: 220 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-[#111114] border-t border-white/10 rounded-t-3xl max-h-[88vh] flex flex-col shadow-2xl max-w-xl mx-auto"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-[#111114] border-t border-white/10 rounded-t-[32px] max-h-[88vh] flex flex-col shadow-2xl max-w-xl mx-auto"
           >
             <div className="p-4 px-5 border-b border-white/10 flex items-center justify-between">
               <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-white font-outfit">
-                <ShoppingBag size={20} className="text-primary-400" />
+                <ShoppingBag size={20} style={{ color: themeColor }} />
                 <span>Your Cart / سلة طلبك</span>
               </h2>
               <Button variant="ghost" size="icon" onClick={toggleCart} className="rounded-full text-zinc-400 hover:text-white">
@@ -192,7 +200,10 @@ export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: 
                           {item.nameEn && item.nameAr && item.nameEn !== item.nameAr && (
                             <p className="text-xs text-zinc-400">{item.nameEn}</p>
                           )}
-                          <div className="text-primary-400 text-sm font-bold font-mono mt-1">
+                          <div 
+                            className="text-sm font-bold font-mono mt-1"
+                            style={{ color: themeColor }}
+                          >
                             SAR {(item.price * item.quantity).toFixed(2)}
                           </div>
                         </div>
@@ -223,13 +234,14 @@ export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: 
                       {hasAttributes && (
                         <div className="flex flex-wrap items-center gap-1.5 pt-1">
                           <span className="text-[11px] text-zinc-400 flex items-center gap-1 font-medium">
-                            <Sparkles className="w-3 h-3 text-primary-400" />
+                            <Sparkles className="w-3 h-3" style={{ color: themeColor }} />
                             Options:
                           </span>
                           {item.selectedAttributes!.map((opt, idx) => (
                             <span 
                               key={idx} 
-                              className="text-[11px] px-2 py-0.5 rounded-md bg-primary-500/10 text-primary-300 border border-primary-500/20 font-medium"
+                              style={{ backgroundColor: `${themeColor}15`, color: themeColor, borderColor: `${themeColor}30` }}
+                              className="text-[11px] px-2 py-0.5 rounded-md border font-medium"
                             >
                               {opt}
                             </span>
@@ -273,17 +285,21 @@ export function CartDrawer({ branchId, tableId }: { branchId: string; tableId?: 
                 )}
                 <div className="flex justify-between items-center mb-4 font-bold text-lg text-white">
                   <span>Total Amount</span>
-                  <span className="text-primary-400 font-mono text-xl">SAR {totalAmount().toFixed(2)}</span>
+                  <span 
+                    className="font-mono text-xl"
+                    style={{ color: themeColor }}
+                  >
+                    SAR {totalAmount().toFixed(2)}
+                  </span>
                 </div>
-                <Button 
+                <button 
                   onClick={handleSubmitOrder}
                   disabled={isSubmitting}
-                  variant="primary" 
-                  size="lg" 
-                  className="w-full rounded-xl h-12 text-base font-bold bg-primary-500 hover:bg-primary-600 text-black shadow-lg shadow-primary-500/20"
+                  style={{ backgroundColor: themeColor }}
+                  className="w-full rounded-xl h-12 text-base font-bold text-black shadow-lg transition-transform active:scale-[0.99] hover:opacity-95 disabled:opacity-50"
                 >
                   {isSubmitting ? "Submitting Order..." : "Place Order Now / تأكيد الطلب"}
-                </Button>
+                </button>
               </div>
             )}
           </motion.div>

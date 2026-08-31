@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
+import { ImageUploader } from "@/components/ui/image-uploader";
 
 interface Branch {
   id: string;
@@ -668,17 +669,14 @@ export default function MenuManagement() {
                 </div>
               </div>
 
-              {/* Image URL */}
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-zinc-300">Image URL (Optional)</label>
-                <input
-                  type="url"
-                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 transition-all text-sm"
-                  placeholder="https://images.unsplash.com/..."
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                />
-              </div>
+              {/* Product Photo Uploader */}
+              <ImageUploader
+                value={formData.imageUrl}
+                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                label="Product Photo / صورة الصنف (Optional)"
+                description="Upload from phone/computer or paste link"
+                aspectRatio="square"
+              />
 
               {/* Attributes / Customization Options Selector */}
               <div className="space-y-3 pt-3 border-t border-white/10">

@@ -30,6 +30,7 @@ export interface ModalProduct {
 interface ProductModalProps {
   product: ModalProduct | null
   isOpen: boolean
+  themeColor?: string
   onClose: () => void
   onAddToCart: (customizedItem: {
     productId: string
@@ -46,6 +47,7 @@ interface ProductModalProps {
 export function ProductModal({
   product,
   isOpen,
+  themeColor = "#D4AF37",
   onClose,
   onAddToCart,
 }: ProductModalProps) {
@@ -92,14 +94,14 @@ export function ProductModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md"
+            className="fixed inset-0 bg-black/75 backdrop-blur-md"
           />
 
           {/* Modal / Sheet */}
@@ -108,12 +110,12 @@ export function ProductModal({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="relative z-10 w-full sm:max-w-lg bg-[#111114] border border-white/10 rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+            className="relative z-10 w-full sm:max-w-lg bg-[#111114] border border-white/10 rounded-t-[32px] sm:rounded-[32px] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
           >
             {/* Close Button Top Right */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/60 border border-white/10 text-zinc-300 hover:text-white flex items-center justify-center transition-colors hover:bg-black/80"
+              className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/60 border border-white/10 text-zinc-300 hover:text-white flex items-center justify-center transition-colors hover:bg-black/80 shadow-md"
               aria-label="Close modal"
             >
               <X size={18} />
@@ -124,7 +126,7 @@ export function ProductModal({
               {/* Product Header / Image */}
               <div className="space-y-4">
                 {product.imageUrl ? (
-                  <div className="w-full h-52 sm:h-60 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 relative">
+                  <div className="w-full h-52 sm:h-64 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 relative">
                     <img
                       src={product.imageUrl}
                       alt={prodNameEn}
@@ -148,7 +150,10 @@ export function ProductModal({
                         <p className="text-sm text-zinc-400 font-medium">{prodNameEn}</p>
                       )}
                     </div>
-                    <span className="text-xl font-bold text-primary-400 font-mono shrink-0">
+                    <span 
+                      className="text-xl font-bold font-mono shrink-0"
+                      style={{ color: themeColor }}
+                    >
                       SAR {unitPrice.toFixed(2)}
                     </span>
                   </div>
@@ -166,7 +171,7 @@ export function ProductModal({
                 <div className="space-y-3 pt-2 border-t border-white/10">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-semibold text-white flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-primary-400" />
+                      <Sparkles className="w-4 h-4" style={{ color: themeColor }} />
                       <span>Custom Options / خيارات إضافية</span>
                     </label>
                     <span className="text-xs text-zinc-500 font-mono">
@@ -190,11 +195,14 @@ export function ProductModal({
                           key={attr.id}
                           type="button"
                           onClick={() => toggleAttribute(fullLabel)}
+                          style={isSelected ? {
+                            backgroundColor: `${themeColor}20`,
+                            borderColor: themeColor,
+                            boxShadow: `0 0 15px ${themeColor}25`
+                          } : {}}
                           className={cn(
                             "flex items-center justify-between p-3 rounded-xl border text-left text-sm font-medium transition-all select-none active:scale-[0.98]",
-                            isSelected
-                              ? "bg-primary-500/15 border-primary-500 text-white shadow-[0_0_15px_rgba(212,175,55,0.15)]"
-                              : "bg-white/[0.03] border-white/10 text-zinc-300 hover:bg-white/[0.06] hover:border-white/20"
+                            !isSelected && "bg-white/[0.03] border-white/10 text-zinc-300 hover:bg-white/[0.06] hover:border-white/20"
                           )}
                         >
                           <div className="flex flex-col">
@@ -205,14 +213,13 @@ export function ProductModal({
                           </div>
 
                           <div
+                            style={isSelected ? { backgroundColor: themeColor, borderColor: themeColor } : {}}
                             className={cn(
                               "w-5 h-5 rounded-lg flex items-center justify-center border transition-colors shrink-0 ml-2",
-                              isSelected
-                                ? "bg-primary-500 border-primary-500 text-black"
-                                : "border-white/20 bg-black/30"
+                              !isSelected && "border-white/20 bg-black/30"
                             )}
                           >
-                            {isSelected && <Check size={13} strokeWidth={3} />}
+                            {isSelected && <Check size={13} strokeWidth={3} className="text-black" />}
                           </div>
                         </button>
                       )
@@ -224,7 +231,7 @@ export function ProductModal({
               {/* Item Specific Note */}
               <div className="space-y-2 pt-2 border-t border-white/10">
                 <label className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <MessageSquare className="w-4 h-4 text-primary-400" />
+                  <MessageSquare className="w-4 h-4" style={{ color: themeColor }} />
                   <span>Special Instructions for this item (Optional)</span>
                 </label>
                 <p className="text-xs text-zinc-400">
@@ -235,7 +242,8 @@ export function ProductModal({
                   value={itemNote}
                   onChange={(e) => setItemNote(e.target.value)}
                   placeholder="Type any specific request here..."
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 transition-colors"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none transition-colors"
+                  style={{ caretColor: themeColor }}
                 />
               </div>
 
@@ -269,15 +277,15 @@ export function ProductModal({
 
             {/* Bottom Fixed Action Bar */}
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-[#111114]/95 backdrop-blur-md border-t border-white/10 flex items-center gap-3 z-20">
-              <Button
+              <button
                 type="button"
                 onClick={handleAdd}
-                variant="primary"
-                className="w-full h-12 rounded-xl text-base font-bold shadow-lg flex items-center justify-between px-6"
+                style={{ backgroundColor: themeColor }}
+                className="w-full h-12 rounded-xl text-base font-bold shadow-lg flex items-center justify-between px-6 text-black transition-transform active:scale-[0.99] hover:opacity-95"
               >
                 <span>Add to Order</span>
-                <span className="font-mono text-sm">SAR {totalPrice.toFixed(2)}</span>
-              </Button>
+                <span className="font-mono text-sm font-black">SAR {totalPrice.toFixed(2)}</span>
+              </button>
             </div>
           </motion.div>
         </div>

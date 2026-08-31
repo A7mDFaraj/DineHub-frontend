@@ -4,7 +4,6 @@ import { useEffect, useState, use } from "react"
 import { apiClient } from "@/lib/api-client"
 import { useCartStore } from "@/store/cart-store"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Plus, UtensilsCrossed, Sparkles, SlidersHorizontal } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { CartDrawer } from "@/components/customer/cart-drawer"
@@ -45,6 +44,8 @@ interface TableInfo {
     name?: string
     nameEn?: string
     nameAr?: string
+    logoUrl?: string
+    themeColor?: string
   }
 }
 
@@ -116,6 +117,13 @@ export default function MenuPage({
     addItem(customizedItem)
   }
 
+  const branchDisplayName = tableInfo?.branch?.name || 
+    tableInfo?.branch?.nameEn || 
+    tableInfo?.branch?.nameAr || "DineHub";
+
+  const branchLogoUrl = (tableInfo?.branch as any)?.logoUrl || null;
+  const branchThemeColor = (tableInfo?.branch as any)?.themeColor || "#D4AF37";
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
@@ -125,23 +133,45 @@ export default function MenuPage({
     )
   }
 
-  const branchDisplayName = tableInfo?.branch?.name || 
-    tableInfo?.branch?.nameEn || 
-    tableInfo?.branch?.nameAr || "DineHub";
-
   return (
     <div className="pb-28 max-w-2xl mx-auto px-4">
-      {/* Header */}
+      {/* Header with Custom Restaurant Logo & Theme Color */}
       <div className="mb-8 pt-4">
-        <div className="flex items-center gap-2 mb-2 text-primary-400 text-xs font-semibold uppercase tracking-wider">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>{branchDisplayName}</span>
+        <div className="flex items-center gap-3.5 mb-3">
+          {branchLogoUrl ? (
+            <div className="w-12 h-12 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 shrink-0 shadow-lg">
+              <img src={branchLogoUrl} alt={branchDisplayName} className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow-md shrink-0"
+              style={{ backgroundColor: `${branchThemeColor}25`, color: branchThemeColor }}
+            >
+              <Sparkles className="w-5 h-5" />
+            </div>
+          )}
+
+          <div>
+            <div 
+              className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
+              style={{ color: branchThemeColor }}
+            >
+              <span>{branchDisplayName}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold font-outfit text-white">
+              Digital Menu
+            </h1>
+          </div>
         </div>
-        <h1 className="text-3xl font-bold font-outfit text-white mb-2">
-          Digital Menu
-        </h1>
+
         <p className="text-neutral-400 flex items-center gap-2 text-sm">
-          Ordering for <span className="bg-primary-500/15 border border-primary-500/30 px-2.5 py-0.5 rounded-lg font-mono text-primary-300 font-bold">Table #{resolvedParams.tableNumber}</span>
+          Ordering for{" "}
+          <span 
+            className="px-2.5 py-0.5 rounded-lg font-mono font-bold text-xs border"
+            style={{ backgroundColor: `${branchThemeColor}20`, color: branchThemeColor, borderColor: `${branchThemeColor}40` }}
+          >
+            Table #{resolvedParams.tableNumber}
+          </span>
         </p>
       </div>
 
@@ -213,7 +243,10 @@ export default function MenuPage({
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
                             {inCart && (
-                              <div className="absolute top-1 right-1 bg-primary-500 text-black text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                              <div 
+                                className="absolute top-1 right-1 text-black text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg"
+                                style={{ backgroundColor: branchThemeColor }}
+                              >
                                 {productCartCount}
                               </div>
                             )}
@@ -227,7 +260,10 @@ export default function MenuPage({
                               <h3 className="font-semibold text-white leading-tight group-hover:text-primary-400 transition-colors">
                                 {prodName}
                               </h3>
-                              <span className="text-primary-400 font-bold ml-2 shrink-0 font-mono text-sm">
+                              <span 
+                                className="font-bold ml-2 shrink-0 font-mono text-sm"
+                                style={{ color: branchThemeColor }}
+                              >
                                 SAR {Number(product.price).toFixed(2)}
                               </span>
                             </div>
@@ -260,14 +296,10 @@ export default function MenuPage({
                           {/* Action Button */}
                           <div className="flex justify-end items-center gap-2 mt-2">
                             {isAvailable ? (
-                              <Button
-                                size="sm"
-                                variant={inCart ? "secondary" : "primary"}
-                                className={`rounded-xl h-8 px-3 font-semibold text-xs transition-all flex items-center gap-1 ${
-                                  inCart 
-                                    ? "bg-primary-500/20 text-primary-300 border border-primary-500/30 hover:bg-primary-500/30" 
-                                    : ""
-                                }`}
+                              <button
+                                type="button"
+                                style={{ backgroundColor: branchThemeColor }}
+                                className="rounded-xl h-8 px-3.5 font-bold text-xs text-black shadow-md transition-transform active:scale-95 flex items-center gap-1.5"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleOpenProductModal(product)
@@ -275,21 +307,21 @@ export default function MenuPage({
                               >
                                 {hasAttributes ? (
                                   <>
-                                    <SlidersHorizontal size={13} />
+                                    <SlidersHorizontal size={12} />
                                     <span>{inCart ? `Custom (${productCartCount})` : "Customize"}</span>
                                   </>
                                 ) : inCart ? (
                                   <>
-                                    <Plus size={13} />
+                                    <Plus size={12} />
                                     <span>Add ({productCartCount})</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Plus size={13} />
+                                    <Plus size={12} />
                                     <span>Add</span>
                                   </>
                                 )}
-                              </Button>
+                              </button>
                             ) : (
                               <span className="text-xs text-zinc-500 font-medium px-2 py-1 bg-white/5 rounded-lg border border-white/5">
                                 Sold Out
@@ -311,6 +343,7 @@ export default function MenuPage({
       <ProductModal
         product={selectedProductForModal}
         isOpen={isModalOpen}
+        themeColor={branchThemeColor}
         onClose={() => {
           setIsModalOpen(false)
           setSelectedProductForModal(null)
@@ -319,7 +352,11 @@ export default function MenuPage({
       />
 
       {/* Cart Drawer Component */}
-      <CartDrawer branchId={resolvedParams.branchId} tableId={tableInfo?.id} />
+      <CartDrawer 
+        branchId={resolvedParams.branchId} 
+        tableId={tableInfo?.id} 
+        themeColor={branchThemeColor}
+      />
     </div>
   )
 }
