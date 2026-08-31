@@ -23,17 +23,18 @@ const productPromises = [
 ];
 
 type JourneyStep = {
+  step: string;
   title: string;
   description: string;
   icon: LucideIcon;
 };
 
 const journeySteps: JourneyStep[] = [
-  { title: "يمسح", description: "QR", icon: QrCode },
-  { title: "يستكشف", description: "القائمة", icon: LayoutGrid },
-  { title: "يخصّص", description: "طلبه", icon: SlidersHorizontal },
-  { title: "يصل", description: "للفريق", icon: BellRing },
-  { title: "يتضح", description: "الأداء", icon: BarChart3 },
+  { step: "01", title: "يمسح", description: "QR", icon: QrCode },
+  { step: "02", title: "يستكشف", description: "القائمة", icon: LayoutGrid },
+  { step: "03", title: "يخصّص", description: "طلبه", icon: SlidersHorizontal },
+  { step: "04", title: "يصل", description: "للفريق", icon: BellRing },
+  { step: "05", title: "يتضح", description: "الأداء", icon: BarChart3 },
 ];
 
 export function HeroSection() {
@@ -128,14 +129,20 @@ export function HeroSection() {
         className="landing-shell hero-shell hero-journey"
         aria-label="رحلة الطلب عبر DineHub"
       >
-        {journeySteps.map((step) => {
+        {journeySteps.map((step, idx) => {
           const Icon = step.icon;
           return (
-            <li key={step.title}>
+            <li
+              key={step.title}
+              className={`hero-journey-item hero-journey-item--${idx + 1}`}
+            >
+              <span className="hero-journey-step-num" aria-hidden="true">
+                {step.step}
+              </span>
               <span className="hero-journey-icon">
                 <Icon aria-hidden="true" strokeWidth={1.7} />
               </span>
-              <span>
+              <span className="hero-journey-text">
                 <strong>{step.title}</strong>
                 <small>{step.description}</small>
               </span>
