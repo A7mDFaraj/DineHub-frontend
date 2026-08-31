@@ -5,7 +5,8 @@ import { apiClient } from "@/lib/api-client"
 import { OrderCard, Order } from "@/components/staff/order-card"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { AnimatePresence } from "framer-motion"
-import { Building2, RefreshCw } from "lucide-react"
+import { Building2, Filter, Layers } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface Branch {
   id: string
@@ -14,10 +15,13 @@ interface Branch {
   nameAr?: string
 }
 
+type StatusFilter = "active" | "pending" | "preparing" | "ready" | "delivered" | "all"
+
 export default function StaffDashboard() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState<string>("")
   const [orders, setOrders] = useState<Order[]>([])
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -79,7 +83,10 @@ export default function StaffDashboard() {
       
       // Polling every 5 seconds for live kitchen updates
       const intervalId = setInterval(() => {
-        fetchOrders(selectedBranchId)
+        // Only poll if tab is visible to avoid unnecessary load
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          fetchOrders(selectedBranchId)
+        }
       }, 5000)
 
       return () => clearInterval(intervalId)
@@ -103,8 +110,21 @@ export default function StaffDashboard() {
     }
   }
 
-  const activeOrders = orders
-    .filter(o => o.status !== 'delivered')
+  const counts = {
+    active: orders.filter(o => o.status !== 'delivered').length,
+    pending: orders.filter(o => o.status === 'pending').length,
+    preparing: orders.filter(o => o.status === 'preparing').length,
+    ready: orders.filter(o => o.status === 'ready').length,
+    delivered: orders.filter(o => o.status === 'delivered').length,
+    all: orders.length,
+  }
+
+  const filteredOrders = orders
+    .filter(o => {
+      if (statusFilter === "active") return o.status !== 'delivered'
+      if (statusFilter === "all") return true
+      return o.status === statusFilter
+    })
     .sort((a, b) => {
       const statusWeight = { pending: 1, preparing: 2, ready: 3, delivered: 4 }
       if (statusWeight[a.status] !== statusWeight[b.status]) {
@@ -114,7 +134,7 @@ export default function StaffDashboard() {
     })
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6">
+    <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -143,9 +163,42 @@ export default function StaffDashboard() {
 
           <div className="flex items-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded-xl">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Live Polling Active</span>
+            <span className="hidden sm:inline">Live Polling Active</span>
           </div>
         </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {[
+          { id: "active", label: "Active Orders", count: counts.active },
+          { id: "pending", label: "New (Pending)", count: counts.pending },
+          { id: "preparing", label: "Preparing", count: counts.preparing },
+          { id: "ready", label: "Ready to Serve", count: counts.ready },
+          { id: "delivered", label: "Delivered", count: counts.delivered },
+          { id: "all", label: "All Orders", count: counts.all },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setStatusFilter(tab.id as StatusFilter)}
+            className={cn(
+              "px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all whitespace-nowrap shrink-0",
+              statusFilter === tab.id
+                ? "bg-primary-500 text-black border-primary-500 shadow-md shadow-primary-500/20"
+                : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            <span>{tab.label}</span>
+            <span className={cn(
+              "px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold",
+              statusFilter === tab.id
+                ? "bg-black/20 text-black"
+                : "bg-white/10 text-zinc-300"
+            )}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -165,7 +218,7 @@ export default function StaffDashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
           <AnimatePresence>
-            {activeOrders.map((order) => (
+            {filteredOrders.map((order) => (
               <OrderCard 
                 key={order.id} 
                 order={order} 
@@ -174,9 +227,9 @@ export default function StaffDashboard() {
             ))}
           </AnimatePresence>
           
-          {activeOrders.length === 0 && (
+          {filteredOrders.length === 0 && (
             <div className="col-span-full py-20 text-center text-neutral-400 glass-panel rounded-2xl border border-white/10">
-              <p className="text-lg font-medium text-white mb-1">No active orders right now 👨‍🍳</p>
+              <p className="text-lg font-medium text-white mb-1">No orders found in this view 👨‍🍳</p>
               <p className="text-sm text-zinc-500">Orders placed by customers via table QR codes will appear here instantly.</p>
             </div>
           )}

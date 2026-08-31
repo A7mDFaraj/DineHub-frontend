@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Tags, Loader2, GripVertical, Building2 } from "lucide-react";
+import { Plus, Tags, Loader2, GripVertical, Building2, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 
 interface Branch {
@@ -184,8 +184,26 @@ export default function CategoriesPage() {
                           ) : null}
                         </div>
                       </div>
-                      <div className="text-xs text-zinc-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/5 shrink-0 ml-2 font-mono">
-                        Order: {category.sortOrder ?? 0}
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <div className="text-xs text-zinc-400 bg-white/5 px-2.5 py-1 rounded-full border border-white/5 font-mono">
+                          Order: {category.sortOrder ?? 0}
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Are you sure you want to delete "${primaryName}"? All products inside it will also be deleted.`)) return;
+                            try {
+                              await apiClient.delete(`/admin/categories/${category.id}`);
+                              if (selectedBranchId) await fetchCategories(selectedBranchId);
+                            } catch (err) {
+                              console.error(err);
+                              setError("Failed to delete category.");
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          title="Delete category"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );
