@@ -6,8 +6,7 @@ import { apiClient } from "@/lib/api-client"
 import { OrderCard, Order } from "@/components/staff/order-card"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { AnimatePresence } from "framer-motion"
-import { Building2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Building2, ChevronDown, Inbox, RefreshCw } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
 
 interface Branch {
@@ -23,6 +22,7 @@ interface RawOrderItem {
   product?: { nameAr?: string; nameEn?: string }
   name?: string
   nameEn?: string
+  nameAr?: string
   quantity?: number
   note?: string
   selectedAttributes?: string[]
@@ -66,13 +66,16 @@ function normalizeOrders(rawOrders: RawOrder[]): Order[] {
     status: order.status ?? "pending",
     note: order.notes ?? order.note ?? "",
     createdAt: order.createdAt ?? new Date().toISOString(),
-    items: Array.isArray(order.items) ? order.items.map((item) => ({
-      productId: item.productId ?? item.id ?? "unknown-product",
-      nameEn: item.product?.nameAr ?? item.product?.nameEn ?? item.nameEn ?? item.name ?? "Menu Item",
-      quantity: item.quantity ?? 1,
-      note: item.note,
-      selectedAttributes: item.selectedAttributes ?? [],
-    })) : [],
+    items: Array.isArray(order.items)
+      ? order.items.map((item) => ({
+          productId: item.productId ?? item.id ?? "unknown-product",
+          nameAr: item.product?.nameAr ?? item.nameAr ?? item.name,
+          nameEn: item.product?.nameEn ?? item.nameEn ?? item.name ?? "عنصر",
+          quantity: item.quantity ?? 1,
+          note: item.note,
+          selectedAttributes: item.selectedAttributes ?? [],
+        }))
+      : [],
   }))
 }
 
@@ -89,6 +92,7 @@ export default function StaffDashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active")
   const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState("")
 
   const fetchBranches = useCallback(async () => {
@@ -96,52 +100,61 @@ export default function StaffDashboard() {
       const { data } = await apiClient.get("/staff/branches")
       const list = readBranches(data)
       setBranches(list)
-      setSelectedBranchId(current => list.some((branch) => branch.id === current) ? current : (list[0]?.id ?? ""))
+      setSelectedBranchId((current) =>
+        list.some((branch) => branch.id === current) ? current : (list[0]?.id ?? "")
+      )
       if (list.length === 0) setLoading(false)
-    } catch (error: unknown) {
-      console.error("Failed to load branches:", error)
-      setError(requestMessage(error, "Unable to load your assigned branch. Please sign in again or contact an admin."))
+    } catch (err: unknown) {
+      console.error("Failed to load branches:", err)
+      setError(
+        requestMessage(
+          err,
+          "تعذر تحميل الفرع المعين لحسابك. يرجى إعادة تسجيل الدخول أو مراجعة المشرف."
+        )
+      )
       setLoading(false)
     }
   }, [])
 
-  const fetchOrders = useCallback(async (branchId: string) => {
-    try {
-      // Fetch both live active orders and delivered history from production backend
-      const [liveRes, historyRes] = await Promise.allSettled([
-        apiClient.get(`/staff/orders/${branchId}`),
-        apiClient.get(`/staff/orders/${branchId}/history`),
-      ])
+  const fetchOrders = useCallback(
+    async (branchId: string, isManual = false) => {
+      if (isManual) setIsRefreshing(true)
+      try {
+        const [liveRes, historyRes] = await Promise.allSettled([
+          apiClient.get(`/staff/orders/${branchId}`),
+          apiClient.get(`/staff/orders/${branchId}/history`),
+        ])
 
-      if (liveRes.status === "rejected" && historyRes.status === "rejected") {
-        throw liveRes.reason
+        if (liveRes.status === "rejected" && historyRes.status === "rejected") {
+          throw liveRes.reason
+        }
+
+        let combinedRaw: RawOrder[] = []
+
+        if (liveRes.status === "fulfilled") {
+          const liveList = readOrders(liveRes.value.data)
+          combinedRaw = [...combinedRaw, ...liveList]
+        }
+
+        if (historyRes.status === "fulfilled") {
+          const histList = readOrders(historyRes.value.data)
+          const existingIds = new Set(combinedRaw.map((o) => o.id))
+          const uniqueHist = histList.filter((order) => !existingIds.has(order.id))
+          combinedRaw = [...combinedRaw, ...uniqueHist]
+        }
+
+        setOrders(normalizeOrders(combinedRaw))
+        setError("")
+      } catch (err: unknown) {
+        console.error("Failed to fetch live orders:", err)
+        setError(requestMessage(err, "تعذر استرجاع قائمة الطلبات الحالية."))
+      } finally {
+        setLoading(false)
+        if (isManual) setIsRefreshing(false)
       }
-
-      let combinedRaw: RawOrder[] = []
-
-      if (liveRes.status === "fulfilled") {
-        const liveList = readOrders(liveRes.value.data)
-        combinedRaw = [...combinedRaw, ...liveList]
-      }
-
-      if (historyRes.status === "fulfilled") {
-        const histList = readOrders(historyRes.value.data)
-        
-        // Avoid duplicates if any overlap
-        const existingIds = new Set(combinedRaw.map(o => o.id))
-        const uniqueHist = histList.filter((order) => !existingIds.has(order.id))
-        combinedRaw = [...combinedRaw, ...uniqueHist]
-      }
-
-      setOrders(normalizeOrders(combinedRaw))
-      setError("")
-    } catch (error: unknown) {
-      console.error("Failed to fetch live orders:", error)
-      setError(requestMessage(error, "Failed to load live orders."))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+    },
+    []
+  )
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void fetchBranches(), 0)
@@ -155,7 +168,7 @@ export default function StaffDashboard() {
       if (document.visibilityState === "visible") void fetchOrders(selectedBranchId)
     }
     const initialLoad = window.setTimeout(() => void fetchOrders(selectedBranchId), 0)
-    const intervalId = window.setInterval(refreshOrders, 5000)
+    const intervalId = window.setInterval(refreshOrders, 4000)
 
     return () => {
       window.clearTimeout(initialLoad)
@@ -164,16 +177,17 @@ export default function StaffDashboard() {
   }, [fetchOrders, selectedBranchId])
 
   const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
-    // Optimistic UI update
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus as Order["status"] } : o))
-    
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus as Order["status"] } : o))
+    )
+
     try {
       await apiClient.patch(`/staff/orders/${orderId}/status`, { status: newStatus })
       if (selectedBranchId) {
         await fetchOrders(selectedBranchId)
       }
-    } catch (error) {
-      console.error("Failed to update order status:", error)
+    } catch (err) {
+      console.error("Failed to update order status:", err)
       if (selectedBranchId) {
         fetchOrders(selectedBranchId)
       }
@@ -181,17 +195,17 @@ export default function StaffDashboard() {
   }
 
   const counts = {
-    active: orders.filter(o => o.status !== 'delivered').length,
-    pending: orders.filter(o => o.status === 'pending').length,
-    preparing: orders.filter(o => o.status === 'preparing').length,
-    ready: orders.filter(o => o.status === 'ready').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
+    active: orders.filter((o) => o.status !== "delivered").length,
+    pending: orders.filter((o) => o.status === "pending").length,
+    preparing: orders.filter((o) => o.status === "preparing").length,
+    ready: orders.filter((o) => o.status === "ready").length,
+    delivered: orders.filter((o) => o.status === "delivered").length,
     all: orders.length,
   }
 
   const filteredOrders = orders
-    .filter(o => {
-      if (statusFilter === "active") return o.status !== 'delivered'
+    .filter((o) => {
+      if (statusFilter === "active") return o.status !== "delivered"
       if (statusFilter === "all") return true
       return o.status === statusFilter
     })
@@ -203,124 +217,135 @@ export default function StaffDashboard() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
 
-  return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 pb-20">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-outfit text-white">Live Kitchen Orders</h1>
-          <p className="text-zinc-400 text-sm mt-1">Real-time incoming orders from customer table QR scans.</p>
-        </div>
+  const isAdmin = session?.user?.role === "admin"
 
-        <div className="flex items-center gap-3">
-          {/* Admins can switch branches; cashiers see their fixed assignment. */}
-          {session?.user.role === "admin" && branches.length > 1 ? (
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-              <Building2 className="w-4 h-4 text-primary-400" />
-              <select 
-                value={selectedBranchId} 
-                onChange={(event) => {
+  return (
+    <div className="space-y-4 pb-16">
+      {/* Action Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#181120] border border-white/[0.08] p-3 sm:p-4 rounded-2xl">
+        <h1 className="text-lg sm:text-xl font-black text-white">الطلبات الواردة</h1>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Admin Branch Selector / Fixed Assigned Branch */}
+          {isAdmin && branches.length > 1 ? (
+            <div className="relative flex items-center bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-1.5">
+              <Building2 size={13} className="text-[#8cd1ca] ml-2 shrink-0" />
+              <select
+                value={selectedBranchId}
+                onChange={(e) => {
                   setOrders([])
                   setError("")
                   setLoading(true)
-                  setSelectedBranchId(event.target.value)
+                  setSelectedBranchId(e.target.value)
                 }}
-                className="bg-transparent text-sm text-white font-medium focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs sm:text-sm text-white font-bold focus:outline-none cursor-pointer appearance-none pl-6 pr-1"
               >
-                {branches.map(b => (
-                  <option key={b.id} value={b.id} className="bg-zinc-900 text-white">
-                    {b.name || b.nameEn || b.nameAr || "Branch"}
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-[#1a1222] text-white">
+                    {b.nameAr || b.name || b.nameEn || "فرع"}
                   </option>
                 ))}
               </select>
+              <ChevronDown size={14} className="text-zinc-400 absolute left-2 pointer-events-none" />
             </div>
           ) : branches[0] ? (
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2" aria-label="Assigned branch">
-              <Building2 className="w-4 h-4 text-primary-400" />
-              <span className="text-sm text-white font-medium">
-                {branches[0].name || branches[0].nameEn || branches[0].nameAr || "Assigned branch"}
-              </span>
-              {session?.user.role === "cashier" ? <span className="text-[10px] text-zinc-500">Assigned</span> : null}
+            <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white font-bold">
+              <Building2 size={13} className="text-[#8cd1ca]" />
+              <span>{branches[0].nameAr || branches[0].name || branches[0].nameEn || "الفرع المعين"}</span>
             </div>
           ) : null}
 
-          <div className="flex items-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded-xl">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="hidden sm:inline">Live Polling Active</span>
-          </div>
+          {/* Refresh Button */}
+          <button
+            type="button"
+            onClick={() => selectedBranchId && fetchOrders(selectedBranchId, true)}
+            disabled={isRefreshing || !selectedBranchId}
+            className="h-9 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            title="تحديث"
+          >
+            <RefreshCw size={13} className={isRefreshing ? "animate-spin text-[#8cd1ca]" : ""} />
+            <span>تحديث</span>
+          </button>
         </div>
       </div>
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         {[
-          { id: "active", label: "Active Orders", count: counts.active },
-          { id: "pending", label: "New (Pending)", count: counts.pending },
-          { id: "preparing", label: "Preparing", count: counts.preparing },
-          { id: "ready", label: "Ready to Serve", count: counts.ready },
-          { id: "delivered", label: "Delivered (History)", count: counts.delivered },
-          { id: "all", label: "All Orders", count: counts.all },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setStatusFilter(tab.id as StatusFilter)}
-            className={cn(
-              "px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all whitespace-nowrap shrink-0",
-              statusFilter === tab.id
-                ? "bg-primary-500 text-black border-primary-500 shadow-md shadow-primary-500/20"
-                : "bg-white/5 text-zinc-400 border-white/10 hover:bg-white/10 hover:text-white"
-            )}
-          >
-            <span>{tab.label}</span>
-            <span className={cn(
-              "px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold",
-              statusFilter === tab.id
-                ? "bg-black/20 text-black"
-                : "bg-white/10 text-zinc-300"
-            )}>
-              {tab.count}
-            </span>
-          </button>
-        ))}
+          { id: "active", label: "النشطة", count: counts.active },
+          { id: "pending", label: "جديدة", count: counts.pending },
+          { id: "preparing", label: "قيد التجهيز", count: counts.preparing },
+          { id: "ready", label: "جاهزة للتسليم", count: counts.ready },
+          { id: "delivered", label: "سجل التسليم", count: counts.delivered },
+          { id: "all", label: "الكل", count: counts.all },
+        ].map((tab) => {
+          const isActive = statusFilter === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id as StatusFilter)}
+              className={`min-h-[38px] px-3.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all whitespace-nowrap shrink-0 ${
+                isActive
+                  ? "bg-[#f2644b] text-white border-transparent shadow-[0_4px_16px_rgba(242,100,75,0.35)]"
+                  : "bg-white/[0.04] text-zinc-400 border-white/[0.08] hover:bg-white/[0.08] hover:text-white"
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-extrabold tabular-nums ${
+                  isActive ? "bg-black/25 text-white" : "bg-white/[0.08] text-zinc-300"
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
+      {/* Error Alert */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
+        <div className="bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl text-xs font-bold">
           {error}
         </div>
       )}
 
+      {/* Main Grid or Loading / Empty States */}
       {loading && orders.length === 0 ? (
-        <div className="flex h-64 items-center justify-center">
+        <div className="flex flex-col items-center justify-center h-64 gap-3 text-zinc-400">
           <LoadingSpinner size={36} />
+          <p className="text-xs font-bold">جارٍ جلب الطلبات الواردة…</p>
         </div>
       ) : branches.length === 0 ? (
-        <div className="glass-panel p-12 text-center rounded-2xl">
-          <p className="text-zinc-400">
+        <div className="bg-[#1c1424] border border-white/[0.08] p-12 text-center rounded-2xl">
+          <p className="text-zinc-400 text-sm">
             {session?.user.role === "cashier"
-              ? "No branch is assigned to your account yet. Ask an admin to assign one from Users."
-              : "No branches found. Please create a branch in the Admin portal."}
+              ? "لم يتم تعيين فرع لحسابك حتى الآن. يرجى التواصل مع المشرف لتحديد الفرع."
+              : "لا توجد فروع مسجلة. يرجى إنشاء فرع من لوحة الإدارة أولاً."}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4.5 items-start">
           <AnimatePresence>
             {filteredOrders.map((order) => (
-              <OrderCard 
-                key={order.id} 
-                order={order} 
-                onStatusChange={handleStatusChange} 
+              <OrderCard
+                key={order.id}
+                order={order}
+                onStatusChange={handleStatusChange}
               />
             ))}
           </AnimatePresence>
-          
+
           {filteredOrders.length === 0 && (
-            <div className="col-span-full py-20 text-center text-neutral-400 glass-panel rounded-2xl border border-white/10">
-              <p className="text-lg font-medium text-white mb-1">No orders in this section 👨‍🍳</p>
-              <p className="text-sm text-zinc-500">
-                {statusFilter === 'delivered' 
-                  ? 'Orders marked as Delivered will appear in this history list.' 
-                  : 'Orders placed by customers via table QR codes will appear here instantly.'}
+            <div className="col-span-full py-16 text-center bg-[#1c1424] border border-white/[0.08] rounded-2xl flex flex-col items-center justify-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-400 mb-1">
+                <Inbox size={22} />
+              </div>
+              <p className="text-base font-bold text-white">لا توجد طلبات في هذا القسم حالياً</p>
+              <p className="text-xs text-zinc-400 max-w-sm">
+                {statusFilter === "delivered"
+                  ? "الطلبات التي تم تسليمها للعملاء ستظهر في هذا السجل."
+                  : "عند قيام العملاء بمسح الرمز وإرسال الطلبات ستظهر هنا فوراً."}
               </p>
             </div>
           )}

@@ -1,10 +1,12 @@
 .page {
   display: grid;
-  width: min(1180px, 100%);
+  width: 100%;
+  max-width: 1240px;
   margin: 0 auto;
   gap: 24px;
   color: #fffdf9;
   font-family: var(--font-thmanyah), var(--font-arabic), sans-serif;
+  box-sizing: border-box;
 }
 
 .liveRegion,
@@ -84,32 +86,51 @@
 }
 
 .primaryButton {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   background: var(--admin-coral, #f2644b);
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(242, 100, 75, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 18px rgba(242, 100, 75, 0.38);
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out, background-color 140ms ease-out;
 }
 
 .primaryButton:hover:not(:disabled) {
-  background: #ff7058;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(242, 100, 75, 0.4);
+  background: #ff735c;
+  transform: translateY(-1.5px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 24px rgba(242, 100, 75, 0.48);
+}
+
+.primaryButton:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.96);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(242, 100, 75, 0.25);
 }
 
 .primaryButton:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.48;
 }
 
 .secondaryButton {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(223, 210, 235, 0.14);
+  background: rgba(255, 255, 255, 0.055);
   color: #e2d8e6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 140ms ease-out, background-color 140ms ease-out, border-color 140ms ease-out;
 }
 
-.secondaryButton:hover {
-  background: rgba(255, 255, 255, 0.12);
+.secondaryButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(223, 210, 235, 0.25);
   color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.secondaryButton:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.96);
 }
 
 /* Summary Grid */
@@ -230,7 +251,7 @@
 
 .searchField svg {
   position: absolute;
-  right: 12px;
+  inset-inline-start: 12px;
   color: #8d8093;
   pointer-events: none;
 }
@@ -238,7 +259,9 @@
 .searchField input {
   width: 100%;
   height: 40px;
-  padding: 0 36px 0 32px;
+  padding-block: 0;
+  padding-inline-start: 38px;
+  padding-inline-end: 16px;
   border: 1px solid rgba(223, 210, 235, 0.15);
   border-radius: 12px;
   background: rgba(255, 253, 249, 0.06);

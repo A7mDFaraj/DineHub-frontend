@@ -503,7 +503,8 @@
 @media (max-width: 860px) {
   .shell {
     display: block;
-    padding: 8px;
+    padding: 0;
+    overflow-x: hidden;
   }
 
   .sidebar {
@@ -511,17 +512,25 @@
   }
 
   .workspace {
-    min-height: calc(100svh - 16px);
-    border-radius: 22px;
+    min-height: 100svh;
+    border-radius: 0;
+    border: none;
+    overflow-x: hidden;
   }
 
   .mobileHeader {
     display: flex;
-    min-height: 76px;
+    min-height: 66px;
     align-items: center;
     justify-content: space-between;
     border-block-end: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 6px 14px;
+    padding: 8px 16px;
+    background: rgba(32, 24, 39, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    position: sticky;
+    top: 0;
+    z-index: 50;
   }
 
   .mobileHeader .brand {
@@ -531,13 +540,14 @@
   }
 
   .mobileHeader .brand img {
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
   }
 
   .contextBar {
-    min-height: 58px;
-    padding: 0 18px;
+    min-height: 46px;
+    padding: 0 16px;
+    background: rgba(25, 19, 31, 0.5);
   }
 
   .contextBar p {
@@ -545,8 +555,10 @@
   }
 
   .main {
-    height: calc(100svh - 150px);
-    padding: 18px 14px 28px;
+    height: auto;
+    min-height: calc(100svh - 112px);
+    overflow-y: visible;
+    padding: 16px 14px 48px;
   }
 }
 

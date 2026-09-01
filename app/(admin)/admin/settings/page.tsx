@@ -1,420 +1,529 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { 
-  Store, Palette, Building2, Save, Loader2, CheckCircle2, 
-  Sparkles, Smartphone, MapPin, Sliders
-} from "lucide-react"
-import { apiClient } from "@/lib/api-client"
-import { ImageUploader } from "@/components/ui/image-uploader"
-import { cn } from "@/lib/utils"
-
-interface Branch {
-  id: string
-  name?: string
-  nameEn?: string
-  nameAr?: string
-  address?: string
-  logoUrl?: string
-  themeColor?: string
-}
+import { useEffect, useState } from "react";
+import {
+  Building2,
+  CheckCircle2,
+  Image as ImageIcon,
+  Loader2,
+  MapPin,
+  Palette,
+  Phone,
+  RotateCcw,
+  Save,
+  Smartphone,
+  Sparkles,
+  Store,
+} from "lucide-react";
+import { apiClient } from "@/lib/api-client";
+import { useAdminBranch } from "@/lib/admin-branch-context";
+import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
+import { ImageUploader } from "@/components/ui/image-uploader";
+import styles from "./settings.module.css";
 
 const PRESET_COLORS = [
-  { name: "Luxury Gold", hex: "#D4AF37" },
-  { name: "Emerald Green", hex: "#10B981" },
-  { name: "Crimson Rose", hex: "#E11D48" },
-  { name: "Royal Blue", hex: "#3B82F6" },
-  { name: "Sunset Amber", hex: "#F59E0B" },
-  { name: "Deep Violet", hex: "#8B5CF6" },
-  { name: "Teal Mint", hex: "#14B8A6" },
-  { name: "Ruby Red", hex: "#DC2626" },
-]
+  { name: "مرجاني DineHub", hex: "#f2644b" },
+  { name: "تيل مهدئ", hex: "#47aaa1" },
+  { name: "ذهبي فاخر", hex: "#d4af37" },
+  { name: "أرجواني ملكي", hex: "#8b5cf6" },
+  { name: "زمردي طبيعي", hex: "#10b981" },
+  { name: "أزرق ياقوتي", hex: "#3b82f6" },
+  { name: "وردي مخملي", hex: "#e11d48" },
+  { name: "عنبري دافئ", hex: "#f59e0b" },
+];
 
 export default function BranchSettingsPage() {
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [selectedBranchId, setSelectedBranchId] = useState<string>("")
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState("")
-  const [successMsg, setSuccessMsg] = useState("")
+  const {
+    branches,
+    selectedBranchId,
+    selectedBranch,
+    refreshBranches,
+    isLoadingBranches,
+  } = useAdminBranch();
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
+    nameEn: "",
     address: "",
+    phone: "",
     logoUrl: "",
-    themeColor: "#D4AF37",
-  })
-
-  const fetchBranches = async () => {
-    try {
-      setIsLoading(true)
-      setError("")
-      const { data } = await apiClient.get("/admin/branches")
-      const list: Branch[] = Array.isArray(data) ? data : data?.data || data?.branches || []
-      setBranches(list)
-
-      if (list.length > 0) {
-        const activeBranch = list.find((b) => b.id === selectedBranchId) || list[0]
-        setSelectedBranchId(activeBranch.id)
-        setFormData({
-          name: activeBranch.name || activeBranch.nameEn || activeBranch.nameAr || "",
-          address: activeBranch.address || "",
-          logoUrl: activeBranch.logoUrl || "",
-          themeColor: activeBranch.themeColor || "#D4AF37",
-        })
-      }
-    } catch (err: any) {
-      console.error(err)
-      setError("Failed to fetch store settings.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    themeColor: "#f2644b",
+  });
 
   useEffect(() => {
-    fetchBranches()
-  }, [])
-
-  const handleBranchSelect = (branchId: string) => {
-    setSelectedBranchId(branchId)
-    const branch = branches.find((b) => b.id === branchId)
-    if (branch) {
+    if (selectedBranch) {
       setFormData({
-        name: branch.name || branch.nameEn || branch.nameAr || "",
-        address: branch.address || "",
-        logoUrl: branch.logoUrl || "",
-        themeColor: branch.themeColor || "#D4AF37",
-      })
-      setSuccessMsg("")
-      setError("")
+        name: selectedBranch.nameAr || selectedBranch.name || "",
+        nameEn: selectedBranch.nameEn || "",
+        address: selectedBranch.address || "",
+        phone: selectedBranch.phone || "",
+        logoUrl: selectedBranch.logoUrl || "",
+        themeColor: selectedBranch.themeColor || "#f2644b",
+      });
+      setErrorMsg("");
+      setSuccessMsg("");
     }
-  }
+  }, [selectedBranchId, selectedBranch]);
 
   const handleSave = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    if (!selectedBranchId) return
+    if (e) e.preventDefault();
+    if (!selectedBranchId) {
+      setErrorMsg("يرجى اختيار فرع أولاً.");
+      return;
+    }
+    if (!formData.name.trim() && !formData.nameEn.trim()) {
+      setErrorMsg("يرجى إدخال اسم الفرع.");
+      return;
+    }
 
     try {
-      setIsSaving(true)
-      setError("")
-      setSuccessMsg("")
+      setIsSaving(true);
+      setErrorMsg("");
+      setSuccessMsg("");
+
+      const primaryName = formData.name.trim() || formData.nameEn.trim();
 
       await apiClient.patch(`/admin/branches/${selectedBranchId}`, {
-        name: formData.name.trim() || undefined,
+        name: primaryName,
+        nameAr: formData.name.trim() || undefined,
+        nameEn: formData.nameEn.trim() || undefined,
         address: formData.address.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
         logoUrl: formData.logoUrl.trim() || undefined,
-        themeColor: formData.themeColor.trim() || "#D4AF37",
-      })
+        themeColor: formData.themeColor.trim() || "#f2644b",
+      });
 
-      setSuccessMsg("Brand settings saved successfully! The customer QR menu is now updated.")
-      
-      // Update local state
-      setBranches((prev) =>
-        prev.map((b) =>
-          b.id === selectedBranchId
-            ? {
-                ...b,
-                name: formData.name,
-                address: formData.address,
-                logoUrl: formData.logoUrl,
-                themeColor: formData.themeColor,
-              }
-            : b
-        )
-      )
-
-      setTimeout(() => setSuccessMsg(""), 5000)
+      setSuccessMsg("تم حفظ إعدادات الهوية والفرع بنجاح! تم تحديث شاشة العميل.");
+      await refreshBranches();
+      setTimeout(() => setSuccessMsg(""), 4500);
     } catch (err: any) {
-      console.error("Save settings error:", err)
-      setError(err?.response?.data?.message || "Failed to save settings.")
+      console.error("Save settings error:", err);
+      setErrorMsg(
+        err?.response?.data?.message || "تعذر حفظ الإعدادات. يرجى المحاولة مرة أخرى."
+      );
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-      </div>
-    )
-  }
+  const selectedColorName =
+    PRESET_COLORS.find((c) => c.hex.toLowerCase() === formData.themeColor.toLowerCase())
+      ?.name || "مخصص";
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-outfit text-white">
-            Brand & Store Settings
-          </h1>
-          <p className="text-zinc-400 mt-1 text-xs sm:text-sm">
-            Customize your restaurant logo, brand colors, and public profile.
+          <p className={styles.eyebrow}>
+            <span aria-hidden="true" />
+            الإدارة • الإعدادات
+          </p>
+          <h1>هوية المتجر وإعدادات الفرع</h1>
+          <p>
+            خصص اسم مطعمك، شعارك التجاري، وألوان الواجهة التي سيراها عملاؤك عند مسح الرمز.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          {branches.length > 0 && (
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-2 px-3 flex-1 sm:flex-initial">
-              <Building2 className="w-4 h-4 text-primary-400 shrink-0" />
-              <select
-                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none text-sm w-full"
-                value={selectedBranchId}
-                onChange={(e) => handleBranchSelect(e.target.value)}
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id} className="bg-zinc-900 text-white">
-                    {b.name || b.nameEn || b.nameAr || "Branch"}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        <div className={styles.headerActions}>
+          <AdminBranchSelector />
 
           <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => refreshBranches()}
+            disabled={isLoadingBranches}
+            aria-label="تحديث البيانات"
+          >
+            <RotateCcw
+              size={17}
+              className={isLoadingBranches ? "animate-spin" : undefined}
+            />
+            <span>تحديث</span>
+          </button>
+
+          <button
+            type="button"
+            className={styles.primaryButton}
             onClick={() => handleSave()}
             disabled={isSaving || !selectedBranchId}
-            className="bg-primary-500 hover:bg-primary-600 text-black font-bold py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 text-sm transition-all shadow-lg shadow-primary-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span>Save Changes</span>
+            {isSaving ? (
+              <>
+                <Loader2 size={17} className="animate-spin" />
+                <span>جارٍ الحفظ…</span>
+              </>
+            ) : (
+              <>
+                <Save size={17} strokeWidth={2.2} />
+                <span>حفظ التغييرات</span>
+              </>
+            )}
           </button>
         </div>
-      </div>
+      </header>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-2xl text-sm">
-          {error}
+      {/* KPI Stats */}
+      <section className={styles.kpiGrid} aria-label="ملخص الإعدادات">
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="coral">
+            <Store size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>
+              {formData.name || selectedBranch?.name || "—"}
+            </span>
+            <span className={styles.kpiLabel}>اسم الفرع الحالي</span>
+          </div>
         </div>
-      )}
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="teal">
+            <ImageIcon size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>
+              {formData.logoUrl ? "شعار مخصص" : "الافتراضي"}
+            </span>
+            <span className={styles.kpiLabel}>حالة شعار المطعم</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="lilac">
+            <Palette size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>{selectedColorName}</span>
+            <span className={styles.kpiLabel}>لون الهوية المعتمد</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="plum">
+            <Sparkles size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>تحديث فوري</span>
+            <span className={styles.kpiLabel}>المزامنة مع قائمة العميل</span>
+          </div>
+        </div>
+      </section>
 
       {successMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3 rounded-2xl text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 size={16} />
+        <div className={styles.successBanner} role="status">
+          <CheckCircle2 size={18} />
           <span>{successMsg}</span>
         </div>
       )}
 
-      {branches.length === 0 ? (
-        <div className="glass-panel p-12 text-center rounded-2xl">
-          <Store className="w-12 h-12 text-zinc-500 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-white mb-1">No branches found</h3>
-          <p className="text-zinc-400 text-sm">Create a branch first to customize its brand and logo.</p>
+      {errorMsg && (
+        <div className={styles.errorBanner} role="alert">
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {!selectedBranchId ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <Building2 size={28} />
+          </div>
+          <h3>يرجى اختيار فرع أولاً</h3>
+          <p>حدد فرعاً لتعديل هويته وشعاره وبياناته.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Main Settings Column */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* Card 1: Restaurant Info & Logo */}
-            <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-6">
-              <div className="flex items-center gap-2 text-white font-bold text-lg font-outfit border-b border-white/5 pb-4">
-                <Store className="w-5 h-5 text-primary-400" />
-                <span>Store Profile & Logo</span>
+        <div className={styles.settingsGrid}>
+          {/* Form Column */}
+          <div className={styles.settingsCol}>
+            {/* Card 1: Store Details */}
+            <section className={styles.sectionCard}>
+              <div className={styles.cardHead}>
+                <div className={styles.cardHeadIcon}>
+                  <Store size={20} />
+                </div>
+                <div>
+                  <h2>بيانات الفرع والموقع</h2>
+                  <p>المعلومات الأساسية التي تظهر في ترويسة القائمة والفاتورة.</p>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                    Restaurant / Branch Name *
-                  </label>
+              <form onSubmit={handleSave} className={styles.formGrid}>
+                <div className={styles.inputGroup}>
+                  <label htmlFor="store-name-ar">اسم المطعم / الفرع (بالعربية) *</label>
                   <input
+                    id="store-name-ar"
                     type="text"
                     required
+                    placeholder="مثال: لاونج داين هب"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. DineHub Lounge"
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 text-sm"
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                    Location / Address
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="e.g. King Fahd Road, Riyadh"
-                      className="w-full bg-black/30 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 text-sm"
-                    />
-                  </div>
+                <div className={styles.inputGroup}>
+                  <label htmlFor="store-name-en">اسم الفرع (بالإنجليزية - اختياري)</label>
+                  <input
+                    id="store-name-en"
+                    type="text"
+                    dir="ltr"
+                    placeholder="e.g. DineHub Lounge"
+                    value={formData.nameEn}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nameEn: e.target.value })
+                    }
+                  />
                 </div>
 
-                {/* Logo Image Uploader */}
-                <div className="pt-2">
+                <div className={styles.inputGroup}>
+                  <label htmlFor="store-address">العنوان أو الحي</label>
+                  <input
+                    id="store-address"
+                    type="text"
+                    placeholder="مثال: طريق التخصصي، حي المعذر، الرياض"
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className={styles.inputGroup}>
+                  <label htmlFor="store-phone">رقم الهاتف أو خدمة العملاء</label>
+                  <input
+                    id="store-phone"
+                    type="tel"
+                    dir="ltr"
+                    placeholder="+966 50 000 0000"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                  />
+                </div>
+              </form>
+            </section>
+
+            {/* Card 2: Visual Identity & Brand Color */}
+            <section className={styles.sectionCard}>
+              <div className={styles.cardHead}>
+                <div className={styles.cardHeadIcon}>
+                  <Palette size={20} />
+                </div>
+                <div>
+                  <h2>الشعار واللون المميز</h2>
+                  <p>تخصيص الهوية البصرية لشاشات الطلب وقائمة العميل.</p>
+                </div>
+              </div>
+
+              <div className={styles.formGrid}>
+                <div className={styles.inputGroup}>
+                  <label>شعار الفرع أو المطعم</label>
                   <ImageUploader
                     value={formData.logoUrl}
-                    onChange={(url) => setFormData({ ...formData, logoUrl: url })}
-                    label="Store Logo / شعار المطعم"
-                    description="Upload from phone/computer or paste link (Square ratio recommended)"
+                    onChange={(url) =>
+                      setFormData({ ...formData, logoUrl: url })
+                    }
+                    label="رفع شعار المتجر"
+                    description="يفضل صورة مربعة بخلفية شفافة PNG أو WebP"
                     aspectRatio="square"
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Card 2: Theme & Brand Colors */}
-            <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-6">
-              <div className="flex items-center gap-2 text-white font-bold text-lg font-outfit border-b border-white/5 pb-4">
-                <Palette className="w-5 h-5 text-primary-400" />
-                <span>Brand Colors & Theme</span>
-              </div>
-
-              <div className="space-y-5">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block mb-2">
-                    Preset Luxury Color Palettes
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {PRESET_COLORS.map((color) => {
-                      const isSelected = formData.themeColor.toLowerCase() === color.hex.toLowerCase()
+                <div className={styles.inputGroup}>
+                  <label>لون الهوية الرئيسي لشاشات العميل</label>
+                  <div className={styles.colorPresetsGrid}>
+                    {PRESET_COLORS.map((preset) => {
+                      const isActive =
+                        formData.themeColor.toLowerCase() === preset.hex.toLowerCase();
                       return (
                         <button
-                          key={color.hex}
+                          key={preset.hex}
                           type="button"
-                          onClick={() => setFormData({ ...formData, themeColor: color.hex })}
-                          className={cn(
-                            "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-medium transition-all select-none text-left",
-                            isSelected
-                              ? "bg-white/10 border-white/40 shadow-md"
-                              : "bg-white/[0.02] border-white/5 hover:bg-white/[0.05]"
-                          )}
+                          className={styles.colorOption}
+                          data-active={String(isActive)}
+                          onClick={() =>
+                            setFormData({ ...formData, themeColor: preset.hex })
+                          }
                         >
-                          <div
-                            className="w-4 h-4 rounded-full shadow-sm shrink-0 border border-white/20"
-                            style={{ backgroundColor: color.hex }}
+                          <span
+                            className={styles.colorSwatch}
+                            style={{ backgroundColor: preset.hex }}
                           />
-                          <span className="text-zinc-200 truncate">{color.name}</span>
+                          <span>{preset.name}</span>
                         </button>
-                      )
+                      );
                     })}
                   </div>
                 </div>
-
-                <div className="pt-2 border-t border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
-                      Custom Hex Color Picker
-                    </label>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      Fine-tune the exact hex code of your restaurant brand.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3 bg-black/40 border border-white/10 p-2 rounded-2xl shrink-0">
-                    <input
-                      type="color"
-                      value={formData.themeColor}
-                      onChange={(e) => setFormData({ ...formData, themeColor: e.target.value })}
-                      className="w-9 h-9 rounded-xl cursor-pointer border-0 p-0 bg-transparent"
-                    />
-                    <input
-                      type="text"
-                      value={formData.themeColor}
-                      onChange={(e) => setFormData({ ...formData, themeColor: e.target.value })}
-                      className="w-24 bg-transparent font-mono text-sm text-white font-bold uppercase focus:outline-none"
-                    />
-                  </div>
-                </div>
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Live Mobile Customer Menu Preview Column */}
-          <div className="lg:col-span-5 lg:sticky lg:top-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                <Smartphone className="w-4 h-4 text-primary-400" />
-                <span>Live Customer Menu Preview</span>
-              </span>
-              <span className="text-[11px] text-zinc-500 font-mono">Mobile QR View</span>
-            </div>
-
-            {/* Mobile Device Mockup */}
-            <div className="w-full max-w-sm mx-auto rounded-[32px] border-4 border-zinc-800 bg-[#0d0d10] p-4 shadow-2xl space-y-4 overflow-hidden relative">
-              {/* Simulated Customer Header */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                <div className="flex items-center gap-2.5">
-                  {formData.logoUrl ? (
-                    <div className="w-9 h-9 rounded-xl overflow-hidden bg-neutral-900 border border-white/10 shrink-0">
-                      <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm"
-                      style={{ backgroundColor: `${formData.themeColor}25`, color: formData.themeColor }}
-                    >
-                      {formData.name.slice(0, 2).toUpperCase() || "DH"}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-white truncate">{formData.name || "Restaurant Name"}</h4>
-                    <p className="text-[10px] text-zinc-400">Table #4</p>
-                  </div>
-                </div>
-
-                <div
-                  className="px-2.5 py-1 rounded-full text-[10px] font-bold"
-                  style={{ backgroundColor: `${formData.themeColor}20`, color: formData.themeColor, border: `1px solid ${formData.themeColor}40` }}
-                >
-                  QR Active
-                </div>
+          {/* Live Mobile Customer Preview Column */}
+          <div className={styles.previewCol}>
+            <div className={styles.phoneFrame}>
+              <div className={styles.phoneNotch}>
+                <div className={styles.phoneSpeaker} />
               </div>
 
-              {/* Sample Dish Card in Customer Menu */}
-              <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-3 space-y-2">
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-neutral-800 border border-white/5 flex items-center justify-center text-2xl shrink-0">
-                    ☕
+              <div className={styles.phoneContent}>
+                {/* Brand Banner Header */}
+                <div className={styles.phoneHeader}>
+                  <div className={styles.phoneLogo}>
+                    {formData.logoUrl ? (
+                      <img src={formData.logoUrl} alt="Logo Preview" />
+                    ) : (
+                      <Store size={20} style={{ color: formData.themeColor }} />
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h5 className="text-xs font-bold text-white">Caramel Macchiato</h5>
-                      <span className="text-xs font-mono font-bold" style={{ color: formData.themeColor }}>
-                        SAR 22.00
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-zinc-400 line-clamp-1 mt-0.5">Espresso with vanilla syrup & caramel drizzle</p>
-                    
-                    {/* Custom Tag */}
-                    <div className="flex gap-1 mt-1">
-                      <span
-                        className="text-[9px] px-1.5 py-0.5 rounded font-medium"
-                        style={{ backgroundColor: `${formData.themeColor}15`, color: formData.themeColor }}
-                      >
-                        Extra Sugar
-                      </span>
-                    </div>
+                  <div className={styles.phoneTitles}>
+                    <strong>{formData.name || "اسم المطعم / المتجر"}</strong>
+                    <small>{formData.address || "حي النخيل، الرياض"}</small>
                   </div>
-                </div>
-
-                {/* Styled Action Button with Restaurant Color */}
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="button"
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-black shadow-md transition-transform active:scale-95"
-                    style={{ backgroundColor: formData.themeColor }}
+                  <div
+                    style={{
+                      backgroundColor: `${formData.themeColor}18`,
+                      borderColor: `${formData.themeColor}35`,
+                      borderWidth: "1px",
+                      borderStyle: "solid",
+                      borderRadius: "10px",
+                      padding: "3px 7px",
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      color: formData.themeColor,
+                      flexShrink: 0,
+                    }}
                   >
-                    + Add to Order
-                  </button>
+                    طاولة #04
+                  </div>
                 </div>
-              </div>
 
-              {/* Simulated Floating Cart Bar */}
-              <div
-                className="rounded-2xl p-3 flex items-center justify-between shadow-lg text-black font-bold text-xs"
-                style={{ backgroundColor: formData.themeColor }}
-              >
-                <span>View Order (1 Item)</span>
-                <span>SAR 22.00</span>
+                {/* Mini Category Pills */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "6px",
+                    overflowX: "hidden",
+                    paddingBottom: "2px",
+                  }}
+                >
+                  <span
+                    style={{
+                      backgroundColor: formData.themeColor,
+                      color: "#ffffff",
+                      fontSize: "0.65rem",
+                      fontWeight: 700,
+                      padding: "3px 8px",
+                      borderRadius: "8px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    الكل
+                  </span>
+                  <span
+                    style={{
+                      backgroundColor: "rgba(255, 255, 255, 0.05)",
+                      color: "#b9aebd",
+                      fontSize: "0.65rem",
+                      fontWeight: 600,
+                      padding: "3px 8px",
+                      borderRadius: "8px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    مشروبات
+                  </span>
+                  <span
+                    style={{
+                      backgroundColor: "rgba(255, 255, 255, 0.05)",
+                      color: "#b9aebd",
+                      fontSize: "0.65rem",
+                      fontWeight: 600,
+                      padding: "3px 8px",
+                      borderRadius: "8px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    حلويات
+                  </span>
+                </div>
+
+                {/* Rich Sample Product Card */}
+                <div className={styles.sampleMenuCard}>
+                  <div className={styles.sampleMenuHead}>
+                    <span style={{ fontSize: "0.78rem" }}>فلات وايت كلاسيك</span>
+                    <span style={{ color: formData.themeColor, fontSize: "0.78rem", fontWeight: 800 }}>
+                      18.00 ر.س
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.68rem", color: "#b9aebd", lineHeight: 1.4 }}>
+                    إسبريسو فاخر مع حليب مبخر بقوام مخملي ناعم
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px" }}>
+                    <span
+                      style={{
+                        backgroundColor: formData.themeColor,
+                        color: "#ffffff",
+                        fontSize: "0.65rem",
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      + إضافة
+                    </span>
+                  </div>
+                </div>
+
+                {/* Floating Cart Bar Sample */}
+                <button
+                  type="button"
+                  className={styles.sampleOrderBtn}
+                  style={{
+                    backgroundColor: formData.themeColor,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span
+                      style={{
+                        backgroundColor: "rgba(0, 0, 0, 0.25)",
+                        width: "18px",
+                        height: "18px",
+                        borderRadius: "50%",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "0.65rem",
+                        fontWeight: 800,
+                      }}
+                    >
+                      1
+                    </span>
+                    <span>عرض ومراجعة الطلب</span>
+                  </div>
+                  <span style={{ fontWeight: 800, fontFamily: "monospace" }}>18.00 ر.س</span>
+                </button>
               </div>
             </div>
+
+            <p
+              style={{
+                textAlign: "center",
+                color: "#b9aebd",
+                fontSize: "0.76rem",
+                marginTop: "12px",
+              }}
+            >
+              معاينة حية فورية لما يراه العميل على هاتفه الذكي
+            </p>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

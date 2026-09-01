@@ -1,30 +1,31 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { 
-  Download, 
-  QrCode as QrCodeIcon, 
-  Copy, 
-  Check, 
-  Building2, 
-  Plus, 
-  Loader2, 
-  Trash2, 
-  ExternalLink, 
-  Printer, 
+import * as Dialog from "@radix-ui/react-dialog";
+import {
+  Check,
+  CheckCircle2,
+  Copy,
+  Download,
+  ExternalLink,
+  Layers,
+  Loader2,
+  Plus,
+  Printer,
+  QrCode as QrCodeIcon,
+  RotateCcw,
   Search,
   Sparkles,
-  UtensilsCrossed
+  Store,
+  Trash2,
+  UtensilsCrossed,
+  X,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-
-interface Branch {
-  id: string;
-  name?: string;
-  nameEn?: string;
-  nameAr?: string;
-}
+import { useAdminBranch } from "@/lib/admin-branch-context";
+import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
+import styles from "./qr-code.module.css";
 
 interface Table {
   id: string;
@@ -32,528 +33,841 @@ interface Table {
   branchId: string;
 }
 
-export default function QrCodePage() {
-  const [branches, setBranches] = useState<Branch[]>([]);
+export default function QrCodeManagementPage() {
+  const {
+    branches,
+    selectedBranchId,
+    selectedBranch,
+  } = useAdminBranch();
+
   const [tables, setTables] = useState<Table[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [isLoadingTables, setIsLoadingTables] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Modals
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [tableToDelete, setTableToDelete] = useState<Table | null>(null);
+  const [activePrintTable, setActivePrintTable] = useState<Table | null>(null);
+
+  // Form states
   const [newTableNumber, setNewTableNumber] = useState("");
-  const [error, setError] = useState("");
+  const [batchStart, setBatchStart] = useState("1");
+  const [batchCount, setBatchCount] = useState("10");
+
+  // State flags
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedGeneral, setCopiedGeneral] = useState(false);
+
+  // Messages
+  const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const fetchTables = async (branchId: string) => {
-    try {
-      const { data } = await apiClient.get(`/admin/tables/${branchId}`);
-      setTables(Array.isArray(data) ? data : data?.data || data?.tables || []);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to fetch tables for this branch.");
-    }
-  };
+  const printAreaRef = useRef<HTMLDivElement>(null);
 
-  const fetchData = async () => {
+  const fetchTables = async (branchId: string) => {
+    if (!branchId) return;
     try {
-      setIsLoading(true);
-      setError("");
-      const { data } = await apiClient.get("/admin/branches");
-      const branchList = Array.isArray(data) ? data : data?.data || data?.branches || [];
-      setBranches(branchList);
-      
-      if (branchList.length > 0) {
-        const activeId = selectedBranchId || branchList[0].id;
-        setSelectedBranchId(activeId);
-        await fetchTables(activeId);
-      }
-    } catch (err) {
+      setIsLoadingTables(true);
+      setErrorMsg("");
+      const { data } = await apiClient.get(`/admin/tables/${branchId}`);
+      const list = Array.isArray(data) ? data : data?.data || data?.tables || [];
+      const sorted = list.slice().sort((a: Table, b: Table) => a.number - b.number);
+      setTables(sorted);
+    } catch (err: any) {
       console.error(err);
-      setError("Failed to fetch branches.");
+      setErrorMsg("تعذر جلب طاولات هذا الفرع. يرجى المحاولة لاحقاً.");
     } finally {
-      setIsLoading(false);
+      setIsLoadingTables(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (selectedBranchId) {
+      fetchTables(selectedBranchId);
+    } else {
+      setTables([]);
+    }
+  }, [selectedBranchId]);
 
-  const handleBranchChange = async (branchId: string) => {
-    setSelectedBranchId(branchId);
-    await fetchTables(branchId);
+  const getBaseOrigin = () => {
+    if (typeof window !== "undefined") {
+      return window.location.origin;
+    }
+    return "https://dinehub.a7mdfaraj.workers.dev";
   };
 
-  const handleAddTable = async (e: React.FormEvent) => {
+  const getBranchMenuUrl = () => {
+    if (!selectedBranchId) return "";
+    return `${getBaseOrigin()}/menu/${selectedBranchId}`;
+  };
+
+  const getTableMenuUrl = (tableNumber: number) => {
+    if (!selectedBranchId) return "";
+    return `${getBaseOrigin()}/menu/${selectedBranchId}/${tableNumber}`;
+  };
+
+  const handleCopy = (text: string, id: string) => {
+    if (!navigator?.clipboard) return;
+    navigator.clipboard.writeText(text);
+    if (id === "general") {
+      setCopiedGeneral(true);
+      setTimeout(() => setCopiedGeneral(false), 2500);
+    } else {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2500);
+    }
+  };
+
+  const handleDownloadQr = (svgId: string, filename: string) => {
+    const svgElement = document.getElementById(svgId);
+    if (!svgElement) return;
+
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = 600;
+      canvas.height = 600;
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 50, 50, 500, 500);
+        const pngUrl = canvas.toDataURL("image/png");
+        const downloadLink = document.createElement("a");
+        downloadLink.href = pngUrl;
+        downloadLink.download = `${filename}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      }
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  const handleAddSingleTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) {
-      setError("Please select a branch first.");
+      setErrorMsg("يرجى اختيار فرع أولاً.");
       return;
     }
-    
     const num = parseInt(newTableNumber, 10);
     if (isNaN(num) || num < 1) {
-      setError("Please enter a valid table number.");
+      setErrorMsg("يرجى إدخال رقم طاولة صحيح.");
       return;
     }
 
     try {
-      setIsCreating(true);
-      setError("");
+      setIsSubmitting(true);
+      setErrorMsg("");
       await apiClient.post("/admin/tables", {
         number: num,
-        branchId: selectedBranchId
+        branchId: selectedBranchId,
       });
+      setSuccessMsg(`تمت إضافة طاولة #${num} بنجاح.`);
       setNewTableNumber("");
-      setSuccessMsg(`Table #${num} created successfully!`);
-      setTimeout(() => setSuccessMsg(""), 3000);
+      setIsAddModalOpen(false);
       await fetchTables(selectedBranchId);
+      setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.message || "Failed to create table. It may already exist.");
+      setErrorMsg(err?.response?.data?.message || "تعذر إضافة الطاولة. قد تكون مسجلة مسبقاً.");
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteTable = async (tableId: string, tableNumber: number) => {
-    if (!confirm(`Are you sure you want to delete Table #${tableNumber}?`)) {
+  const handleBatchCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBranchId) return;
+    const start = parseInt(batchStart, 10);
+    const count = parseInt(batchCount, 10);
+
+    if (isNaN(start) || start < 1 || isNaN(count) || count < 1 || count > 50) {
+      setErrorMsg("يرجى إدخال أرقام صحيحة (العدد من 1 إلى 50).");
       return;
     }
 
     try {
-      setDeletingId(tableId);
-      setError("");
-      await apiClient.delete(`/admin/tables/${tableId}`);
-      setSuccessMsg(`Table #${tableNumber} deleted successfully.`);
-      setTimeout(() => setSuccessMsg(""), 3000);
+      setIsSubmitting(true);
+      setErrorMsg("");
+
+      const existingNumbers = new Set(tables.map((t) => t.number));
+      const promises: Promise<any>[] = [];
+
+      for (let i = 0; i < count; i++) {
+        const tableNum = start + i;
+        if (!existingNumbers.has(tableNum)) {
+          promises.push(
+            apiClient.post("/admin/tables", {
+              number: tableNum,
+              branchId: selectedBranchId,
+            })
+          );
+        }
+      }
+
+      await Promise.allSettled(promises);
+      setSuccessMsg(`تم إنشاء الطاولات بنجاح.`);
+      setIsBatchModalOpen(false);
       await fetchTables(selectedBranchId);
+      setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.message || "Failed to delete table.");
+      setErrorMsg("حدث خطأ أثناء التوليد التلقائي للطاولات.");
     } finally {
-      setDeletingId(null);
+      setIsSubmitting(false);
     }
   };
 
-  const getStoreUrl = (branchId: string, tableNumber: number) => {
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/menu/${branchId}/${tableNumber}`;
+  const handleConfirmDelete = async () => {
+    if (!tableToDelete || !selectedBranchId) return;
+
+    try {
+      setIsDeleting(true);
+      setErrorMsg("");
+      await apiClient.delete(`/admin/tables/${tableToDelete.id}`);
+      setSuccessMsg(`تم حذف طاولة #${tableToDelete.number} بنجاح.`);
+      setIsDeleteModalOpen(false);
+      setTableToDelete(null);
+      await fetchTables(selectedBranchId);
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err?.response?.data?.message || "تعذر حذف الطاولة.");
+    } finally {
+      setIsDeleting(false);
     }
-    return `https://dinehub.app/menu/${branchId}/${tableNumber}`;
   };
 
-  const filteredTables = tables
-    .filter(t => searchQuery === "" || t.number.toString().includes(searchQuery))
-    .sort((a, b) => a.number - b.number);
+  const handlePrint = () => {
+    window.print();
+  };
 
-  const activeBranchName = branches.find(b => b.id === selectedBranchId)?.name || 
-    branches.find(b => b.id === selectedBranchId)?.nameEn || 
-    branches.find(b => b.id === selectedBranchId)?.nameAr || "Branch";
+  const filteredTables = tables.filter((t) =>
+    searchQuery === "" ? true : t.number.toString().includes(searchQuery.trim())
+  );
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-16">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-outfit text-white flex items-center gap-3">
-            <div className="p-2.5 bg-primary-500/15 border border-primary-500/30 rounded-xl text-primary-400 shrink-0">
-              <QrCodeIcon className="w-6 h-6" />
-            </div>
-            Tables & QR Codes
-          </h1>
-          <p className="text-zinc-400 mt-1.5 text-xs sm:text-sm max-w-xl leading-relaxed">
-            Generate and manage digital menu QR codes for each table. Customers scan with their phones to browse and order directly.
+          <p className={styles.eyebrow}>
+            <span aria-hidden="true" />
+            الإدارة • رموز الطلب
+          </p>
+          <h1>رموز QR ونقاط طلب الطاولات</h1>
+          <p>
+            أنشئ رموز استجابة سريعة (QR) مخصصة لكل طاولة، أو شارك الرابط المباشر لقائمتك الرقمية.
           </p>
         </div>
-        
-        {/* Branch Selector */}
-        {branches.length > 0 && (
-          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 px-4 backdrop-blur-md self-start sm:self-auto w-full sm:w-auto">
-            <Building2 className="w-5 h-5 text-primary-400 shrink-0" />
-            <select 
-              className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none text-sm w-full sm:w-auto pr-6"
-              value={selectedBranchId}
-              onChange={(e) => handleBranchChange(e.target.value)}
-            >
-              {branches.map(b => (
-                <option key={b.id} value={b.id} className="bg-zinc-900 text-white">
-                  {b.name || b.nameEn || b.nameAr || "Branch"}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
 
-      {/* Notifications */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError("")} className="text-zinc-400 hover:text-white text-xs ml-4">Dismiss</button>
+        <div className={styles.headerActions}>
+          <AdminBranchSelector />
+
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => selectedBranchId && fetchTables(selectedBranchId)}
+            disabled={isLoadingTables || !selectedBranchId}
+            aria-label="تحديث الطاولات"
+          >
+            <RotateCcw
+              size={17}
+              className={isLoadingTables ? "animate-spin" : undefined}
+            />
+            <span>تحديث</span>
+          </button>
+
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => {
+              setErrorMsg("");
+              setIsAddModalOpen(true);
+            }}
+            disabled={!selectedBranchId}
+          >
+            <Plus size={18} strokeWidth={2.2} />
+            <span>إضافة طاولة</span>
+          </button>
         </div>
-      )}
+      </header>
+
+      {/* KPI Stats */}
+      <section className={styles.kpiGrid} aria-label="ملخص رموز QR">
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="coral">
+            <QrCodeIcon size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>{tables.length}</span>
+            <span className={styles.kpiLabel}>طاولات معرفة بالفرع</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="teal">
+            <UtensilsCrossed size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>
+              {selectedBranch?.nameAr || selectedBranch?.name || "الفرع المحدد"}
+            </span>
+            <span className={styles.kpiLabel}>نقطة الخدمة الحالية</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="lilac">
+            <Sparkles size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>فوري وتلقائي</span>
+            <span className={styles.kpiLabel}>توجيه مباشر لقائمة الطعام</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="plum">
+            <Printer size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>طباعة قياسية</span>
+            <span className={styles.kpiLabel}>ستاندات الطاولات والتصدير</span>
+          </div>
+        </div>
+      </section>
 
       {successMsg && (
-        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-          <Check className="w-4 h-4 shrink-0" />
+        <div className={styles.successBanner} role="status">
+          <CheckCircle2 size={18} />
           <span>{successMsg}</span>
         </div>
       )}
 
-      {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+      {errorMsg && !isAddModalOpen && !isBatchModalOpen && !isDeleteModalOpen && (
+        <div className={styles.errorBanner} role="alert">
+          <span>{errorMsg}</span>
         </div>
-      ) : branches.length === 0 ? (
-        <div className="glass-panel p-8 sm:p-12 text-center flex flex-col items-center justify-center rounded-2xl">
-          <Building2 className="w-12 h-12 text-zinc-500 mb-4" />
-          <h3 className="text-xl font-medium text-white mb-2">No branches available</h3>
-          <p className="text-zinc-400 text-sm">You need to create a branch before managing tables.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
-          
-          {/* Left Column: Add Table & Guide */}
-          <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-4">
-            <div className="glass-panel p-5 sm:p-6 border border-white/10 rounded-2xl">
-              <div className="flex items-center gap-2 mb-4">
-                <Plus className="w-5 h-5 text-primary-400" />
-                <h2 className="text-lg font-bold text-white font-outfit">Add New Table</h2>
-              </div>
+      )}
 
-              <form onSubmit={handleAddTable} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                    Table Number
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 transition-all font-mono text-lg"
-                    placeholder="e.g. 1, 2, 10"
-                    value={newTableNumber}
-                    onChange={(e) => setNewTableNumber(e.target.value)}
-                  />
-                </div>
-                
+      {/* Public Menu Showcase Banner */}
+      {selectedBranchId && (
+        <section className={styles.showcaseBanner}>
+          <div className={styles.showcaseCopy}>
+            <span className={styles.showcaseTag}>
+              <Store size={14} />
+              <span>الرابط العام لقائمة الفرع</span>
+            </span>
+            <h2>القائمة الرقمية العامة بدون تحديد طاولة</h2>
+            <p>
+              استخدم هذا الرابط العام أو رمزه في حسابات التواصل الاجتماعي، خرائط جوجل، أو خدمة الاستلام المباشر.
+            </p>
+
+            <div className={styles.urlBox}>
+              <span className={styles.urlText}>{getBranchMenuUrl()}</span>
+              <div className={styles.urlActions}>
                 <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="w-full bg-primary-500 hover:bg-primary-600 text-black font-bold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary-500/20 active:scale-[0.98]"
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => handleCopy(getBranchMenuUrl(), "general")}
                 >
-                  {isCreating ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Plus className="w-5 h-5" />
-                      Create Table QR
-                    </>
-                  )}
+                  {copiedGeneral ? <Check size={14} color="#8cd1ca" /> : <Copy size={14} />}
+                  <span>{copiedGeneral ? "تم النسخ" : "نسخ الرابط"}</span>
                 </button>
-              </form>
-            </div>
-            
-            {/* Pro Tip Card */}
-            <div className="bg-gradient-to-br from-primary-500/10 via-white/[0.02] to-transparent border border-primary-500/20 rounded-2xl p-5 space-y-3">
-              <div className="flex items-center gap-2 text-primary-400 font-semibold text-sm">
-                <Sparkles className="w-4 h-4" />
-                <span>How QR Ordering Works</span>
-              </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                Each QR code is permanently assigned to a table. You can print them or save high-res PNGs to place on table stands.
-              </p>
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-zinc-400">
-                <span>Active Branch:</span>
-                <span className="font-semibold text-white truncate max-w-[140px]">{activeBranchName}</span>
+                <a
+                  href={getBranchMenuUrl()}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.secondaryButton}
+                >
+                  <ExternalLink size={14} />
+                  <span>معاينة</span>
+                </a>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Tables Grid */}
-          <div className="lg:col-span-2 xl:col-span-3 space-y-4">
-            
-            {/* Toolbar */}
-            <div className="glass-panel p-3 px-4 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input 
-                  type="text"
-                  placeholder="Search table number..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-black/30 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50"
+          <div className={styles.showcaseActions}>
+            <div className={styles.showcaseQrCard}>
+              <QRCodeSVG
+                id="branch-general-qr"
+                value={getBranchMenuUrl()}
+                size={110}
+                level="M"
+              />
+            </div>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() =>
+                handleDownloadQr(
+                  "branch-general-qr",
+                  `dinehub-menu-${selectedBranch?.name || "branch"}`
+                )
+              }
+              title="تحميل رمز QR بدقة عالية"
+            >
+              <Download size={16} />
+              <span>تحميل الرمز</span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Filter / Action Row */}
+      <div className={styles.filterRow}>
+        <div className={styles.searchBox}>
+          <Search size={16} className={styles.searchIcon} />
+          <input
+            type="search"
+            className={styles.searchInput}
+            placeholder="ابحث برقم الطاولة (مثال: 1, 5, 12)…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <div className={styles.filterActions}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => setIsBatchModalOpen(true)}
+            disabled={!selectedBranchId}
+          >
+            <Layers size={16} />
+            <span>توليد مجموعة طاولات</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Table QR Grid */}
+      {isLoadingTables && tables.length === 0 ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <Loader2 size={28} className="animate-spin" />
+          </div>
+          <h3>جارٍ تحميل رموز الطاولات…</h3>
+        </div>
+      ) : !selectedBranchId ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <QrCodeIcon size={28} />
+          </div>
+          <h3>يرجى اختيار فرع أولاً</h3>
+        </div>
+      ) : filteredTables.length === 0 ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <QrCodeIcon size={28} />
+          </div>
+          <h3>
+            {tables.length === 0
+              ? "لا توجد طاولات معرفة في هذا الفرع بعد"
+              : "لا توجد طاولة مطابقة للبحث"}
+          </h3>
+          <p>
+            {tables.length === 0
+              ? "أضف أرقام طاولات مطعمك لتوليد رموز QR جاهزة للطباعة والطلب."
+              : "جرب البحث برقم طاولة آخر."}
+          </p>
+          {tables.length === 0 && (
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={() => setIsAddModalOpen(true)}
+              style={{ marginTop: "10px" }}
+            >
+              <Plus size={18} />
+              <span>إضافة أول طاولة الآن</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className={styles.tableGrid}>
+          {filteredTables.map((table) => {
+            const tableUrl = getTableMenuUrl(table.number);
+            const isCopied = copiedId === table.id;
+            const svgId = `table-qr-${table.id}`;
+
+            return (
+              <article key={table.id} className={styles.tableCard}>
+                <div className={styles.tableHead}>
+                  <span className={styles.tableNumberBadge}>
+                    <QrCodeIcon size={16} color="#8cd1ca" />
+                    <span>طاولة #{table.number}</span>
+                  </span>
+                </div>
+
+                <div className={styles.qrContainer}>
+                  <QRCodeSVG
+                    id={svgId}
+                    value={tableUrl}
+                    size={140}
+                    level="H"
+                  />
+                </div>
+
+                <div className={styles.tableActions}>
+                  <button
+                    type="button"
+                    className={styles.cardActionBtn}
+                    onClick={() => handleCopy(tableUrl, table.id)}
+                    title="نسخ الرابط"
+                    aria-label={`نسخ رابط طاولة ${table.number}`}
+                  >
+                    {isCopied ? <Check size={16} color="#8cd1ca" /> : <Copy size={16} />}
+                  </button>
+
+                  <a
+                    href={tableUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={styles.cardActionBtn}
+                    title="معاينة شاشة العميل"
+                    aria-label={`معاينة طاولة ${table.number}`}
+                  >
+                    <ExternalLink size={16} />
+                  </a>
+
+                  <button
+                    type="button"
+                    className={styles.cardActionBtn}
+                    onClick={() => {
+                      setActivePrintTable(table);
+                      setIsPrintModalOpen(true);
+                    }}
+                    title="طباعة ستاند الطاولة"
+                    aria-label={`طباعة ستاند طاولة ${table.number}`}
+                  >
+                    <Printer size={16} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className={styles.cardActionBtn}
+                    data-variant="danger"
+                    onClick={() => {
+                      setTableToDelete(table);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    title="حذف الطاولة"
+                    aria-label={`حذف طاولة ${table.number}`}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Single Table Modal */}
+      <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={styles.dialogOverlay} />
+          <Dialog.Content className={styles.dialogContent} dir="rtl">
+            <div className={styles.dialogHead}>
+              <Dialog.Title>إضافة طاولة جديدة</Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  aria-label="إغلاق"
+                >
+                  <X size={19} />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {errorMsg && (
+              <div
+                className={styles.errorBanner}
+                style={{ marginBottom: "16px" }}
+                role="alert"
+              >
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAddSingleTable} className={styles.formGrid}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="table-num">رقم الطاولة *</label>
+                <input
+                  id="table-num"
+                  type="number"
+                  min="1"
+                  required
+                  placeholder="مثال: 12"
+                  value={newTableNumber}
+                  onChange={(e) => setNewTableNumber(e.target.value)}
                 />
               </div>
 
-              <div className="text-xs text-zinc-400 flex items-center justify-between sm:justify-end gap-2">
-                <span className="bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 text-zinc-300 font-mono">
-                  {filteredTables.length} {filteredTables.length === 1 ? "Table" : "Tables"}
-                </span>
+              <div className={styles.dialogActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => setIsAddModalOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className={styles.primaryButton}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>جارٍ الحفظ…</span>
+                    </>
+                  ) : (
+                    <span>إنشاء الطاولة</span>
+                  )}
+                </button>
               </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Batch Create Tables Modal */}
+      <Dialog.Root open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={styles.dialogOverlay} />
+          <Dialog.Content className={styles.dialogContent} dir="rtl">
+            <div className={styles.dialogHead}>
+              <Dialog.Title>توليد مجموعة طاولات تلقائياً</Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  aria-label="إغلاق"
+                >
+                  <X size={19} />
+                </button>
+              </Dialog.Close>
             </div>
 
-            {/* Grid Container */}
-            {filteredTables.length === 0 ? (
-              <div className="glass-panel p-12 text-center flex flex-col items-center justify-center rounded-2xl border border-white/10">
-                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
-                  <UtensilsCrossed className="w-7 h-7 text-zinc-500" />
-                </div>
-                <h3 className="text-lg font-medium text-white mb-1">
-                  {searchQuery ? "No matching tables found" : "No tables yet"}
-                </h3>
-                <p className="text-zinc-400 text-xs max-w-sm">
-                  {searchQuery ? "Try searching for another table number." : "Add table numbers on the left to generate their customer QR codes."}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                {filteredTables.map((table) => (
-                  <TableQrCard 
-                    key={table.id} 
-                    table={table} 
-                    url={getStoreUrl(table.branchId, table.number)}
-                    onDelete={() => handleDeleteTable(table.id, table.number)}
-                    isDeleting={deletingId === table.id}
-                    branchName={activeBranchName}
-                  />
-                ))}
+            {errorMsg && (
+              <div
+                className={styles.errorBanner}
+                style={{ marginBottom: "16px" }}
+                role="alert"
+              >
+                <span>{errorMsg}</span>
               </div>
             )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
-function TableQrCard({ 
-  table, 
-  url, 
-  onDelete, 
-  isDeleting,
-  branchName
-}: { 
-  table: Table; 
-  url: string; 
-  onDelete: () => void;
-  isDeleting: boolean;
-  branchName: string;
-}) {
-  const qrRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
+            <form onSubmit={handleBatchCreate} className={styles.formGrid}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="batch-start">البدء من رقم الطاولة:</label>
+                <input
+                  id="batch-start"
+                  type="number"
+                  min="1"
+                  required
+                  value={batchStart}
+                  onChange={(e) => setBatchStart(e.target.value)}
+                />
+              </div>
 
-  const handleDownload = () => {
-    if (!qrRef.current) return;
-    
-    const svg = qrRef.current.querySelector("svg");
-    if (!svg) return;
-    
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new Image();
-    
-    img.onload = () => {
-      canvas.width = 400;
-      canvas.height = 500;
-      
-      if (ctx) {
-        // Background
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Brand Title
-        ctx.fillStyle = "#111827";
-        ctx.font = "bold 26px Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("DineHub Menu", canvas.width / 2, 50);
-        
-        // Table Number
-        ctx.fillStyle = "#d4af37";
-        ctx.font = "bold 20px Arial, sans-serif";
-        ctx.fillText(`Table #${table.number}`, canvas.width / 2, 85);
-        
-        // Branch Name
-        ctx.fillStyle = "#6b7280";
-        ctx.font = "14px Arial, sans-serif";
-        ctx.fillText(branchName, canvas.width / 2, 110);
-        
-        // QR Code centered
-        ctx.drawImage(img, 60, 135, 280, 280);
+              <div className={styles.inputGroup}>
+                <label htmlFor="batch-count">عدد الطاولات المراد إنشاؤها (1 إلى 50):</label>
+                <input
+                  id="batch-count"
+                  type="number"
+                  min="1"
+                  max="50"
+                  required
+                  value={batchCount}
+                  onChange={(e) => setBatchCount(e.target.value)}
+                />
+              </div>
 
-        // Scan instruction
-        ctx.fillStyle = "#374151";
-        ctx.font = "bold 15px Arial, sans-serif";
-        ctx.fillText("Scan with your phone to order", canvas.width / 2, 455);
-      }
-      
-      const pngFile = canvas.toDataURL("image/png");
-      const downloadLink = document.createElement("a");
-      downloadLink.download = `dinehub-table-${table.number}-qr.png`;
-      downloadLink.href = `${pngFile}`;
-      downloadLink.click();
-    };
-    
-    img.src = `data:image/svg+xml;base64,${btoa(svgData)}`;
-  };
+              <p style={{ color: "#b9aebd", fontSize: "0.82rem", margin: 0 }}>
+                سيتم تجاوز أي طاولة موجودة مسبقاً وتوليد الأرقام المتبقية تلقائياً.
+              </p>
 
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
+              <div className={styles.dialogActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => setIsBatchModalOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className={styles.primaryButton}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>جارٍ التوليد…</span>
+                    </>
+                  ) : (
+                    <span>توليد الطاولات الآن</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Table #${table.number} QR - DineHub</title>
-          <style>
-            body {
-              font-family: system-ui, -apple-system, sans-serif;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 100vh;
-              margin: 0;
-              background: #f3f4f6;
-            }
-            .card {
-              background: white;
-              border: 2px solid #e5e7eb;
-              border-radius: 24px;
-              padding: 40px 32px;
-              text-align: center;
-              width: 320px;
-              box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            }
-            h1 { margin: 0 0 6px 0; font-size: 26px; color: #111827; }
-            .tag {
-              display: inline-block;
-              background: #fef3c7;
-              color: #92400e;
-              font-weight: bold;
-              padding: 4px 14px;
-              border-radius: 9999px;
-              font-size: 16px;
-              margin-bottom: 8px;
-            }
-            .branch { color: #6b7280; font-size: 14px; margin-bottom: 24px; }
-            .qr { margin: 0 auto 20px; display: inline-block; }
-            .footer { font-size: 13px; color: #4b5563; font-weight: 500; }
-            @media print {
-              body { background: white; }
-              .card { border: none; box-shadow: none; width: 100%; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>DineHub</h1>
-            <div class="tag">Table #${table.number}</div>
-            <div class="branch">${branchName}</div>
-            <div class="qr">${qrRef.current?.innerHTML || ""}</div>
-            <div class="footer">Scan to browse menu & order</div>
-          </div>
-          <script>
-            window.onload = () => { window.print(); window.close(); };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
+      {/* Print Table Stand Modal */}
+      <Dialog.Root open={isPrintModalOpen} onOpenChange={setIsPrintModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={styles.dialogOverlay} />
+          <Dialog.Content className={styles.dialogContent} dir="rtl">
+            <div className={styles.dialogHead}>
+              <Dialog.Title>معاينة وطباعة ستاند الطاولة</Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  aria-label="إغلاق"
+                >
+                  <X size={19} />
+                </button>
+              </Dialog.Close>
+            </div>
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+            {activePrintTable && (
+              <div ref={printAreaRef} className={styles.tentCardPreview}>
+                <span style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f2644b" }}>
+                  DineHub
+                </span>
+                <span className={styles.tentCardTitle}>
+                  {selectedBranch?.nameAr || selectedBranch?.name || "مطعمنا الفاخر"}
+                </span>
+                <p className={styles.tentCardLead}>
+                  امسح الرمز بكاميرا هاتفك لتصفح القائمة والطلب مباشرة
+                </p>
 
-  return (
-    <div className="bg-white/[0.03] border border-white/10 hover:border-primary-500/30 rounded-2xl p-4 sm:p-5 flex flex-col justify-between transition-all group shadow-sm">
-      {/* Top Row: Title, Badge & Delete */}
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg sm:text-xl font-bold text-white font-outfit">Table #{table.number}</span>
-          <span className="text-[10px] bg-primary-500/15 text-primary-400 border border-primary-500/30 px-2 py-0.5 rounded-full font-medium shrink-0">
-            Active
-          </span>
-        </div>
+                <div style={{ background: "#ffffff", padding: "16px", borderRadius: "16px", margin: "8px 0" }}>
+                  <QRCodeSVG
+                    id={`print-qr-${activePrintTable.id}`}
+                    value={getTableMenuUrl(activePrintTable.number)}
+                    size={190}
+                    level="H"
+                  />
+                </div>
 
-        {/* Delete Button pinned to top right */}
-        <button
-          onClick={onDelete}
-          disabled={isDeleting}
-          className="p-2 hover:bg-red-500/15 text-zinc-400 hover:text-red-400 rounded-xl transition-colors shrink-0 disabled:opacity-50"
-          title="Delete Table"
-          aria-label={`Delete Table ${table.number}`}
-        >
-          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin text-red-400" /> : <Trash2 className="w-4 h-4" />}
-        </button>
-      </div>
+                <div
+                  style={{
+                    background: "#22182a",
+                    color: "#fffdf9",
+                    padding: "6px 20px",
+                    borderRadius: "999px",
+                    fontWeight: 800,
+                    fontSize: "1.05rem",
+                  }}
+                >
+                  طاولة #{activePrintTable.number}
+                </div>
+              </div>
+            )}
 
-      {/* QR Code Center Box */}
-      <div className="flex flex-col items-center justify-center my-2">
-        <div 
-          ref={qrRef}
-          className="bg-white p-3 rounded-2xl shadow-xl ring-1 ring-black/5 transition-transform group-hover:scale-105"
-        >
-          <QRCodeSVG 
-            value={url}
-            size={130}
-            level={"H"}
-            includeMargin={false}
-            fgColor="#0a0a0c"
-            bgColor="#ffffff"
-          />
-        </div>
-        <p className="text-[11px] text-zinc-400 truncate mt-3 w-full text-center px-2" title={url}>
-          {url}
-        </p>
-      </div>
-      
-      {/* Action Buttons: 2x2 on mobile, 4 in row when space permits */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4 mt-2 border-t border-white/5">
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-medium text-zinc-200 hover:text-white transition-colors"
-          title="Open Customer Menu"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-          <span>Open</span>
-        </a>
+            <div className={styles.dialogActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() =>
+                  activePrintTable &&
+                  handleDownloadQr(
+                    `print-qr-${activePrintTable.id}`,
+                    `table-${activePrintTable.number}-qr`
+                  )
+                }
+              >
+                <Download size={16} />
+                <span>تحميل كصورة PNG</span>
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={handlePrint}
+              >
+                <Printer size={16} />
+                <span>طباعة الستاند</span>
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
-        <button 
-          onClick={copyToClipboard}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-medium text-zinc-200 hover:text-white transition-colors"
-          title="Copy Menu Link"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-          <span>{copied ? "Copied" : "Copy"}</span>
-        </button>
+      {/* Delete Confirmation Modal */}
+      <Dialog.Root
+        open={isDeleteModalOpen}
+        onOpenChange={setIsDeleteModalOpen}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className={styles.dialogOverlay} />
+          <Dialog.Content className={styles.dialogContent} dir="rtl">
+            <div className={styles.dialogHead}>
+              <Dialog.Title>تأكيد حذف الطاولة</Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  aria-label="إغلاق"
+                >
+                  <X size={19} />
+                </button>
+              </Dialog.Close>
+            </div>
 
-        <button 
-          onClick={handleDownload}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-primary-500/10 hover:bg-primary-500/20 text-primary-400 rounded-xl text-xs font-medium transition-colors"
-          title="Download PNG Table Card"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Save</span>
-        </button>
+            <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
+              هل أنت متأكد من رغبتك في حذف طاولة{" "}
+              <strong style={{ color: "#fffdf9" }}>
+                "#{tableToDelete?.number}"
+              </strong>
+              ؟ لن يتمكن العملاء من مسح رمز هذه الطاولة للطلب بعد الحذف.
+            </p>
 
-        <button 
-          onClick={handlePrint}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-medium text-zinc-200 hover:text-white transition-colors"
-          title="Print Table Tent"
-        >
-          <Printer className="w-3.5 h-3.5" />
-          <span>Print</span>
-        </button>
-      </div>
+            <div className={styles.dialogActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isDeleting}
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{ background: "#be4936" }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>جارٍ الحذف…</span>
+                  </>
+                ) : (
+                  <span>نعم، احذف الطاولة</span>
+                )}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

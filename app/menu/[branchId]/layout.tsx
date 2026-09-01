@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-import { apiClient } from "@/lib/api-client";
 import { CartDrawer } from "@/components/customer/cart-drawer";
 
 interface BranchLayoutProps {
@@ -9,24 +7,25 @@ interface BranchLayoutProps {
 
 export default async function BranchLayout({ children, params }: BranchLayoutProps) {
   const resolvedParams = await params;
-  
-  // Here we would fetch branch settings for theming
-  // e.g. const { data: branch } = await apiClient.get(`/branches/${resolvedParams.branchId}`);
-  // For MVP, we mock some settings or rely on globals if backend isn't returning colors yet
-  
-  const primaryColor = "#d4af37"; // Mocking gold
-  
+
   return (
     <div 
-      className="min-h-screen relative flex flex-col pb-20"
+      className="min-h-screen bg-[#faf8f5] text-[#1c1917] font-sans antialiased relative selection:bg-[#f2644b]/20"
+      dir="rtl"
       style={{
-        // We can inject CSS variables based on branch settings here
-        // "--color-primary-500": primaryColor,
-      } as React.CSSProperties}
+        fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif",
+      }}
     >
-      <main className="flex-1 max-w-2xl mx-auto w-full p-4">
+      {/* Soft warm appetizing ambient light */}
+      <div 
+        className="fixed inset-0 pointer-events-none opacity-60 bg-[radial-gradient(ellipse_at_top,_rgba(254,243,199,0.6),_transparent_75%)]" 
+        aria-hidden="true" 
+      />
+      
+      <main className="relative z-10 max-w-xl mx-auto w-full px-3.5 sm:px-4 py-3 sm:py-5 box-border">
         {children}
       </main>
+
       <CartDrawer branchId={resolvedParams.branchId} />
     </div>
   );

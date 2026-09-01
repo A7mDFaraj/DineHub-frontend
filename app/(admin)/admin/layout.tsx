@@ -23,6 +23,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { AdminGuideTrigger, AdminOnboardingGuide } from "@/components/admin/admin-onboarding-guide";
+import { AdminBranchProvider } from "@/lib/admin-branch-context";
 import { authClient, signOut } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import logo from "@/public/brand/dinehub-logo-3d.png";
@@ -261,8 +262,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthenticatedAdminShell pathname={pathname}>
-      {children}
-    </AuthenticatedAdminShell>
+    <AdminBranchProvider>
+      <AuthenticatedAdminShell pathname={pathname}>
+        {children}
+      </AuthenticatedAdminShell>
+    </AdminBranchProvider>
   );
 }

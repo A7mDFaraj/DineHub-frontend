@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Plus, Minus, Check, Sparkles, MessageSquare, Utensils } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { X, Plus, Minus, Check, MessageSquare, SlidersHorizontal } from "lucide-react"
 
 export interface ProductAttributeItem {
   attribute: {
@@ -47,7 +45,7 @@ interface ProductModalProps {
 export function ProductModal({
   product,
   isOpen,
-  themeColor = "#D4AF37",
+  themeColor = "#f2644b",
   onClose,
   onAddToCart,
 }: ProductModalProps) {
@@ -94,132 +92,101 @@ export function ProductModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div 
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" 
+          dir="rtl"
+          style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
+        >
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/75 backdrop-blur-md"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
 
-          {/* Modal / Sheet */}
+          {/* Modal Bottom Sheet */}
           <motion.div
             initial={{ y: "100%", opacity: 0.5 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="relative z-10 w-full sm:max-w-lg bg-[#111114] border border-white/10 rounded-t-[32px] sm:rounded-[32px] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl"
+            className="relative z-10 w-full sm:max-w-lg bg-white border border-stone-200 rounded-t-[32px] sm:rounded-[28px] max-h-[88vh] flex flex-col overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.2)] text-stone-900"
           >
-            {/* Close Button Top Right */}
+            {/* Close Button Top Left (in RTL) */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/60 border border-white/10 text-zinc-300 hover:text-white flex items-center justify-center transition-colors hover:bg-black/80 shadow-md"
-              aria-label="Close modal"
+              className="absolute top-4 left-4 z-20 w-9 h-9 rounded-full bg-stone-100 border border-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center transition-colors shadow-sm"
+              aria-label="إغلاق"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
 
-            {/* Scrollable Content */}
-            <div className="overflow-y-auto flex-1 p-5 sm:p-6 space-y-6 pb-28">
-              {/* Product Header / Image */}
-              <div className="space-y-4">
-                {product.imageUrl ? (
-                  <div className="w-full h-52 sm:h-64 rounded-2xl overflow-hidden bg-neutral-900 border border-white/10 relative">
-                    <img
-                      src={product.imageUrl}
-                      alt={prodNameEn}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#111114] via-transparent to-transparent opacity-80" />
-                  </div>
-                ) : (
-                  <div className="w-full h-32 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-500">
-                    <Utensils className="w-10 h-10 stroke-[1.5]" />
-                  </div>
-                )}
-
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-xl sm:text-2xl font-bold text-white font-outfit">
-                        {prodNameAr}
-                      </h2>
-                      {prodNameEn && prodNameEn !== prodNameAr && (
-                        <p className="text-sm text-zinc-400 font-medium">{prodNameEn}</p>
-                      )}
-                    </div>
-                    <span 
-                      className="text-xl font-bold font-mono shrink-0"
-                      style={{ color: themeColor }}
-                    >
-                      SAR {unitPrice.toFixed(2)}
-                    </span>
-                  </div>
-
-                  {prodDesc && (
-                    <p className="text-xs sm:text-sm text-zinc-400 mt-2 leading-relaxed">
-                      {prodDesc}
-                    </p>
-                  )}
+            {/* Scrollable Modal Content */}
+            <div className="overflow-y-auto flex-1 p-5 sm:p-6 space-y-5">
+              {/* Product Image */}
+              {product.imageUrl && (
+                <div className="w-full h-44 sm:h-52 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200/80 outline outline-1 -outline-offset-1 outline-black/5 relative -mt-1 shadow-sm">
+                  <img
+                    src={product.imageUrl}
+                    alt={prodNameAr}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
+              )}
+
+              {/* Title and Price */}
+              <div>
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <h2 className="text-xl sm:text-2xl font-black text-stone-900 leading-tight">
+                    {prodNameAr}
+                  </h2>
+                  <span
+                    className="text-lg sm:text-xl font-black font-mono tabular-nums shrink-0"
+                    style={{ color: themeColor }}
+                  >
+                    {unitPrice.toFixed(2)} ر.س
+                  </span>
+                </div>
+                {prodDesc && (
+                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed mt-1 font-medium">
+                    {prodDesc}
+                  </p>
+                )}
               </div>
 
-              {/* Options / Attributes Section */}
+              {/* Customization Options / Attributes */}
               {product.attributes && product.attributes.length > 0 && (
-                <div className="space-y-3 pt-2 border-t border-white/10">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-semibold text-white flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4" style={{ color: themeColor }} />
-                      <span>Custom Options / خيارات إضافية</span>
-                    </label>
-                    <span className="text-xs text-zinc-500 font-mono">
-                      {selectedAttributes.length} selected
-                    </span>
+                <div className="space-y-2.5 pt-2 border-t border-stone-100">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
+                    <SlidersHorizontal size={14} style={{ color: themeColor }} />
+                    <span>الخيارات والإضافات المتاحة</span>
                   </div>
-                  <p className="text-xs text-zinc-400">
-                    Choose multiple options according to your preference.
-                  </p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                    {product.attributes.map((attrItem) => {
-                      const attr = attrItem.attribute
-                      const labelAr = attr.labelAr || attr.labelEn || "Option"
-                      const labelEn = attr.labelEn && attr.labelEn !== labelAr ? attr.labelEn : null
-                      const fullLabel = labelEn ? `${labelAr} (${labelEn})` : labelAr
-                      const isSelected = selectedAttributes.includes(fullLabel)
-
+                  <div className="grid grid-cols-2 gap-2">
+                    {product.attributes.map((attr) => {
+                      const label = attr.attribute.labelAr || attr.attribute.labelEn || ""
+                      const isSelected = selectedAttributes.includes(label)
                       return (
                         <button
-                          key={attr.id}
+                          key={attr.attribute.id}
                           type="button"
-                          onClick={() => toggleAttribute(fullLabel)}
-                          style={isSelected ? {
-                            backgroundColor: `${themeColor}20`,
-                            borderColor: themeColor,
-                            boxShadow: `0 0 15px ${themeColor}25`
-                          } : {}}
-                          className={cn(
-                            "flex items-center justify-between p-3 rounded-xl border text-left text-sm font-medium transition-all select-none active:scale-[0.98]",
-                            !isSelected && "bg-white/[0.03] border-white/10 text-zinc-300 hover:bg-white/[0.06] hover:border-white/20"
-                          )}
+                          onClick={() => toggleAttribute(label)}
+                          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
+                            isSelected
+                              ? "bg-stone-900 border-stone-900 text-white shadow-sm"
+                              : "bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100"
+                          }`}
                         >
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-white">{labelAr}</span>
-                            {labelEn && (
-                              <span className="text-xs text-zinc-400">{labelEn}</span>
-                            )}
-                          </div>
-
+                          <span className="truncate">{label}</span>
                           <div
-                            style={isSelected ? { backgroundColor: themeColor, borderColor: themeColor } : {}}
-                            className={cn(
-                              "w-5 h-5 rounded-lg flex items-center justify-center border transition-colors shrink-0 ml-2",
-                              !isSelected && "border-white/20 bg-black/30"
-                            )}
+                            className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
+                              isSelected
+                                ? "bg-white text-stone-900 border-white"
+                                : "border-stone-300 bg-white"
+                            }`}
                           >
-                            {isSelected && <Check size={13} strokeWidth={3} className="text-black" />}
+                            {isSelected && <Check size={11} strokeWidth={3} />}
                           </div>
                         </button>
                       )
@@ -228,63 +195,59 @@ export function ProductModal({
                 </div>
               )}
 
-              {/* Item Specific Note */}
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <label className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <MessageSquare className="w-4 h-4" style={{ color: themeColor }} />
-                  <span>Special Instructions for this item (Optional)</span>
+              {/* Customer Item Note */}
+              <div className="space-y-1.5 pt-2 border-t border-stone-100">
+                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                  <MessageSquare size={13} style={{ color: themeColor }} />
+                  <span>ملاحظات إضافية على هذا الطبق (اختياري)</span>
                 </label>
-                <p className="text-xs text-zinc-400">
-                  e.g., &quot;No ice&quot;, &quot;Extra hot&quot;, &quot;Sauce on the side&quot; / أي طلب خاص
-                </p>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={itemNote}
                   onChange={(e) => setItemNote(e.target.value)}
-                  placeholder="Type any specific request here..."
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:outline-none transition-colors"
-                  style={{ caretColor: themeColor }}
+                  placeholder="مثال: بدون بصل، زيادة صوص، الحليب خالي من الدسم…"
+                  className="w-full rounded-xl bg-stone-50 border border-stone-200 p-3 text-xs text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:border-stone-400 resize-none transition-all box-border font-medium"
                 />
-              </div>
-
-              {/* Quantity Selector */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                <span className="text-sm font-semibold text-white">Quantity</span>
-                <div className="flex items-center gap-3 bg-black/40 border border-white/10 rounded-full p-1">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    disabled={quantity <= 1}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 disabled:opacity-30 transition-colors"
-                    aria-label="Decrease quantity"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <span className="w-6 text-center font-mono font-bold text-white text-base">
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity((q) => q + 1)}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
-                    aria-label="Increase quantity"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
               </div>
             </div>
 
-            {/* Bottom Fixed Action Bar */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-[#111114]/95 backdrop-blur-md border-t border-white/10 flex items-center gap-3 z-20">
+            {/* Footer: Quantity Stepper & Submit */}
+            <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 flex items-center gap-3">
+              {/* Quantity Counter */}
+              <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl p-1 shrink-0 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                  className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 disabled:opacity-30 text-stone-800 flex items-center justify-center transition-colors"
+                  aria-label="إنقاص الكمية"
+                >
+                  <Minus size={15} />
+                </button>
+                <span className="w-8 text-center font-mono font-extrabold text-sm sm:text-base tabular-nums text-stone-900">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 flex items-center justify-center transition-colors"
+                  aria-label="زيادة الكمية"
+                >
+                  <Plus size={15} />
+                </button>
+              </div>
+
+              {/* Add to Cart Button */}
               <button
                 type="button"
                 onClick={handleAdd}
                 style={{ backgroundColor: themeColor }}
-                className="w-full h-12 rounded-xl text-base font-bold shadow-lg flex items-center justify-between px-6 text-black transition-transform active:scale-[0.99] hover:opacity-95"
+                className="flex-1 min-h-[48px] rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-between px-5 shadow-sm transition-all active:scale-[0.96]"
               >
-                <span>Add to Order</span>
-                <span className="font-mono text-sm font-black">SAR {totalPrice.toFixed(2)}</span>
+                <span>إضافة إلى الطلب</span>
+                <span className="font-mono tabular-nums font-black text-sm sm:text-base">
+                  {totalPrice.toFixed(2)} ر.س
+                </span>
               </button>
             </div>
           </motion.div>

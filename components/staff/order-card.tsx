@@ -1,14 +1,14 @@
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Clock, CheckCircle2, ChevronRight, MessageSquare, Sparkles } from "lucide-react"
+"use client"
+
+import { Clock, CheckCircle2, ChevronLeft, MessageSquare } from "lucide-react"
 import { motion } from "framer-motion"
 
-type OrderStatus = "pending" | "preparing" | "ready" | "delivered"
+export type OrderStatus = "pending" | "preparing" | "ready" | "delivered"
 
 export interface OrderItem {
   productId: string
   nameEn: string
+  nameAr?: string
   quantity: number
   note?: string
   selectedAttributes?: string[]
@@ -28,119 +28,178 @@ interface OrderCardProps {
   onStatusChange: (id: string, newStatus: OrderStatus) => void
 }
 
-const statusConfig: Record<OrderStatus, { color: "default" | "primary" | "success" | "secondary" | "destructive" | "outline", nextStatus: OrderStatus | null, label: string, actionLabel: string }> = {
-  pending: { color: "destructive", nextStatus: "preparing", label: "New", actionLabel: "Accept & Prepare" },
-  preparing: { color: "primary", nextStatus: "ready", label: "Preparing", actionLabel: "Mark Ready" },
-  ready: { color: "success", nextStatus: "delivered", label: "Ready", actionLabel: "Mark Delivered" },
-  delivered: { color: "secondary", nextStatus: null, label: "Delivered", actionLabel: "" },
+const statusConfig: Record<
+  OrderStatus,
+  {
+    statusTitle: string
+    statusColor: string
+    nextStatus: OrderStatus | null
+    actionLabel: string
+    actionButtonClass: string
+  }
+> = {
+  pending: {
+    statusTitle: "جديد",
+    statusColor: "text-red-400",
+    nextStatus: "preparing",
+    actionLabel: "بدء التجهيز",
+    actionButtonClass:
+      "bg-[#f2644b] hover:bg-[#ff735c] text-white shadow-[0_4px_16px_rgba(242,100,75,0.35)] active:scale-[0.96]",
+  },
+  preparing: {
+    statusTitle: "قيد التجهيز",
+    statusColor: "text-amber-400",
+    nextStatus: "ready",
+    actionLabel: "جاهز للتسليم",
+    actionButtonClass:
+      "bg-[#47aaa1] hover:bg-[#58bdb4] text-white shadow-[0_4px_16px_rgba(71,170,161,0.35)] active:scale-[0.96]",
+  },
+  ready: {
+    statusTitle: "جاهز للتسليم",
+    statusColor: "text-emerald-400",
+    nextStatus: "delivered",
+    actionLabel: "تأكيد التسليم",
+    actionButtonClass:
+      "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_4px_16px_rgba(16,185,129,0.35)] active:scale-[0.96]",
+  },
+  delivered: {
+    statusTitle: "مكتمل",
+    statusColor: "text-zinc-400",
+    nextStatus: null,
+    actionLabel: "",
+    actionButtonClass: "",
+  },
+}
+
+function formatElapsedTime(createdAt: string): { label: string; isDelayed: boolean } {
+  const diffMs = Date.now() - new Date(createdAt).getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+
+  if (diffMins < 1) return { label: "الآن", isDelayed: false }
+  if (diffMins === 1) return { label: "منذ دقيقة", isDelayed: false }
+  if (diffMins === 2) return { label: "منذ دقيقتين", isDelayed: false }
+  if (diffMins <= 10) return { label: `منذ ${diffMins} دقائق`, isDelayed: false }
+  if (diffMins < 60) return { label: `منذ ${diffMins} دقيقة`, isDelayed: diffMins > 15 }
+
+  const diffHours = Math.floor(diffMins / 60)
+  return { label: `منذ ${diffHours} ساعة`, isDelayed: true }
 }
 
 export function OrderCard({ order, onStatusChange }: OrderCardProps) {
   const config = statusConfig[order.status]
-  
-  // Format time (e.g. 10:45 AM)
-  const time = new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  
-  // Calculate how long ago the order was placed (in minutes)
-  const diffMinutes = Math.floor((new Date().getTime() - new Date(order.createdAt).getTime()) / 60000)
+  const elapsed = formatElapsedTime(order.createdAt)
+  const shortId = order.id.slice(-4).toUpperCase()
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      exit={{ opacity: 0, scale: 0.96 }}
       transition={{ duration: 0.2 }}
+      className="flex flex-col h-full rounded-2xl bg-[#1c1424] border border-white/[0.09] hover:border-white/[0.18] transition-all shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden"
+      style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
     >
-      <Card className="flex flex-col h-full border-white/10 hover:border-white/20 transition-colors">
-        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/5 rounded-t-2xl">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center font-bold text-lg border border-primary-500/30">
-              {order.tableId}
+      {/* Card Header: Table Number + Time */}
+      <div className="p-3.5 bg-white/[0.03] border-b border-white/[0.06] flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-10 h-10 rounded-xl bg-[#f2644b]/20 border border-[#f2644b]/30 text-[#ff9d8c] flex items-center justify-center font-black text-base tabular-nums">
+            {order.tableId}
+          </div>
+          <div>
+            <div className="text-sm font-black text-white flex items-center gap-1.5">
+              <span>طاولة {order.tableId}</span>
+              <span className="text-xs font-mono font-normal text-zinc-500">#{shortId}</span>
             </div>
-            <div>
-              <div className="font-mono text-sm text-zinc-300 font-semibold">Table #{order.tableId} <span className="text-zinc-500 font-normal">#{order.id.slice(-4).toUpperCase()}</span></div>
-              <div className="text-xs text-zinc-400 flex items-center gap-1 mt-0.5">
-                <Clock size={12} /> {time} 
-                {diffMinutes > 15 && order.status !== 'delivered' && (
-                  <span className="text-red-400 font-medium ml-1">({diffMinutes}m ago)</span>
-                )}
-              </div>
+            <div className="text-[0.72rem] text-zinc-400 flex items-center gap-1 font-medium">
+              <Clock size={11} className="shrink-0" />
+              <span>{elapsed.label}</span>
+              {elapsed.isDelayed && order.status !== "delivered" && (
+                <span className="text-red-400 font-bold mr-1">⚠️ تأخير</span>
+              )}
             </div>
           </div>
-          <Badge variant={config.color} className="text-xs capitalize">
-            {config.label}
-          </Badge>
         </div>
-        
-        <div className="p-4 flex-1 overflow-y-auto space-y-4">
-          {/* Order / Item Customizations Note */}
-          {order.note && (
-            <div className="bg-primary-500/10 border border-primary-500/20 rounded-xl p-3 text-xs text-primary-200 space-y-1">
-              <div className="font-bold text-primary-400 flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>Special Instructions & Notes / ملاحظات:</span>
-              </div>
-              <div className="whitespace-pre-line font-arabic text-xs leading-relaxed text-zinc-200">
-                {order.note}
-              </div>
+
+        <span className={`text-xs font-black ${config.statusColor}`}>
+          {config.statusTitle}
+        </span>
+      </div>
+
+      {/* Card Content & Items */}
+      <div className="p-4 flex-1 overflow-y-auto space-y-3">
+        {/* Customer Notes */}
+        {order.note && (
+          <div className="bg-[#f2644b]/10 border border-[#f2644b]/20 rounded-xl p-2.5 text-xs space-y-1">
+            <div className="font-bold text-[#ff9d8c] flex items-center gap-1.5 text-[0.72rem]">
+              <MessageSquare size={13} className="shrink-0" />
+              <span>ملاحظات الطلب:</span>
             </div>
-          )}
-          
-          <ul className="space-y-3 divide-y divide-white/5">
-            {order.items.map((item, idx) => {
-              const hasItemAttrs = item.selectedAttributes && item.selectedAttributes.length > 0;
-              const hasItemNote = Boolean(item.note);
+            <div className="text-zinc-200 text-xs leading-relaxed whitespace-pre-line">
+              {order.note}
+            </div>
+          </div>
+        )}
 
-              return (
-                <li key={idx} className="pt-2 first:pt-0 space-y-1">
-                  <div className="flex items-start justify-between gap-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <span className="font-bold text-primary-400 min-w-[24px] font-mono">{item.quantity}x</span>
-                      <span className="text-white font-medium">{item.nameEn}</span>
-                    </div>
+        {/* Items List */}
+        <ul className="space-y-2 divide-y divide-white/[0.04]">
+          {order.items.map((item, idx) => {
+            const hasAttrs = item.selectedAttributes && item.selectedAttributes.length > 0
+            const itemName = item.nameAr || item.nameEn || "عنصر"
+
+            return (
+              <li key={idx} className="pt-1.5 first:pt-0 space-y-0.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-black text-[#ff9d8c] text-xs font-mono tabular-nums shrink-0">
+                    {item.quantity}×
+                  </span>
+                  <span className="text-white font-bold text-xs sm:text-sm leading-snug">
+                    {itemName}
+                  </span>
+                </div>
+
+                {hasAttrs && (
+                  <div className="flex flex-wrap gap-1 mr-6">
+                    {item.selectedAttributes!.map((attr, aIdx) => (
+                      <span
+                        key={aIdx}
+                        className="text-[9px] bg-white/[0.06] text-zinc-300 px-1.5 py-0.5 rounded font-medium"
+                      >
+                        {attr}
+                      </span>
+                    ))}
                   </div>
+                )}
 
-                  {/* Render item-level attributes if passed from backend */}
-                  {hasItemAttrs && (
-                    <div className="flex flex-wrap gap-1 ml-8">
-                      {item.selectedAttributes!.map((attr, aIdx) => (
-                        <span key={aIdx} className="text-[10px] bg-white/10 text-zinc-300 px-1.5 py-0.5 rounded">
-                          {attr}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                {item.note && (
+                  <div className="text-[11px] text-zinc-400 italic mr-6">
+                    {item.note}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </div>
 
-                  {/* Render item-level note if passed from backend */}
-                  {hasItemNote && (
-                    <div className="text-xs text-zinc-400 italic ml-8 font-arabic">
-                      Note: {item.note}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-        
-        <div className="p-4 border-t border-white/5 mt-auto">
-          {config.nextStatus ? (
-            <Button 
-              variant={order.status === 'pending' ? 'primary' : 'secondary'} 
-              className="w-full justify-between group h-11 rounded-xl font-bold"
-              onClick={() => onStatusChange(order.id, config.nextStatus!)}
-            >
-              <span>{config.actionLabel}</span>
-              <ChevronRight size={16} className="transition-transform group-hover:translate-x-1" />
-            </Button>
-          ) : (
-            <Button variant="ghost" className="w-full cursor-default text-zinc-500 h-11" disabled>
-              <CheckCircle2 size={16} className="mr-2" /> Completed
-            </Button>
-          )}
-        </div>
-      </Card>
+      {/* Card Action Footer */}
+      <div className="p-3 bg-white/[0.02] border-t border-white/[0.06] mt-auto">
+        {config.nextStatus ? (
+          <button
+            type="button"
+            onClick={() => onStatusChange(order.id, config.nextStatus!)}
+            className={`w-full min-h-[42px] rounded-xl font-black text-xs sm:text-sm px-4 flex items-center justify-between transition-all ${config.actionButtonClass}`}
+          >
+            <span>{config.actionLabel}</span>
+            <ChevronLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+          </button>
+        ) : (
+          <div className="w-full min-h-[38px] rounded-xl bg-white/[0.03] text-zinc-400 flex items-center justify-center gap-1.5 text-xs font-bold">
+            <CheckCircle2 size={14} className="text-emerald-400" />
+            <span>تم تسليم الطلب</span>
+          </div>
+        )}
+      </div>
     </motion.div>
   )
 }

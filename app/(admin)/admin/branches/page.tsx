@@ -1,193 +1,431 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Store, Loader2, MapPin, Phone } from "lucide-react";
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import {
+  Building2,
+  CheckCircle2,
+  Edit3,
+  ExternalLink,
+  Loader2,
+  MapPin,
+  Phone,
+  Plus,
+  QrCode,
+  RotateCcw,
+  Settings,
+  Sparkles,
+  Store,
+  UtensilsCrossed,
+  X,
+} from "lucide-react";
+import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
-
-interface Branch {
-  id: string;
-  name?: string;
-  nameEn?: string;
-  nameAr?: string;
-  address?: string;
-  addressEn?: string;
-  addressAr?: string;
-  phone?: string;
-}
+import { useAdminBranch, type Branch } from "@/lib/admin-branch-context";
+import styles from "./branches.module.css";
 
 export default function BranchesPage() {
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState("");
+  const {
+    branches,
+    isLoadingBranches,
+    refreshBranches,
+    setSelectedBranchId,
+  } = useAdminBranch();
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
     address: "",
+    phone: "",
   });
 
-  const fetchBranches = async () => {
-    try {
-      setIsLoading(true);
-      const { data } = await apiClient.get("/admin/branches");
-      setBranches(Array.isArray(data) ? data : data?.data || data?.branches || []);
-    } catch (err) {
-      console.error(err);
-      setError("Failed to fetch branches.");
-    } finally {
-      setIsLoading(false);
-    }
+  const handleOpenCreate = () => {
+    setEditingBranch(null);
+    setFormData({ name: "", address: "", phone: "" });
+    setErrorMsg("");
+    setIsDialogOpen(true);
   };
 
-  useEffect(() => {
-    fetchBranches();
-  }, []);
+  const handleOpenEdit = (branch: Branch) => {
+    setEditingBranch(branch);
+    setFormData({
+      name: branch.name || branch.nameAr || branch.nameEn || "",
+      address: branch.address || branch.addressAr || branch.addressEn || "",
+      phone: branch.phone || "",
+    });
+    setErrorMsg("");
+    setIsDialogOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.name.trim()) {
+      setErrorMsg("يرجى إدخال اسم الفرع.");
+      return;
+    }
+
     try {
-      setIsCreating(true);
-      await apiClient.post("/admin/branches", {
-        name: formData.name.trim(),
-        address: formData.address.trim() || undefined,
-      });
-      setFormData({
-        name: "",
-        address: "",
-      });
-      fetchBranches();
-    } catch (err) {
+      setIsSubmitting(true);
+      setErrorMsg("");
+
+      if (editingBranch) {
+        await apiClient.patch(`/admin/branches/${editingBranch.id}`, {
+          name: formData.name.trim(),
+          address: formData.address.trim() || undefined,
+          phone: formData.phone.trim() || undefined,
+        });
+        setSuccessMsg(`تم تحديث بيانات فرع "${formData.name.trim()}" بنجاح.`);
+      } else {
+        const { data } = await apiClient.post("/admin/branches", {
+          name: formData.name.trim(),
+          address: formData.address.trim() || undefined,
+          phone: formData.phone.trim() || undefined,
+        });
+        const createdBranch = data?.data || data;
+        if (createdBranch?.id) {
+          setSelectedBranchId(createdBranch.id);
+        }
+        setSuccessMsg(`تم إنشاء فرع "${formData.name.trim()}" بنجاح.`);
+      }
+
+      await refreshBranches();
+      setIsDialogOpen(false);
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err: any) {
       console.error(err);
-      setError("Failed to create branch.");
+      setErrorMsg(
+        err?.response?.data?.message || "تعذر حفظ بيانات الفرع. يرجى المحاولة لاحقاً."
+      );
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
         <div>
-          <h1 className="text-3xl font-bold font-outfit text-white">Branches</h1>
-          <p className="text-zinc-400 mt-1">Manage your restaurant locations</p>
+          <p className={styles.eyebrow}>
+            <span aria-hidden="true" />
+            الإدارة • الفروع ومواقع الخدمة
+          </p>
+          <h1>إدارة الفروع ونقاط البيع</h1>
+          <p>
+            أدر مواقع مطعمك، وحدد عناوين الفروع وأرقام التواصل لربط القوائم ورموز الطلب بسلاسة.
+          </p>
         </div>
-      </div>
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-xl">
-          {error}
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => refreshBranches()}
+            disabled={isLoadingBranches}
+            aria-label="تحديث قائمة الفروع"
+          >
+            <RotateCcw
+              size={17}
+              className={isLoadingBranches ? "animate-spin" : undefined}
+            />
+            <span>تحديث</span>
+          </button>
+
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={handleOpenCreate}
+          >
+            <Plus size={18} strokeWidth={2.2} />
+            <span>إضافة فرع جديد</span>
+          </button>
+        </div>
+      </header>
+
+      {/* KPI Stats */}
+      <section className={styles.kpiGrid} aria-label="ملخص الفروع">
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="coral">
+            <Building2 size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>{branches.length}</span>
+            <span className={styles.kpiLabel}>إجمالي الفروع المسجلة</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="teal">
+            <CheckCircle2 size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>{branches.length}</span>
+            <span className={styles.kpiLabel}>الفروع النشطة والمتصلة</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="lilac">
+            <Store size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>
+              {branches.length > 0 ? "جاهز للطلب" : "بانتظار الإعداد"}
+            </span>
+            <span className={styles.kpiLabel}>الحالة التشغيلية</span>
+          </div>
+        </div>
+
+        <div className={styles.kpiCard}>
+          <div className={styles.kpiIcon} data-tone="plum">
+            <Sparkles size={22} />
+          </div>
+          <div className={styles.kpiInfo}>
+            <span className={styles.kpiValue}>QR + سحابي</span>
+            <span className={styles.kpiLabel}>نوع الخدمة المتصلة</span>
+          </div>
+        </div>
+      </section>
+
+      {successMsg && (
+        <div className={styles.successBanner} role="status">
+          <CheckCircle2 size={18} />
+          <span>{successMsg}</span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Branch List */}
-        <div className="lg:col-span-2 space-y-4">
-          {branches.length === 0 ? (
-            <div className="glass-panel p-12 text-center flex flex-col items-center justify-center">
-              <Store className="w-12 h-12 text-zinc-500 mb-4" />
-              <h3 className="text-xl font-medium text-white mb-2">No branches yet</h3>
-              <p className="text-zinc-400">Create your first branch to get started.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {branches.map((branch) => {
-                const primaryName = branch.name || branch.nameEn || branch.nameAr || "Branch";
-                const secondaryName = (branch.nameEn && branch.nameAr)
-                  ? (branch.name === branch.nameEn ? branch.nameAr : branch.nameEn)
-                  : (branch.nameAr || branch.nameEn || null);
-                const displayAddress = branch.address || branch.addressEn || branch.addressAr;
+      {errorMsg && !isDialogOpen && (
+        <div className={styles.errorBanner} role="alert">
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
-                return (
-                  <div key={branch.id} className="glass-panel p-5 flex flex-col gap-3 group hover:border-primary-500/30 transition-all">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="text-lg font-bold text-white group-hover:text-primary-400 transition-colors">
-                          {primaryName}
-                        </h3>
-                        {secondaryName && secondaryName !== primaryName ? (
-                          <p className="text-sm text-zinc-400 font-arabic">{secondaryName}</p>
-                        ) : null}
-                      </div>
-                      <div className="w-10 h-10 rounded-full bg-primary-500/10 flex items-center justify-center">
-                        <Store className="w-5 h-5 text-primary-500" />
-                      </div>
+      {/* Branch List / Grid */}
+      {isLoadingBranches && branches.length === 0 ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <Loader2 size={28} className="animate-spin" />
+          </div>
+          <h3>جارٍ تحميل بيانات الفروع…</h3>
+          <p>يرجى الانتظار ريثما يتم الاتصال بقاعدة البيانات.</p>
+        </div>
+      ) : branches.length === 0 ? (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <Store size={28} />
+          </div>
+          <h3>لا توجد فروع مسجلة حتى الآن</h3>
+          <p>
+            ابدأ بإضافة أول فرع لمطعمك لتتمكن من إنشاء قوائم الطعام وتوليد رموز QR للطاولات.
+          </p>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={handleOpenCreate}
+            style={{ marginTop: "12px" }}
+          >
+            <Plus size={18} />
+            <span>إضافة أول فرع الآن</span>
+          </button>
+        </div>
+      ) : (
+        <div className={styles.branchGrid}>
+          {branches.map((branch) => {
+            const primaryName =
+              branch.nameAr || branch.name || branch.nameEn || "فرع بدون اسم";
+            const secondaryName =
+              branch.nameEn && branch.nameAr && branch.nameAr !== branch.nameEn
+                ? branch.nameEn
+                : branch.address || "نقطة خدمة DineHub";
+            const displayAddress =
+              branch.address || branch.addressAr || branch.addressEn;
+
+            return (
+              <article key={branch.id} className={styles.branchCard}>
+                <div className={styles.cardHead}>
+                  <div className={styles.brandLock}>
+                    <div className={styles.branchLogo}>
+                      {branch.logoUrl ? (
+                        <img src={branch.logoUrl} alt={primaryName} />
+                      ) : (
+                        <Store size={24} />
+                      )}
                     </div>
-                    
-                    <div className="space-y-2 mt-2">
-                      {displayAddress ? (
-                        <div className="flex items-center gap-2 text-sm text-zinc-400">
-                          <MapPin className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{displayAddress}</span>
-                        </div>
-                      ) : null}
-                      {branch.phone ? (
-                        <div className="flex items-center gap-2 text-sm text-zinc-400">
-                          <Phone className="w-4 h-4 flex-shrink-0" />
-                          <span>{branch.phone}</span>
-                        </div>
-                      ) : null}
+                    <div className={styles.branchTitles}>
+                      <h2>{primaryName}</h2>
+                      <p>{secondaryName}</p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Create Branch Form */}
-        <div className="lg:col-span-1">
-          <div className="glass-panel p-6">
-            <h2 className="text-xl font-bold text-white mb-4">Add New Branch</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Branch Name</label>
+                  <span className={styles.statusBadge}>
+                    <i aria-hidden="true" />
+                    <span>نشط</span>
+                  </span>
+                </div>
+
+                <div className={styles.cardDetails}>
+                  <div className={styles.detailRow}>
+                    <MapPin size={15} />
+                    <span>{displayAddress || "لم يتم تحديد العنوان بعد"}</span>
+                  </div>
+                  {branch.phone && (
+                    <div className={styles.detailRow}>
+                      <Phone size={15} />
+                      <span dir="ltr">{branch.phone}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.cardNav}>
+                  <Link
+                    href="/admin/menu"
+                    className={styles.navAction}
+                    onClick={() => setSelectedBranchId(branch.id)}
+                    title="الانتقال إلى قائمة هذا الفرع"
+                  >
+                    <UtensilsCrossed size={16} />
+                    <span>القائمة</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/qr-code"
+                    className={styles.navAction}
+                    onClick={() => setSelectedBranchId(branch.id)}
+                    title="الانتقال إلى رموز QR لهذا الفرع"
+                  >
+                    <QrCode size={16} />
+                    <span>رموز QR</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/settings"
+                    className={styles.navAction}
+                    onClick={() => setSelectedBranchId(branch.id)}
+                    title="إعدادات الهوية والشعار"
+                  >
+                    <Settings size={16} />
+                    <span>الهوية</span>
+                  </Link>
+                </div>
+
+                <button
+                  type="button"
+                  className={styles.editAction}
+                  onClick={() => handleOpenEdit(branch)}
+                >
+                  <Edit3 size={15} />
+                  <span>تعديل بيانات الفرع</span>
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add / Edit Branch Dialog */}
+      <Dialog.Root open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={styles.dialogOverlay} />
+          <Dialog.Content className={styles.dialogContent} dir="rtl">
+            <div className={styles.dialogHead}>
+              <Dialog.Title>
+                {editingBranch ? "تعديل بيانات الفرع" : "إضافة فرع جديد"}
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  aria-label="إغلاق"
+                >
+                  <X size={19} />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            {errorMsg && (
+              <div
+                className={styles.errorBanner}
+                style={{ marginBottom: "16px" }}
+                role="alert"
+              >
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className={styles.formGrid}>
+              <div className={styles.inputGroup}>
+                <label htmlFor="branch-name">اسم الفرع *</label>
                 <input
+                  id="branch-name"
                   type="text"
                   required
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all"
-                  placeholder="e.g. DineHub Downtown"
+                  placeholder="مثال: فرع التخصصي - الرياض"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-300">Address (Optional)</label>
+              <div className={styles.inputGroup}>
+                <label htmlFor="branch-address">العنوان أو الحي</label>
                 <input
+                  id="branch-address"
                   type="text"
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary-500/50 transition-all"
-                  placeholder="e.g. 123 Main St, City Center"
+                  placeholder="مثال: طريق التخصصي، حي المعذر"
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={isCreating}
-                className="w-full mt-4 bg-primary-500 hover:bg-primary-600 text-black font-bold py-3 px-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-primary-500/20"
-              >
-                {isCreating ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Plus className="w-5 h-5" />
-                    Create Branch
-                  </>
-                )}
-              </button>
+              <div className={styles.inputGroup}>
+                <label htmlFor="branch-phone">رقم الهاتف أو التواصل (اختياري)</label>
+                <input
+                  id="branch-phone"
+                  type="tel"
+                  dir="ltr"
+                  placeholder="+966 50 000 0000"
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className={styles.dialogActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => setIsDialogOpen(false)}
+                  disabled={isSubmitting}
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className={styles.primaryButton}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>جارٍ الحفظ…</span>
+                    </>
+                  ) : (
+                    <span>{editingBranch ? "حفظ التعديلات" : "إنشاء الفرع"}</span>
+                  )}
+                </button>
+              </div>
             </form>
-          </div>
-        </div>
-      </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

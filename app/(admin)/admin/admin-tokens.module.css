@@ -1,4 +1,5 @@
-.theme {
+.theme,
+.tokens {
   --admin-ink: #22182a;
   --admin-plum: #4b2f51;
   --admin-coral: #f2644b;

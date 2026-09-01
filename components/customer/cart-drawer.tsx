@@ -1,43 +1,53 @@
 "use client"
 
-import { useCartStore, CartItem } from "@/store/cart-store"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useCartStore } from "@/store/cart-store"
 import { AnimatePresence, motion } from "framer-motion"
-import { Minus, Plus, ShoppingBag, X, Sparkles, MessageSquare } from "lucide-react"
+import { Minus, Plus, ShoppingBag, X, Trash2, ArrowLeft, Loader2, MessageSquare } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 
-export function CartDrawer({ 
-  branchId, 
-  tableId, 
-  themeColor = "#D4AF37" 
-}: { 
-  branchId: string; 
-  tableId?: string;
-  themeColor?: string;
+export function CartDrawer({
+  branchId,
+  tableId,
+  themeColor = "#f2644b",
+}: {
+  branchId: string
+  tableId?: string
+  themeColor?: string
 }) {
-  const { items, isCartOpen, toggleCart, updateQuantity, totalAmount, note, setNote, clearCart, totalItems } = useCartStore()
+  const {
+    items,
+    isCartOpen,
+    toggleCart,
+    updateQuantity,
+    removeItem,
+    totalAmount,
+    note,
+    setNote,
+    clearCart,
+    totalItems,
+  } = useCartStore()
+
   const params = useParams()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState("")
   const tableNumber = params?.tableNumber as string
 
-  if (!isCartOpen && items.length === 0) return null;
+  if (!isCartOpen && items.length === 0) return null
 
   const buildFormattedOrderNote = () => {
     const customizedLines: string[] = []
-    
+
     items.forEach((item) => {
       const hasAttrs = item.selectedAttributes && item.selectedAttributes.length > 0
       const hasItemNote = Boolean(item.itemNote)
 
       if (hasAttrs || hasItemNote) {
-        let line = `• ${item.quantity}x ${item.nameAr || item.nameEn}`
+        let line = `• ${item.quantity}× ${item.nameAr || item.nameEn}`
         if (hasAttrs) {
-          line += ` [${item.selectedAttributes!.join(', ')}]`
+          line += ` [${item.selectedAttributes!.join(", ")}]`
         }
         if (hasItemNote) {
           line += ` (ملاحظة: ${item.itemNote})`
@@ -49,9 +59,9 @@ export function CartDrawer({
     const generalNote = note.trim()
 
     if (customizedLines.length > 0 && generalNote) {
-      return `خيارات الطلبات:\n${customizedLines.join('\n')}\n\nملاحظة عامة: ${generalNote}`
+      return `خيارات الطلبات:\n${customizedLines.join("\n")}\n\nملاحظة عامة: ${generalNote}`
     } else if (customizedLines.length > 0) {
-      return `خيارات الطلبات:\n${customizedLines.join('\n')}`
+      return `خيارات الطلبات:\n${customizedLines.join("\n")}`
     } else {
       return generalNote
     }
@@ -59,37 +69,37 @@ export function CartDrawer({
 
   const handleSubmitOrder = async () => {
     if (!tableNumber) {
-      alert("Invalid Table Number")
+      alert("رقم الطاولة غير محدد")
       return
     }
-    
+
     setIsSubmitting(true)
     setSubmitError("")
 
     try {
       let resolvedTableId = tableId
 
-      // If table UUID wasn't passed down, fetch it via the public endpoint
+      // Fetch table UUID if not present
       if (!resolvedTableId) {
         const tableRes = await apiClient.get(`/table/${branchId}/${tableNumber}`)
         resolvedTableId = tableRes.data?.id
       }
 
       if (!resolvedTableId) {
-        throw new Error("Unable to identify table. Please refresh and try again.")
+        throw new Error("تعذر التحقق من بيانات الطاولة. يرجى تحديث الصفحة والمحاولة مجدداً.")
       }
 
       const formattedNote = buildFormattedOrderNote()
 
       const payload: {
-        branchId: string;
-        tableId: string;
-        note?: string;
-        items: { productId: string; quantity: number }[];
+        branchId: string
+        tableId: string
+        note?: string
+        items: { productId: string; quantity: number }[]
       } = {
         branchId,
         tableId: resolvedTableId,
-        items: items.map(i => ({
+        items: items.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
         })),
@@ -100,209 +110,252 @@ export function CartDrawer({
       }
 
       const res = await apiClient.post("/orders", payload)
-      
       const orderId = res.data?.id || res.data?.order?.id
+
       if (orderId) {
         clearCart()
         toggleCart()
         router.push(`/menu/${branchId}/order/${orderId}`)
       } else {
-        throw new Error("Order was submitted but no order confirmation was received.")
+        throw new Error("تم إرسال الطلب ولكن لم يتم استلام رقم التأكيد.")
       }
-    } catch (error: any) {
-      console.error("Order error:", error)
-      setSubmitError(error?.response?.data?.message || error?.message || "Failed to place order. Please try again.")
+    } catch (err: any) {
+      console.error("Order error:", err)
+      setSubmitError(
+        err?.response?.data?.message || err?.message || "تعذر إرسال الطلب. يرجى المحاولة مرة أخرى."
+      )
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const count = totalItems()
+  const total = totalAmount()
+
   return (
     <>
-      {/* Floating Cart Button */}
+      {/* Floating Bottom Cart Pill */}
       <AnimatePresence>
         {!isCartOpen && items.length > 0 && (
           <motion.div
-            initial={{ y: 100, opacity: 0 }}
+            initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md"
+            exit={{ y: 80, opacity: 0 }}
+            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md"
+            dir="rtl"
+            style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
           >
-            <button 
+            <button
               onClick={toggleCart}
               style={{ backgroundColor: themeColor }}
-              className="w-full rounded-full h-14 text-base sm:text-lg font-bold shadow-2xl flex items-center justify-between px-6 text-black border border-white/20 transition-transform active:scale-[0.98] hover:opacity-95"
+              className="w-full h-14 rounded-full text-white font-black shadow-[0_12px_32px_rgba(0,0,0,0.18)] flex items-center justify-between px-5 border border-white/20 transition-all active:scale-[0.96]"
             >
               <div className="flex items-center gap-2.5">
-                <div className="bg-black/25 w-8 h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-white">
-                  {totalItems()}
+                <div className="bg-black/20 w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white tabular-nums">
+                  {count}
                 </div>
-                <span>View Cart / مراجعة الطلب</span>
+                <span className="text-xs sm:text-sm font-bold">عرض ومراجعة الطلب</span>
               </div>
-              <span className="font-mono text-sm sm:text-base font-black">
-                SAR {totalAmount().toFixed(2)}
+              <span className="font-mono text-sm sm:text-base font-black tabular-nums">
+                {total.toFixed(2)} ر.س
               </span>
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Drawer Overlay */}
+      {/* Cart Drawer / Bottom Sheet */}
       <AnimatePresence>
         {isCartOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={toggleCart}
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Drawer Content */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 26, stiffness: 220 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-[#111114] border-t border-white/10 rounded-t-[32px] max-h-[88vh] flex flex-col shadow-2xl max-w-xl mx-auto"
+          <div 
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" 
+            dir="rtl"
+            style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
           >
-            <div className="p-4 px-5 border-b border-white/10 flex items-center justify-between">
-              <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-white font-outfit">
-                <ShoppingBag size={20} style={{ color: themeColor }} />
-                <span>Your Cart / سلة طلبك</span>
-              </h2>
-              <Button variant="ghost" size="icon" onClick={toggleCart} className="rounded-full text-zinc-400 hover:text-white">
-                <X size={20} />
-              </Button>
-            </div>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={toggleCart}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            />
 
-            <div className="overflow-y-auto p-4 sm:p-5 flex-1 space-y-4">
-              {items.length === 0 ? (
-                <div className="text-center text-zinc-500 py-12">
-                  Your cart is empty
+            {/* Sheet Box */}
+            <motion.div
+              initial={{ y: "100%", opacity: 0.5 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="relative z-10 w-full sm:max-w-lg bg-white border border-stone-200 rounded-t-[32px] sm:rounded-[28px] max-h-[88vh] flex flex-col overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.25)] text-stone-900"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+                    style={{ backgroundColor: `${themeColor}20`, color: themeColor }}
+                  >
+                    <ShoppingBag size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-black text-stone-900">سلة الطلبات</h2>
+                    <p className="text-[0.72rem] text-stone-500 font-medium">
+                      طاولة رقم #{tableNumber} • {count} عناصر
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                items.map((item: CartItem) => {
-                  const hasAttributes = item.selectedAttributes && item.selectedAttributes.length > 0
-                  const hasItemNote = Boolean(item.itemNote)
 
-                  return (
-                    <div key={item.id} className="glass-panel p-3.5 rounded-2xl border border-white/10 space-y-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-white leading-snug">
-                            {item.nameAr || item.nameEn}
-                          </h4>
-                          {item.nameEn && item.nameAr && item.nameEn !== item.nameAr && (
-                            <p className="text-xs text-zinc-400">{item.nameEn}</p>
-                          )}
-                          <div 
-                            className="text-sm font-bold font-mono mt-1"
+                <button
+                  type="button"
+                  onClick={toggleCart}
+                  className="w-9 h-9 rounded-xl bg-white border border-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center transition-colors shadow-sm"
+                  aria-label="إغلاق السلة"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+
+              {/* Items List */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+                {items.length === 0 ? (
+                  <div className="py-12 text-center text-stone-400 space-y-2">
+                    <p className="text-sm font-bold text-stone-900">سلة الطلبات فارغة</p>
+                    <p className="text-xs text-stone-500">أضف بعض الأطباق والمشروبات من القائمة لتأكيد طلبك.</p>
+                  </div>
+                ) : (
+                  items.map((item, idx) => {
+                    const itemName = item.nameAr || item.nameEn || "عنصر"
+                    const itemTotal = Number(item.price) * item.quantity
+                    const hasAttrs = item.selectedAttributes && item.selectedAttributes.length > 0
+
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-xs sm:text-sm text-stone-900 truncate">
+                            {itemName}
+                          </h3>
+                          <div
+                            className="font-mono text-xs font-black tabular-nums mt-0.5"
                             style={{ color: themeColor }}
                           >
-                            SAR {(item.price * item.quantity).toFixed(2)}
+                            {itemTotal.toFixed(2)} ر.س
                           </div>
+
+                          {/* Attributes and Notes */}
+                          {hasAttrs && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {item.selectedAttributes!.map((attr, aIdx) => (
+                                <span
+                                  key={aIdx}
+                                  className="text-[9px] bg-white border border-stone-200 text-stone-700 px-1.5 py-0.5 rounded font-bold"
+                                >
+                                  {attr}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {item.itemNote && (
+                            <p className="text-[10px] text-stone-500 italic mt-0.5">
+                              ملاحظة: {item.itemNote}
+                            </p>
+                          )}
                         </div>
-                        
-                        {/* Quantity Counter */}
-                        <div className="flex items-center gap-2 bg-black/40 rounded-full p-1 border border-white/10 shrink-0">
-                          <button 
+
+                        {/* Quantity Stepper */}
+                        <div className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-xl p-1 shrink-0 shadow-sm">
+                          <button
                             type="button"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors"
-                            aria-label="Decrease quantity"
+                            onClick={() => {
+                              if (item.quantity > 1) {
+                                updateQuantity(item.productId, item.quantity - 1)
+                              } else {
+                                removeItem(item.productId)
+                              }
+                            }}
+                            className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-red-50 hover:text-red-600 text-stone-700 flex items-center justify-center transition-colors"
+                            aria-label="إنقاص أو حذف"
                           >
-                            <Minus size={13} />
+                            {item.quantity === 1 ? <Trash2 size={13} /> : <Minus size={13} />}
                           </button>
-                          <span className="w-4 text-center font-mono font-bold text-sm text-white">{item.quantity}</span>
-                          <button 
+                          <span className="w-6 text-center font-mono font-extrabold text-xs tabular-nums text-stone-900">
+                            {item.quantity}
+                          </span>
+                          <button
                             type="button"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors"
-                            aria-label="Increase quantity"
+                            onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                            className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 flex items-center justify-center transition-colors"
+                            aria-label="زيادة الكمية"
                           >
                             <Plus size={13} />
                           </button>
                         </div>
                       </div>
+                    )
+                  })
+                )}
 
-                      {/* Render Selected Options */}
-                      {hasAttributes && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          <span className="text-[11px] text-zinc-400 flex items-center gap-1 font-medium">
-                            <Sparkles className="w-3 h-3" style={{ color: themeColor }} />
-                            Options:
-                          </span>
-                          {item.selectedAttributes!.map((opt, idx) => (
-                            <span 
-                              key={idx} 
-                              style={{ backgroundColor: `${themeColor}15`, color: themeColor, borderColor: `${themeColor}30` }}
-                              className="text-[11px] px-2 py-0.5 rounded-md border font-medium"
-                            >
-                              {opt}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                {/* General Order Notes */}
+                {items.length > 0 && (
+                  <div className="space-y-1.5 pt-2">
+                    <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                      <MessageSquare size={13} style={{ color: themeColor }} />
+                      <span>ملاحظات عامة لطاقم الخدمة (اختياري)</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="أي توجيهات إضافية تخص الطاولة أو تقديم الطلب…"
+                      className="w-full rounded-xl bg-stone-50 border border-stone-200 p-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:border-stone-400 resize-none transition-all box-border font-medium"
+                    />
+                  </div>
+                )}
 
-                      {/* Render Item Special Note */}
-                      {hasItemNote && (
-                        <div className="flex items-center gap-1.5 text-xs text-zinc-300 bg-black/30 px-2.5 py-1.5 rounded-lg border border-white/5 font-arabic">
-                          <MessageSquare className="w-3 h-3 text-amber-400 shrink-0" />
-                          <span className="truncate">{item.itemNote}</span>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-
-              {items.length > 0 && (
-                <div className="pt-2 border-t border-white/10">
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                    General Order Note (Optional) / ملاحظات عامة على الطلب
-                  </label>
-                  <Input 
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="e.g. Please bring extra napkins or cutlery..."
-                    className="bg-black/30 border-white/10 text-sm text-white placeholder:text-zinc-600 rounded-xl"
-                  />
-                </div>
-              )}
-            </div>
-
-            {items.length > 0 && (
-              <div className="p-4 sm:p-5 border-t border-white/10 bg-[#111114]">
                 {submitError && (
-                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl mb-3">
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold">
                     {submitError}
                   </div>
                 )}
-                <div className="flex justify-between items-center mb-4 font-bold text-lg text-white">
-                  <span>Total Amount</span>
-                  <span 
-                    className="font-mono text-xl"
-                    style={{ color: themeColor }}
-                  >
-                    SAR {totalAmount().toFixed(2)}
-                  </span>
-                </div>
-                <button 
-                  onClick={handleSubmitOrder}
-                  disabled={isSubmitting}
-                  style={{ backgroundColor: themeColor }}
-                  className="w-full rounded-xl h-12 text-base font-bold text-black shadow-lg transition-transform active:scale-[0.99] hover:opacity-95 disabled:opacity-50"
-                >
-                  {isSubmitting ? "Submitting Order..." : "Place Order Now / تأكيد الطلب"}
-                </button>
               </div>
-            )}
-          </motion.div>
+
+              {/* Drawer Footer */}
+              {items.length > 0 && (
+                <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 space-y-3">
+                  <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-stone-600">
+                    <span>إجمالي الحساب:</span>
+                    <span className="font-mono text-base sm:text-lg font-black text-stone-900 tabular-nums">
+                      {total.toFixed(2)} ر.س
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSubmitOrder}
+                    disabled={isSubmitting}
+                    style={{ backgroundColor: themeColor }}
+                    className="w-full min-h-[48px] rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.96] disabled:opacity-60"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>جارٍ إرسال الطلب…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>تأكيد وإرسال الطلب إلى الطاقم</span>
+                        <ArrowLeft size={16} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </>
