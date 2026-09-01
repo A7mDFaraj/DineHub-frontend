@@ -54,7 +54,7 @@ export default function BranchesPage() {
   const handleOpenEdit = (branch: Branch) => {
     setEditingBranch(branch);
     setFormData({
-      name: branch.name || branch.nameAr || branch.nameEn || "",
+      name: branch.nameAr || branch.name || branch.nameEn || "",
       address: branch.address || branch.addressAr || branch.addressEn || "",
       phone: branch.phone || "",
     });
@@ -76,6 +76,7 @@ export default function BranchesPage() {
       if (editingBranch) {
         await apiClient.patch(`/admin/branches/${editingBranch.id}`, {
           name: formData.name.trim(),
+          nameAr: formData.name.trim(),
           address: formData.address.trim() || undefined,
           phone: formData.phone.trim() || undefined,
         });

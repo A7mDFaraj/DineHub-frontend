@@ -35,6 +35,12 @@ body {
   overflow-x: hidden;
 }
 
+.admin-branch-select:focus-visible {
+  outline: 2px solid #8cd1ca;
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
 h1, h2, h3, h4 {
   text-wrap: balance;
 }

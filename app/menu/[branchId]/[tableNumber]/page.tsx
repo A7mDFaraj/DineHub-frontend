@@ -5,6 +5,7 @@ import { apiClient } from "@/lib/api-client"
 import { useCartStore } from "@/store/cart-store"
 import { Plus, UtensilsCrossed, SlidersHorizontal, Search, MapPin, Store } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { CartDrawer } from "@/components/customer/cart-drawer"
 import { ProductModal, ModalProduct } from "@/components/customer/product-modal"
 
 interface Attribute {
@@ -473,6 +474,11 @@ export default function MenuPage({
           setSelectedProductForModal(null)
         }}
         onAddToCart={handleAddToCartFromModal}
+      />
+      <CartDrawer
+        branchId={resolvedParams.branchId}
+        tableId={tableInfo?.id}
+        themeColor={branchThemeColor}
       />
     </div>
   )

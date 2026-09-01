@@ -199,7 +199,7 @@ export default function QrCodeManagementPage() {
       setErrorMsg("");
 
       const existingNumbers = new Set(tables.map((t) => t.number));
-      const promises: Promise<any>[] = [];
+      const promises: Promise<unknown>[] = [];
 
       for (let i = 0; i < count; i++) {
         const tableNum = start + i;
@@ -213,11 +213,32 @@ export default function QrCodeManagementPage() {
         }
       }
 
-      await Promise.allSettled(promises);
-      setSuccessMsg(`تم إنشاء الطاولات بنجاح.`);
-      setIsBatchModalOpen(false);
+      if (promises.length === 0) {
+        setSuccessMsg("كل أرقام الطاولات المحددة موجودة بالفعل.");
+        setIsBatchModalOpen(false);
+        return;
+      }
+
+      const results = await Promise.allSettled(promises);
+      const createdCount = results.filter(
+        (result) => result.status === "fulfilled"
+      ).length;
+      const failedCount = results.length - createdCount;
+
+      if (failedCount > 0) {
+        setErrorMsg(
+          createdCount > 0
+            ? `تم إنشاء ${createdCount} طاولات، وتعذر إنشاء ${failedCount} طاولات. يرجى المحاولة مرة أخرى.`
+            : "تعذر إنشاء الطاولات. يرجى المحاولة مرة أخرى."
+        );
+      } else {
+        setSuccessMsg(`تم إنشاء ${createdCount} طاولات بنجاح.`);
+        setIsBatchModalOpen(false);
+      }
       await fetchTables(selectedBranchId);
-      setTimeout(() => setSuccessMsg(""), 4000);
+      if (failedCount === 0) {
+        setTimeout(() => setSuccessMsg(""), 4000);
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg("حدث خطأ أثناء التوليد التلقائي للطاولات.");
@@ -247,7 +268,34 @@ export default function QrCodeManagementPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    const standMarkup = printAreaRef.current?.innerHTML;
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+
+    if (!standMarkup || !printWindow) {
+      setErrorMsg("تعذر فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة ثم المحاولة مرة أخرى.");
+      return;
+    }
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.onafterprint = () => printWindow.close();
+    };
+
+    printWindow.document.write(`<!doctype html>
+      <html dir="rtl">
+        <head>
+          <title>ستاند طاولة</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Arial, sans-serif; background: #fff; }
+            .${styles.tentCardPreview} { width: 330px; padding: 28px; text-align: center; border: 1px solid #e7e1eb; border-radius: 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+            @media print { body { min-height: auto; } }
+          </style>
+        </head>
+        <body>${standMarkup}</body>
+      </html>`);
+    printWindow.document.close();
   };
 
   const filteredTables = tables.filter((t) =>

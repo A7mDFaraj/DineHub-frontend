@@ -19,6 +19,8 @@ export function AdminBranchSelector({
     selectedBranchId,
     setSelectedBranchId,
     isLoadingBranches,
+    branchError,
+    refreshBranches,
   } = useAdminBranch();
 
   if (isLoadingBranches && branches.length === 0) {
@@ -66,8 +68,28 @@ export function AdminBranchSelector({
         }}
         className={className}
       >
-        <Building2 size={15} />
-        <span>لا توجد فروع معرفة</span>
+        <Building2 size={15} aria-hidden="true" />
+        <span>{branchError || "لا توجد فروع معرفة"}</span>
+        {branchError && (
+          <button
+            type="button"
+            onClick={() => void refreshBranches()}
+            style={{
+              marginInlineStart: "auto",
+              border: "1px solid rgba(242, 100, 75, 0.35)",
+              borderRadius: "8px",
+              background: "transparent",
+              color: "inherit",
+              cursor: "pointer",
+              font: "inherit",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              padding: "5px 8px",
+            }}
+          >
+            إعادة المحاولة
+          </button>
+        )}
       </div>
     );
   }
@@ -131,6 +153,7 @@ export function AdminBranchSelector({
         </span>
 
         <select
+          className="admin-branch-select"
           value={selectedBranchId}
           onChange={(e) => setSelectedBranchId(e.target.value)}
           aria-label={label}
@@ -146,7 +169,6 @@ export function AdminBranchSelector({
             fontFamily: "inherit",
             padding: "10px 0",
             cursor: "pointer",
-            outline: "none",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
             overflow: "hidden",
