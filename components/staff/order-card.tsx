@@ -1,7 +1,9 @@
 "use client"
 
-import { Clock, CheckCircle2, ChevronLeft, MessageSquare } from "lucide-react"
+import { Loader2, Clock, CheckCircle2, ChevronLeft, MessageSquare } from "lucide-react"
 import { motion } from "framer-motion"
+
+import { OrderElapsed } from "@/components/orders/order-elapsed"
 
 export type OrderStatus = "pending" | "preparing" | "ready" | "delivered"
 
@@ -16,6 +18,11 @@ export interface OrderItem {
 
 export interface Order {
   id: string
+  orderNumber?: number
+  updatedAt?: string
+  acceptedAt?: string | null
+  readyAt?: string | null
+  deliveredAt?: string | null
   tableId: string
   status: OrderStatus
   note: string
@@ -25,6 +32,8 @@ export interface Order {
 
 interface OrderCardProps {
   order: Order
+  isUpdating?: boolean
+  error?: string
   onStatusChange: (id: string, newStatus: OrderStatus) => void
 }
 
@@ -42,7 +51,7 @@ const statusConfig: Record<
     statusTitle: "جديد",
     statusColor: "text-red-400",
     nextStatus: "preparing",
-    actionLabel: "بدء التجهيز",
+    actionLabel: "قبول الطلب وبدء التجهيز",
     actionButtonClass:
       "bg-[#f2644b] hover:bg-[#ff735c] text-white shadow-[0_4px_16px_rgba(242,100,75,0.35)] active:scale-[0.96]",
   },
@@ -85,10 +94,10 @@ function formatElapsedTime(createdAt: string): { label: string; isDelayed: boole
   return { label: `منذ ${diffHours} ساعة`, isDelayed: true }
 }
 
-export function OrderCard({ order, onStatusChange }: OrderCardProps) {
+export function OrderCard({ order, onStatusChange, isUpdating = false, error }: OrderCardProps) {
   const config = statusConfig[order.status]
   const elapsed = formatElapsedTime(order.createdAt)
-  const shortId = order.id.slice(-4).toUpperCase()
+  const shortId = order.orderNumber?.toString().padStart(4, "0") ?? "—"
 
   return (
     <motion.div
@@ -97,7 +106,7 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ duration: 0.2 }}
-      className="flex flex-col h-full rounded-2xl bg-[#1c1424] border border-white/[0.09] hover:border-white/[0.18] transition-all shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden"
+      className="flex flex-col h-full rounded-2xl bg-[#1c1424] border border-white/[0.09] hover:border-white/[0.18] transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden"
       style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
     >
       {/* Card Header: Table Number + Time */}
@@ -109,11 +118,11 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
           <div>
             <div className="text-sm font-black text-white flex items-center gap-1.5">
               <span>طاولة {order.tableId}</span>
-              <span className="text-xs font-mono font-normal text-zinc-500">#{shortId}</span>
+              <bdi className="text-base font-mono font-black text-white">#{shortId}</bdi>
             </div>
             <div className="text-[0.72rem] text-zinc-400 flex items-center gap-1 font-medium">
               <Clock size={11} className="shrink-0" />
-              <span>{elapsed.label}</span>
+              <OrderElapsed createdAt={order.createdAt} deliveredAt={order.deliveredAt} completed={order.status === "delivered"} />
               {elapsed.isDelayed && order.status !== "delivered" && (
                 <span className="text-red-400 font-bold mr-1">⚠️ تأخير</span>
               )}
@@ -182,16 +191,20 @@ export function OrderCard({ order, onStatusChange }: OrderCardProps) {
         </ul>
       </div>
 
+      {error && <p role="alert" className="px-4 pb-3 text-xs text-red-300">{error}</p>}
+      {order.status === "ready" && <p className="px-4 pb-3 text-xs text-emerald-300">طابق الرمز #{shortId} مع شاشة العميل قبل التسليم.</p>}
       {/* Card Action Footer */}
       <div className="p-3 bg-white/[0.02] border-t border-white/[0.06] mt-auto">
         {config.nextStatus ? (
           <button
             type="button"
+            disabled={isUpdating}
+            aria-busy={isUpdating}
             onClick={() => onStatusChange(order.id, config.nextStatus!)}
-            className={`w-full min-h-[42px] rounded-xl font-black text-xs sm:text-sm px-4 flex items-center justify-between transition-all ${config.actionButtonClass}`}
+            className={`w-full min-h-[48px] rounded-xl font-black text-xs sm:text-sm px-4 flex items-center justify-between transition-all disabled:opacity-60 disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${config.actionButtonClass}`}
           >
-            <span>{config.actionLabel}</span>
-            <ChevronLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+            <span>{isUpdating ? "جارٍ تأكيد التحديث…" : config.actionLabel}</span>
+            {isUpdating ? <Loader2 size={18} className="animate-spin" /> : <ChevronLeft size={18} />}
           </button>
         ) : (
           <div className="w-full min-h-[38px] rounded-xl bg-white/[0.03] text-zinc-400 flex items-center justify-center gap-1.5 text-xs font-bold">

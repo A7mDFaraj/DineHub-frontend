@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, use, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { apiClient } from "@/lib/api-client"
 import { useCartStore } from "@/store/cart-store"
 import { Plus, UtensilsCrossed, SlidersHorizontal, Search, MapPin, Store } from "lucide-react"
@@ -40,6 +41,7 @@ interface TableInfo {
   number: number
   branchId: string
   branch?: {
+    publicCode?: string
     name?: string
     nameEn?: string
     nameAr?: string
@@ -55,6 +57,7 @@ export default function MenuPage({
   params: Promise<{ branchId: string; tableNumber: string }>
 }) {
   const resolvedParams = use(params)
+  const router = useRouter()
   const [categories, setCategories] = useState<Category[]>([])
   const [tableInfo, setTableInfo] = useState<TableInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -88,6 +91,11 @@ export default function MenuPage({
 
         if (tableRes.status === "fulfilled" && tableRes.value.data) {
           setTableInfo(tableRes.value.data)
+          const code = tableRes.value.data.branch?.publicCode
+          if (code && code !== resolvedParams.branchId) router.replace(`/menu/${code}/${tableRes.value.data.number}`)
+        } else {
+          setTableInfo(null)
+          setError("تعذر التحقق من الطاولة. امسح رمز الطاولة الصحيح أو أعد تحميل الصفحة.")
         }
       } catch (err) {
         console.error("Failed to fetch data:", err)
@@ -98,7 +106,7 @@ export default function MenuPage({
     }
 
     fetchMenuAndTable()
-  }, [resolvedParams.branchId, resolvedParams.tableNumber])
+  }, [resolvedParams.branchId, resolvedParams.tableNumber, router])
 
   const handleOpenProductModal = (product: Product) => {
     if (product.isAvailable === false) return
@@ -125,8 +133,8 @@ export default function MenuPage({
     tableInfo?.branch?.nameEn ||
     "DineHub"
 
-  const branchLogoUrl = (tableInfo?.branch as any)?.logoUrl || null
-  const branchThemeColor = (tableInfo?.branch as any)?.themeColor || "#f2644b"
+  const branchLogoUrl = tableInfo?.branch?.logoUrl || null
+  const branchThemeColor = tableInfo?.branch?.themeColor || "#f2644b"
   const branchAddress = tableInfo?.branch?.address || ""
 
   // Filter products based on search query and category
@@ -476,7 +484,7 @@ export default function MenuPage({
         onAddToCart={handleAddToCartFromModal}
       />
       <CartDrawer
-        branchId={resolvedParams.branchId}
+        branchId={tableInfo?.branchId ?? resolvedParams.branchId}
         tableId={tableInfo?.id}
         themeColor={branchThemeColor}
       />

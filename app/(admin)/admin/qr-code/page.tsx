@@ -103,12 +103,12 @@ export default function QrCodeManagementPage() {
 
   const getBranchMenuUrl = () => {
     if (!selectedBranchId) return "";
-    return `${getBaseOrigin()}/menu/${selectedBranchId}`;
+    return `${getBaseOrigin()}/menu/${selectedBranch?.publicCode ?? selectedBranchId}`;
   };
 
   const getTableMenuUrl = (tableNumber: number) => {
     if (!selectedBranchId) return "";
-    return `${getBaseOrigin()}/menu/${selectedBranchId}/${tableNumber}`;
+    return `${getBaseOrigin()}/menu/${selectedBranch?.publicCode ?? selectedBranchId}/${tableNumber}`;
   };
 
   const handleCopy = (text: string, id: string) => {

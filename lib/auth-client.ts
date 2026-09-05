@@ -3,7 +3,7 @@ import { createAuthClient } from "better-auth/react";
 import { clearAuthToken, getAuthToken, storeAuthToken } from "./auth-token";
 
 const authServerUrl = (
-  process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? "http://localhost:3000"
+  process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? "https://dinehub-backend-42eq.onrender.com"
 ).replace(/\/+$/, "");
 
 export const authClient = createAuthClient({

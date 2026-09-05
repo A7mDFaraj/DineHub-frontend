@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Store, UtensilsCrossed } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -38,6 +39,7 @@ export default function BranchMenuPage({
   params: Promise<{ branchId: string }>;
 }) {
   const { branchId } = use(params);
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -51,7 +53,10 @@ export default function BranchMenuPage({
         setError("");
         const { data } = await apiClient.get(`/menu/${branchId}`);
         const list = Array.isArray(data) ? data : data?.categories || data?.data || [];
-        if (isCurrent) setCategories(list);
+        if (isCurrent) {
+          setCategories(list);
+          if (data.branch?.publicCode && data.branch.publicCode !== branchId) router.replace(`/menu/${data.branch.publicCode}`);
+        }
       } catch (err) {
         console.error("Failed to load branch menu:", err);
         if (isCurrent) {
@@ -66,7 +71,7 @@ export default function BranchMenuPage({
     return () => {
       isCurrent = false;
     };
-  }, [branchId]);
+  }, [branchId, router]);
 
   if (isLoading) {
     return (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import axios from "axios"
 import { apiClient } from "@/lib/api-client"
 import { OrderCard, Order } from "@/components/staff/order-card"
@@ -30,6 +30,11 @@ interface RawOrderItem {
 
 interface RawOrder {
   id: string
+  orderNumber?: number
+  updatedAt?: string
+  acceptedAt?: string | null
+  readyAt?: string | null
+  deliveredAt?: string | null
   table?: { number?: number }
   tableId?: string
   status?: Order["status"]
@@ -62,7 +67,12 @@ function readOrders(data: unknown): RawOrder[] {
 function normalizeOrders(rawOrders: RawOrder[]): Order[] {
   return rawOrders.map((order) => ({
     id: order.id,
-    tableId: order.table?.number?.toString() ?? order.tableId ?? "1",
+    tableId: order.table?.number?.toString() ?? "—",
+    orderNumber: order.orderNumber,
+    updatedAt: order.updatedAt,
+    acceptedAt: order.acceptedAt,
+    readyAt: order.readyAt,
+    deliveredAt: order.deliveredAt,
     status: order.status ?? "pending",
     note: order.notes ?? order.note ?? "",
     createdAt: order.createdAt ?? new Date().toISOString(),
@@ -95,6 +105,13 @@ export default function StaffDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState("")
 
+  const fetchingBranches = useRef(new Set<string>())
+  const pendingRef = useRef(new Set<string>())
+  const requestVersion = useRef(0)
+  const branchRef = useRef("")
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({})
+
   const fetchBranches = useCallback(async () => {
     try {
       const { data } = await apiClient.get("/staff/branches")
@@ -118,6 +135,9 @@ export default function StaffDashboard() {
 
   const fetchOrders = useCallback(
     async (branchId: string, isManual = false) => {
+      if (fetchingBranches.current.has(branchId)) return
+      fetchingBranches.current.add(branchId)
+      const version = ++requestVersion.current
       if (isManual) setIsRefreshing(true)
       try {
         const [liveRes, historyRes] = await Promise.allSettled([
@@ -143,13 +163,27 @@ export default function StaffDashboard() {
           combinedRaw = [...combinedRaw, ...uniqueHist]
         }
 
-        setOrders(normalizeOrders(combinedRaw))
+        if (version !== requestVersion.current || branchRef.current !== branchId) return
+        if (liveRes.status === "rejected" || historyRes.status === "rejected") {
+          throw new Error("Partial refresh failed")
+        }
+        setOrders(previous => {
+          const existing = new Map(previous.map(order => [order.id, order]))
+          const rank = { pending: 0, preparing: 1, ready: 2, delivered: 3 }
+          const receivedIds = new Set(combinedRaw.map(order => order.id))
+          return [...normalizeOrders(combinedRaw).map(order => {
+            const old = existing.get(order.id)
+            return old && (pendingRef.current.has(order.id) || rank[old.status] > rank[order.status]) ? old : order
+          }), ...previous.filter(order => !receivedIds.has(order.id))]
+        })
         setError("")
       } catch (err: unknown) {
+        if (version !== requestVersion.current || branchRef.current !== branchId) return
         console.error("Failed to fetch live orders:", err)
         setError(requestMessage(err, "تعذر استرجاع قائمة الطلبات الحالية."))
       } finally {
-        setLoading(false)
+        fetchingBranches.current.delete(branchId)
+        if (version === requestVersion.current) setLoading(false)
         if (isManual) setIsRefreshing(false)
       }
     },
@@ -162,8 +196,10 @@ export default function StaffDashboard() {
   }, [fetchBranches])
 
   useEffect(() => {
+    branchRef.current = selectedBranchId
     if (!selectedBranchId) return
 
+    const invalidateRequests = () => { ++requestVersion.current }
     const refreshOrders = () => {
       if (document.visibilityState === "visible") void fetchOrders(selectedBranchId)
     }
@@ -171,26 +207,34 @@ export default function StaffDashboard() {
     const intervalId = window.setInterval(refreshOrders, 4000)
 
     return () => {
+      invalidateRequests()
       window.clearTimeout(initialLoad)
       window.clearInterval(intervalId)
     }
   }, [fetchOrders, selectedBranchId])
 
   const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus as Order["status"] } : o))
-    )
-
+    if (pendingRef.current.has(orderId)) return
+    const branchId = selectedBranchId
+    pendingRef.current.add(orderId)
+    setPendingIds(new Set(pendingRef.current))
+    setActionErrors(previous => ({ ...previous, [orderId]: "" }))
+    ++requestVersion.current
     try {
-      await apiClient.patch(`/staff/orders/${orderId}/status`, { status: newStatus })
-      if (selectedBranchId) {
-        await fetchOrders(selectedBranchId)
+      const { data } = await apiClient.patch(`/staff/orders/${orderId}/status`, { status: newStatus })
+      if (branchRef.current === branchId) {
+        const confirmed = normalizeOrders([data.data || data])[0]
+        ++requestVersion.current
+        setOrders(previous => previous.map(order => order.id === orderId ? confirmed : order))
       }
-    } catch (err) {
-      console.error("Failed to update order status:", err)
-      if (selectedBranchId) {
-        fetchOrders(selectedBranchId)
+    } catch {
+      if (branchRef.current === branchId) {
+        setActionErrors(previous => ({ ...previous, [orderId]: "تعذر تأكيد التحديث. سنحدّث حالة الطلب؛ تحقق منها قبل المحاولة مجدداً." }))
       }
+    } finally {
+      pendingRef.current.delete(orderId)
+      setPendingIds(new Set(pendingRef.current))
+      if (branchRef.current === branchId) void fetchOrders(branchId)
     }
   }
 
@@ -214,7 +258,7 @@ export default function StaffDashboard() {
       if (statusWeight[a.status] !== statusWeight[b.status]) {
         return statusWeight[a.status] - statusWeight[b.status]
       }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     })
 
   const isAdmin = session?.user?.role === "admin"
@@ -233,6 +277,8 @@ export default function StaffDashboard() {
               <select
                 value={selectedBranchId}
                 onChange={(e) => {
+                  branchRef.current = e.target.value
+                  ++requestVersion.current
                   setOrders([])
                   setError("")
                   setLoading(true)
@@ -305,7 +351,7 @@ export default function StaffDashboard() {
 
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl text-xs font-bold">
+        <div role="alert" className="bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl text-xs font-bold">
           {error}
         </div>
       )}
@@ -326,11 +372,13 @@ export default function StaffDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4.5 items-start">
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {filteredOrders.map((order) => (
               <OrderCard
                 key={order.id}
                 order={order}
+                isUpdating={pendingIds.has(order.id)}
+                error={actionErrors[order.id]}
                 onStatusChange={handleStatusChange}
               />
             ))}

@@ -3,8 +3,9 @@
 import { useCartStore } from "@/store/cart-store"
 import { AnimatePresence, motion } from "framer-motion"
 import { Minus, Plus, ShoppingBag, X, Trash2, ArrowLeft, Loader2, MessageSquare } from "lucide-react"
+import axios from "axios"
 import { apiClient } from "@/lib/api-client"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 
 export function CartDrawer({
@@ -31,6 +32,7 @@ export function CartDrawer({
 
   const params = useParams()
   const router = useRouter()
+  const submittingRef = useRef(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState("")
   const tableNumber = params?.tableNumber as string
@@ -68,11 +70,13 @@ export function CartDrawer({
   }
 
   const handleSubmitOrder = async () => {
+    if (submittingRef.current || items.length === 0) return
     if (!tableNumber) {
       alert("رقم الطاولة غير محدد")
       return
     }
 
+    submittingRef.current = true
     setIsSubmitting(true)
     setSubmitError("")
 
@@ -110,21 +114,21 @@ export function CartDrawer({
       }
 
       const res = await apiClient.post("/orders", payload)
-      const orderId = res.data?.id || res.data?.order?.id
+      const trackingPath = res.data?.trackingPath
 
-      if (orderId) {
+      if (typeof trackingPath === "string" && trackingPath.startsWith("/order/")) {
         clearCart()
         toggleCart()
-        router.push(`/menu/${branchId}/order/${orderId}`)
+        router.push(trackingPath)
       } else {
         throw new Error("تم إرسال الطلب ولكن لم يتم استلام رقم التأكيد.")
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Order error:", err)
-      setSubmitError(
-        err?.response?.data?.message || err?.message || "تعذر إرسال الطلب. يرجى المحاولة مرة أخرى."
-      )
+      const message = axios.isAxiosError(err) ? err.response?.data?.message : err instanceof Error ? err.message : null
+      setSubmitError(typeof message === "string" ? message : "تعذر إرسال الطلب. يرجى المحاولة مرة أخرى.")
     } finally {
+      submittingRef.current = false
       setIsSubmitting(false)
     }
   }

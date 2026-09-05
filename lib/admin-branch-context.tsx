@@ -11,6 +11,7 @@ import {
 import { apiClient } from "@/lib/api-client";
 
 export interface Branch {
+  publicCode?: string;
   id: string;
   name?: string;
   nameEn?: string;
