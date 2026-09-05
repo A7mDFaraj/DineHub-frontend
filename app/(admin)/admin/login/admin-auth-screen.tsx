@@ -308,10 +308,6 @@ export function AdminAuthScreen() {
           </div>
 
           <SignInForm />
-          <details>
-            <summary>نسيت كلمة المرور؟</summary>
-            <p>مالك النشاط: تواصل مع دعم DineHub. عضو الفريق: اطلب كلمة مرور مؤقتة من مسؤول نشاطك. الحسابات يصدرها المسؤول ولا تحتاج إلى تفعيل بالبريد.</p>
-          </details>
           <p className={styles.secureNote}>
             <ShieldCheck aria-hidden="true" size={17} />
             جلسة دخول آمنة ومشفّرة
