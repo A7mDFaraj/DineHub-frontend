@@ -1,45 +1,49 @@
-"use client"
+"use client";
 
-import { useSession } from "@/lib/auth-client"
-import { useRouter } from "next/navigation"
-import { LogOut, User, Radio } from "lucide-react"
-import { signOut } from "@/lib/auth-client"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { useEffect, useState } from "react"
+import { AccessProvider, useAccess } from "@/lib/access-context";
+import { useSession } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { LogOut, User, Radio } from "lucide-react";
+import { signOut } from "@/lib/auth-client";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useEffect, useState } from "react";
 
-export default function StaffLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const { data: session, isPending } = useSession()
-  const [isSigningOut, setIsSigningOut] = useState(false)
+function StaffShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { can, loading: accessLoading } = useAccess();
+  const { data: session, isPending } = useSession();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     if (!isPending && !session) {
-      router.replace("/admin/login")
+      router.replace("/admin/login");
     }
-  }, [isPending, router, session])
+  }, [isPending, router, session]);
 
-  if (isPending || !session) {
+  if (isPending || !session || accessLoading) {
     return (
       <div className="min-h-screen bg-[#130d1b] flex flex-col items-center justify-center gap-3 text-white">
         <LoadingSpinner size={36} />
-        <p className="text-xs text-zinc-400 animate-pulse">جارٍ التحقق من الجلسة…</p>
+        <p className="text-xs text-zinc-400 animate-pulse">
+          جارٍ التحقق من الجلسة…
+        </p>
       </div>
-    )
+    );
   }
 
   const handleLogout = async () => {
-    setIsSigningOut(true)
+    setIsSigningOut(true);
     try {
-      await signOut()
-      router.replace("/admin/login")
-      router.refresh()
+      await signOut();
+      router.replace("/admin/login");
+      router.refresh();
     } finally {
-      setIsSigningOut(false)
+      setIsSigningOut(false);
     }
-  }
+  };
 
   return (
-    <div 
+    <div
       className="min-h-screen flex flex-col bg-[#110b17] text-[#fffdf9] font-sans antialiased"
       dir="rtl"
       style={{
@@ -56,7 +60,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             شاشة الطلبات المباشرة
           </span>
         </div>
-        
+
         <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] px-3 py-1.5 rounded-xl text-xs text-zinc-300">
             <User size={13} className="text-zinc-400" />
@@ -77,10 +81,26 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
       </header>
-      
+
       <main className="flex-1 w-full max-w-[1440px] mx-auto p-4 sm:p-6 box-border">
-        {children}
+        {can("orders.read") ? (
+          children
+        ) : (
+          <p role="alert">ليس لديك صلاحية لعرض العمليات.</p>
+        )}
       </main>
     </div>
-  )
+  );
+}
+
+export default function StaffLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AccessProvider>
+      <StaffShell>{children}</StaffShell>
+    </AccessProvider>
+  );
 }

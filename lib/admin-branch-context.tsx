@@ -37,7 +37,7 @@ interface AdminBranchContextType {
 const STORAGE_KEY = "dinehub_admin_selected_branch_id";
 
 const AdminBranchContext = createContext<AdminBranchContextType | undefined>(
-  undefined
+  undefined,
 );
 
 export function AdminBranchProvider({ children }: { children: ReactNode }) {
@@ -50,7 +50,7 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoadingBranches(true);
       setBranchError("");
-      const { data } = await apiClient.get("/admin/branches");
+      const { data } = await apiClient.get("/staff/branches");
       const list: Branch[] = Array.isArray(data)
         ? data
         : data?.data || data?.branches || [];
@@ -68,8 +68,6 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
         const validStored = storedId && list.some((b) => b.id === storedId);
         const resolvedId = validStored
           ? (storedId as string)
-          : selectedBranchId && list.some((b) => b.id === selectedBranchId)
-          ? selectedBranchId
           : list[0].id;
 
         setSelectedBranchIdState(resolvedId);
@@ -82,18 +80,19 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
         setSelectedBranchIdState("");
       }
       return list;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to fetch admin branches:", err);
       setBranchError("تعذر جلب بيانات الفروع. يرجى المحاولة مرة أخرى.");
       return [];
     } finally {
       setIsLoadingBranches(false);
     }
-  }, [selectedBranchId]);
+  }, []);
 
   useEffect(() => {
-    refreshBranches();
-  }, []);
+    const timer = setTimeout(() => void refreshBranches(), 0);
+    return () => clearTimeout(timer);
+  }, [refreshBranches]);
 
   const setSelectedBranchId = useCallback((id: string) => {
     setSelectedBranchIdState(id);
@@ -129,7 +128,7 @@ export function useAdminBranch() {
   const context = useContext(AdminBranchContext);
   if (!context) {
     throw new Error(
-      "useAdminBranch must be used within an AdminBranchProvider"
+      "useAdminBranch must be used within an AdminBranchProvider",
     );
   }
   return context;

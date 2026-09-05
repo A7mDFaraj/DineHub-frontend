@@ -1,0 +1,252 @@
+.panel {
+  border: 1px solid var(--admin-border, #403345);
+  background: var(--admin-glass, #211927);
+  border-radius: 26px;
+  padding: clamp(18px, 3vw, 28px);
+  color: var(--admin-text, #fffdf9);
+}
+.section {
+  display: grid;
+  gap: 22px;
+  margin-top: 28px;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.heading h2,
+.heading h1 {
+  margin: 0;
+  font-size: clamp(20px, 2vw, 28px);
+}
+.muted {
+  color: var(--admin-muted, #b9aebd);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.button,
+.select,
+.input {
+  min-height: 44px;
+  border: 1px solid var(--admin-border, #403345);
+  border-radius: 13px;
+  padding: 10px 14px;
+  background: #2e2335;
+  color: #fffdf9;
+  font: inherit;
+}
+.button {
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.button:hover {
+  background: #403047;
+}
+.button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.primary {
+  background: var(--admin-coral, #f2644b);
+  border-color: transparent;
+  color: white;
+}
+.button:focus-visible,
+.select:focus-visible,
+.input:focus-visible,
+.check:focus-visible {
+  outline: 2px solid #f2644b;
+  outline-offset: 3px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.metric {
+  border: 1px solid var(--admin-border, #403345);
+  border-radius: 18px;
+  background: #ffffff04;
+  padding: 20px;
+  min-width: 0;
+}
+.metric strong {
+  display: block;
+  margin: 12px 0 4px;
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  color: #fffdf9;
+}
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 16px;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--admin-border, #403345);
+  min-width: 0;
+}
+.row strong {
+  overflow-wrap: anywhere;
+}
+.bar {
+  height: 7px;
+  border-radius: 10px;
+  background: #ffffff09;
+  margin-top: 9px;
+  overflow: hidden;
+}
+.bar span {
+  display: block;
+  background: #47aaa1;
+  height: 100%;
+  border-radius: 10px;
+}
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+.chart div {
+  background: #47aaa1;
+  min-width: 2px;
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #0d0818b8;
+  backdrop-filter: blur(6px);
+}
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, calc(100% - 24px));
+  max-height: 90dvh;
+  overflow-y: auto;
+  z-index: 101;
+  border: 1px solid #53415b;
+  border-radius: 24px;
+  padding: 24px;
+  background: #211927;
+  color: #fffdf9;
+  box-shadow: 0 28px 90px #0008;
+  font-family: var(--font-thmanyah), sans-serif;
+}
+.fields {
+  display: grid;
+  gap: 16px;
+  margin: 22px 0;
+}
+.field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.permissions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.group {
+  border: 1px solid #403345;
+  border-radius: 16px;
+  padding: 14px;
+  min-width: 0;
+}
+.group legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.check {
+  width: 20px;
+  height: 20px;
+  accent-color: #f2644b;
+  flex-shrink: 0;
+}
+.error {
+  padding: 12px;
+  border-radius: 12px;
+  color: #ffb4aa;
+  background: #b328281c;
+  font-size: 14px;
+}
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .permissions {
+    grid-template-columns: 1fr;
+  }
+  .modal {
+    padding: 18px;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+  .metric {
+    padding: 14px;
+  }
+  .metric strong {
+    font-size: 24px;
+  }
+}
+.modal > .heading {
+  position: sticky;
+  top: -24px;
+  z-index: 2;
+  background: #211927;
+  padding: 12px 0;
+}
+.modal > .row:last-child {
+  position: sticky;
+  bottom: -24px;
+  z-index: 2;
+  background: #211927;
+  padding: 16px 0;
+  margin-bottom: -10px;
+}

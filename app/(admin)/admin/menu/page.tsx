@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { apiErrorMessage } from "@/lib/api-error";
+
+import { useCallback, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Check,
@@ -108,7 +110,7 @@ export default function MenuManagementPage() {
     labelEn: "",
   });
 
-  const fetchMenuData = async (branchId: string) => {
+  const fetchMenuData = useCallback(async (branchId: string) => {
     if (!branchId) return;
     try {
       setIsLoadingMenu(true);
@@ -140,15 +142,16 @@ export default function MenuManagementPage() {
           : attributesRes.value.data?.data || [];
         setAttributes(attrList);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setErrorMsg("تعذر جلب بيانات القائمة. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsLoadingMenu(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
     if (selectedBranchId) {
       fetchMenuData(selectedBranchId);
     } else {
@@ -156,7 +159,9 @@ export default function MenuManagementPage() {
       setCategories([]);
       setAttributes([]);
     }
-  }, [selectedBranchId]);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedBranchId, fetchMenuData]);
 
   const handleOpenCreate = () => {
     setEditingProductId(null);
@@ -208,7 +213,7 @@ export default function MenuManagementPage() {
       });
       setSuccessMsg(`تم ${newStatus ? "تفعيل" : "إيقاف"} توفر صنف "${prod.nameAr || prod.name}".`);
       setTimeout(() => setSuccessMsg(""), 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       if (selectedBranchId) fetchMenuData(selectedBranchId);
       setErrorMsg("تعذر تحديث حالة التوفر.");
@@ -266,9 +271,9 @@ export default function MenuManagementPage() {
       await fetchMenuData(selectedBranchId);
       setIsProductModalOpen(false);
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err?.response?.data?.message || "تعذر حفظ المنتج.");
+      setErrorMsg(apiErrorMessage(err) || "تعذر حفظ المنتج.");
     } finally {
       setIsSubmitting(false);
     }
@@ -286,9 +291,9 @@ export default function MenuManagementPage() {
       setProductToDelete(null);
       await fetchMenuData(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err?.response?.data?.message || "تعذر حذف المنتج.");
+      setErrorMsg(apiErrorMessage(err) || "تعذر حذف المنتج.");
     } finally {
       setIsDeleting(false);
     }
@@ -313,9 +318,9 @@ export default function MenuManagementPage() {
       const newAttr = data?.data || data;
       setAttributes((prev) => [...prev, newAttr]);
       setNewAttrData({ labelAr: "", labelEn: "" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setAttrError(err?.response?.data?.message || "تعذر إنشاء الوسم.");
+      setAttrError(apiErrorMessage(err) || "تعذر إنشاء الوسم.");
     } finally {
       setIsSavingAttr(false);
     }
@@ -326,7 +331,7 @@ export default function MenuManagementPage() {
       await apiClient.delete(`/admin/attributes/${attrId}`);
       setAttributes((prev) => prev.filter((a) => a.id !== attrId));
       setSelectedAttrIds((prev) => prev.filter((id) => id !== attrId));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setAttrError("تعذر حذف الوسم.");
     }
@@ -481,7 +486,10 @@ export default function MenuManagementPage() {
             <select
               className={styles.availabilitySelect}
               value={availabilityFilter}
-              onChange={(e: any) => setAvailabilityFilter(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "all" || value === "available" || value === "unavailable") setAvailabilityFilter(value);
+              }}
               aria-label="تصفية حسب التوفر"
             >
               <option value="all">كافة الحالات</option>
@@ -1023,7 +1031,7 @@ export default function MenuManagementPage() {
             <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
               هل أنت متأكد من رغبتك في حذف صنف{" "}
               <strong style={{ color: "#fffdf9" }}>
-                "{productToDelete?.nameAr || productToDelete?.name}"
+                &quot;{productToDelete?.nameAr || productToDelete?.name}&quot;
               </strong>
               ؟ سيتم حذفه نهائياً من قائمة هذا الفرع.
             </p>

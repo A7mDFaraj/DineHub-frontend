@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { apiErrorMessage } from "@/lib/api-error";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -69,7 +71,7 @@ export default function QrCodeManagementPage() {
 
   const printAreaRef = useRef<HTMLDivElement>(null);
 
-  const fetchTables = async (branchId: string) => {
+  const fetchTables = useCallback(async (branchId: string) => {
     if (!branchId) return;
     try {
       setIsLoadingTables(true);
@@ -78,21 +80,24 @@ export default function QrCodeManagementPage() {
       const list = Array.isArray(data) ? data : data?.data || data?.tables || [];
       const sorted = list.slice().sort((a: Table, b: Table) => a.number - b.number);
       setTables(sorted);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setErrorMsg("تعذر جلب طاولات هذا الفرع. يرجى المحاولة لاحقاً.");
     } finally {
       setIsLoadingTables(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
     if (selectedBranchId) {
       fetchTables(selectedBranchId);
     } else {
       setTables([]);
     }
-  }, [selectedBranchId]);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedBranchId, fetchTables]);
 
   const getBaseOrigin = () => {
     if (typeof window !== "undefined") {
@@ -175,9 +180,9 @@ export default function QrCodeManagementPage() {
       setIsAddModalOpen(false);
       await fetchTables(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err?.response?.data?.message || "تعذر إضافة الطاولة. قد تكون مسجلة مسبقاً.");
+      setErrorMsg(apiErrorMessage(err) || "تعذر إضافة الطاولة. قد تكون مسجلة مسبقاً.");
     } finally {
       setIsSubmitting(false);
     }
@@ -239,7 +244,7 @@ export default function QrCodeManagementPage() {
       if (failedCount === 0) {
         setTimeout(() => setSuccessMsg(""), 4000);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setErrorMsg("حدث خطأ أثناء التوليد التلقائي للطاولات.");
     } finally {
@@ -259,9 +264,9 @@ export default function QrCodeManagementPage() {
       setTableToDelete(null);
       await fetchTables(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(err?.response?.data?.message || "تعذر حذف الطاولة.");
+      setErrorMsg(apiErrorMessage(err) || "تعذر حذف الطاولة.");
     } finally {
       setIsDeleting(false);
     }
@@ -882,7 +887,7 @@ export default function QrCodeManagementPage() {
             <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
               هل أنت متأكد من رغبتك في حذف طاولة{" "}
               <strong style={{ color: "#fffdf9" }}>
-                "#{tableToDelete?.number}"
+                &quot;#{tableToDelete?.number}&quot;
               </strong>
               ؟ لن يتمكن العملاء من مسح رمز هذه الطاولة للطلب بعد الحذف.
             </p>

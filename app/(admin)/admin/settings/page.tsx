@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { apiErrorMessage } from "@/lib/api-error";
+
+import { useState } from "react";
 import {
   Building2,
   CheckCircle2,
@@ -54,7 +56,9 @@ export default function BranchSettingsPage() {
     themeColor: "#f2644b",
   });
 
-  useEffect(() => {
+  const [draftBranch, setDraftBranch] = useState<typeof selectedBranch>(null);
+  if (draftBranch !== selectedBranch) {
+    setDraftBranch(selectedBranch);
     if (selectedBranch) {
       setFormData({
         name: selectedBranch.nameAr || selectedBranch.name || "",
@@ -67,7 +71,7 @@ export default function BranchSettingsPage() {
       setErrorMsg("");
       setSuccessMsg("");
     }
-  }, [selectedBranchId, selectedBranch]);
+  }
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -100,10 +104,10 @@ export default function BranchSettingsPage() {
       setSuccessMsg("تم حفظ إعدادات الهوية والفرع بنجاح! تم تحديث شاشة العميل.");
       await refreshBranches();
       setTimeout(() => setSuccessMsg(""), 4500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Save settings error:", err);
       setErrorMsg(
-        err?.response?.data?.message || "تعذر حفظ الإعدادات. يرجى المحاولة مرة أخرى."
+        apiErrorMessage(err) || "تعذر حفظ الإعدادات. يرجى المحاولة مرة أخرى."
       );
     } finally {
       setIsSaving(false);

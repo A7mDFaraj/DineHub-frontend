@@ -14,6 +14,7 @@ await page.route('https://dinehub-backend-42eq.onrender.com/**', async route => 
  const send = (data, code=200) => route.fulfill({status:code,contentType:'application/json',body:JSON.stringify(data)});
  if(route.request().method()==='OPTIONS') return send({});
  if(path.endsWith('/auth/get-session')) return send({session:{id:'session',userId:'staff',expiresAt:'2099-01-01T00:00:00Z',token:'test'},user:{id:'staff',name:'موظف',role:'cashier',branchId:'branch-1',email:'staff@example.test',emailVerified:true}});
+ if(path.endsWith('/access/me')) return send({role:'cashier',branchId:'branch-1',permissions:['orders.read','orders.prepare','orders.ready','orders.deliver']});
  if(path.endsWith('/staff/branches')) return send([{id:'branch-1',name:'الفرع الرئيسي'}]);
  if(path.endsWith('/status') && route.request().method()==='PATCH') {
   patches++; await new Promise(resolve=>setTimeout(resolve,900));

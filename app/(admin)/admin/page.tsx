@@ -1,3 +1,4 @@
+import { BusinessInsights } from "@/components/admin/business-insights";
 import {
   ArrowLeft,
   Building2,
@@ -49,9 +50,14 @@ export default function AdminDashboard() {
     <div className={styles.page}>
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
-          <p className={styles.eyebrow}><span aria-hidden="true" />مسار الإعداد</p>
+          <p className={styles.eyebrow}>
+            <span aria-hidden="true" />
+            مسار الإعداد
+          </p>
           <h1>حوّل المكان إلى خط خدمة متصل.</h1>
-          <p className={styles.heroLead}>ابدأ بالفرع، مرّر القائمة إلى العميل، ثم اجعل كل طلب واضحًا للفريق.</p>
+          <p className={styles.heroLead}>
+            ابدأ بالفرع، مرّر القائمة إلى العميل، ثم اجعل كل طلب واضحًا للفريق.
+          </p>
           <div className={styles.heroActions}>
             <Link className={styles.primaryAction} href="/admin/branches">
               <span>ابدأ بأول فرع</span>
@@ -64,19 +70,28 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className={styles.signalMap} aria-label="مسار الطلب من العميل إلى لوحة التحكم">
+        <div
+          className={styles.signalMap}
+          aria-label="مسار الطلب من العميل إلى لوحة التحكم"
+        >
           <div className={styles.signalLine} aria-hidden="true" />
           <div className={styles.signalDot} aria-hidden="true" />
           <div className={styles.mapNode} data-position="customer">
-            <span><QrCode aria-hidden="true" size={22} /></span>
+            <span>
+              <QrCode aria-hidden="true" size={22} />
+            </span>
             <small>العميل</small>
           </div>
           <div className={styles.mapNode} data-position="order">
-            <span><ClipboardList aria-hidden="true" size={22} /></span>
+            <span>
+              <ClipboardList aria-hidden="true" size={22} />
+            </span>
             <small>الطلب</small>
           </div>
           <div className={styles.mapNode} data-position="team">
-            <span><CheckCircle2 aria-hidden="true" size={22} /></span>
+            <span>
+              <CheckCircle2 aria-hidden="true" size={22} />
+            </span>
             <small>الفريق</small>
           </div>
         </div>
@@ -93,14 +108,23 @@ export default function AdminDashboard() {
 
         <div className={styles.setupTrack}>
           {setupSteps.map((step) => (
-            <Link className={styles.setupCard} data-tone={step.tone} href={step.href} key={step.href}>
+            <Link
+              className={styles.setupCard}
+              data-tone={step.tone}
+              href={step.href}
+              key={step.href}
+            >
               <div className={styles.stepTop}>
-                <span className={styles.stepIcon}><step.icon aria-hidden="true" size={21} strokeWidth={1.7} /></span>
+                <span className={styles.stepIcon}>
+                  <step.icon aria-hidden="true" size={21} strokeWidth={1.7} />
+                </span>
                 <small>{step.number}</small>
               </div>
               <h3>{step.title}</h3>
               <p>{step.description}</p>
-              <span className={styles.cardAction}>افتح المحطة <ArrowLeft aria-hidden="true" size={17} /></span>
+              <span className={styles.cardAction}>
+                افتح المحطة <ArrowLeft aria-hidden="true" size={17} />
+              </span>
             </Link>
           ))}
         </div>
@@ -108,12 +132,21 @@ export default function AdminDashboard() {
 
       <section className={styles.emptyStage} aria-labelledby="today-title">
         <div>
-          <p><i aria-hidden="true" />اليوم</p>
+          <p>
+            <i aria-hidden="true" />
+            اليوم
+          </p>
           <h2 id="today-title">هنا ستظهر نبضات الخدمة.</h2>
-          <span>عندما يبدأ العملاء بالطلب، ستجد الحالة والتوقيت والفرع دون أرقام تجريبية.</span>
+          <span>
+            عندما يبدأ العملاء بالطلب، ستجد الحالة والتوقيت والفرع دون أرقام
+            تجريبية.
+          </span>
         </div>
-        <Link href="/admin/menu">راجع القائمة <ArrowLeft aria-hidden="true" size={18} /></Link>
+        <Link href="/admin/menu">
+          راجع القائمة <ArrowLeft aria-hidden="true" size={18} />
+        </Link>
       </section>
+      <BusinessInsights />
     </div>
   );
 }

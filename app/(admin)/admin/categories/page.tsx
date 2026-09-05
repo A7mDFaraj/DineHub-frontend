@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { apiErrorMessage } from "@/lib/api-error";
+
+import { useCallback, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowDown,
@@ -62,7 +64,7 @@ export default function CategoriesPage() {
     nameEn: "",
   });
 
-  const fetchCategories = async (branchId: string) => {
+  const fetchCategories = useCallback(async (branchId: string) => {
     if (!branchId) return;
     try {
       setIsLoadingCats(true);
@@ -78,21 +80,24 @@ export default function CategoriesPage() {
             (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
         );
       setCategories(sorted);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setErrorMsg("تعذر جلب تصنيفات هذا الفرع. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsLoadingCats(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
     if (selectedBranchId) {
       fetchCategories(selectedBranchId);
     } else {
       setCategories([]);
     }
-  }, [selectedBranchId]);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedBranchId, fetchCategories]);
 
   const handleOpenCreate = (presetAr?: string, presetEn?: string) => {
     setEditingCategory(null);
@@ -154,10 +159,10 @@ export default function CategoriesPage() {
       await fetchCategories(selectedBranchId);
       setIsDialogOpen(false);
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setErrorMsg(
-        err?.response?.data?.message || "تعذر حفظ التصنيف. يرجى المحاولة لاحقاً."
+        apiErrorMessage(err) || "تعذر حفظ التصنيف. يرجى المحاولة لاحقاً."
       );
     } finally {
       setIsSubmitting(false);
@@ -215,10 +220,10 @@ export default function CategoriesPage() {
       setCategoryToDelete(null);
       await fetchCategories(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Delete category error:", err);
       setErrorMsg(
-        err?.response?.data?.message || "تعذر حذف التصنيف. قد يحتوي على منتجات مرتبطة."
+        apiErrorMessage(err) || "تعذر حذف التصنيف. قد يحتوي على منتجات مرتبطة."
       );
     } finally {
       setIsDeleting(false);
@@ -567,7 +572,7 @@ export default function CategoriesPage() {
             <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
               هل أنت متأكد من رغبتك في حذف تصنيف{" "}
               <strong style={{ color: "#fffdf9" }}>
-                "{categoryToDelete?.nameAr || categoryToDelete?.name}"
+                &quot;{categoryToDelete?.nameAr || categoryToDelete?.name}&quot;
               </strong>
               ؟ لن تتمكن من التراجع عن هذه الخطوة.
             </p>

@@ -1,5 +1,7 @@
 "use client";
 
+import { apiErrorMessage } from "@/lib/api-error";
+
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -97,10 +99,10 @@ export default function BranchesPage() {
       await refreshBranches();
       setIsDialogOpen(false);
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setErrorMsg(
-        err?.response?.data?.message || "تعذر حفظ بيانات الفرع. يرجى المحاولة لاحقاً."
+        apiErrorMessage(err) || "تعذر حفظ بيانات الفرع. يرجى المحاولة لاحقاً."
       );
     } finally {
       setIsSubmitting(false);

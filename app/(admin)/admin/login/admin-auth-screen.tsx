@@ -19,6 +19,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
+import { apiClient } from "@/lib/api-client";
+import { permissionForPage } from "@/lib/access-context";
 import { authClient } from "@/lib/auth-client";
 import { reportClientIncident } from "@/lib/observability";
 import logo from "@/public/brand/dinehub-logo-3d.png";
@@ -33,7 +35,10 @@ const signUpSchema = z
   .object({
     name: z.string().trim().min(2, "اكتب اسمك كما سيظهر لفريقك."),
     email: z.email("اكتب بريدًا إلكترونيًا صحيحًا."),
-    password: z.string().min(8, "استخدم 8 أحرف على الأقل.").max(128, "كلمة المرور طويلة جدًا."),
+    password: z
+      .string()
+      .min(8, "استخدم 8 أحرف على الأقل.")
+      .max(128, "كلمة المرور طويلة جدًا."),
     confirmPassword: z.string(),
   })
   .refine((values) => values.password === values.confirmPassword, {
@@ -71,8 +76,20 @@ async function confirmSession() {
   return null;
 }
 
-function openAuthenticatedArea(role: string | undefined) {
-  window.location.replace(role === "admin" ? "/admin" : "/staff");
+async function openAuthenticatedArea() {
+  const { data } = await apiClient.get<{ permissions: string[] }>("/access/me");
+  const destination = [
+    "/admin",
+    "/staff",
+    "/admin/menu",
+    "/admin/branches",
+    "/admin/categories",
+    "/admin/qr-code",
+    "/admin/users",
+    "/admin/logs",
+    "/admin/settings",
+  ].find((path) => data.permissions.includes(permissionForPage(path)));
+  window.location.replace(destination ?? "/staff");
 }
 
 function getAuthError(error: AuthError | null) {
@@ -82,7 +99,11 @@ function getAuthError(error: AuthError | null) {
   if (message.includes("invalid") || code.includes("invalid")) {
     return "البريد أو كلمة المرور غير صحيحة. راجعهما وحاول مرة أخرى.";
   }
-  if (message.includes("already") || message.includes("exist") || code.includes("user_already_exists")) {
+  if (
+    message.includes("already") ||
+    message.includes("exist") ||
+    code.includes("user_already_exists")
+  ) {
     return "يوجد حساب بهذا البريد بالفعل. انتقل إلى تسجيل الدخول.";
   }
   if (message.includes("password") || code.includes("password")) {
@@ -128,17 +149,29 @@ function PasswordField({
           aria-label={visible ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
           aria-pressed={visible}
         >
-          {visible ? <EyeOff aria-hidden="true" size={19} /> : <Eye aria-hidden="true" size={19} />}
+          {visible ? (
+            <EyeOff aria-hidden="true" size={19} />
+          ) : (
+            <Eye aria-hidden="true" size={19} />
+          )}
         </button>
       </div>
-      {error ? <p className={styles.fieldError} id={errorId}>{error}</p> : null}
+      {error ? (
+        <p className={styles.fieldError} id={errorId}>
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function SignInForm() {
   const [requestError, setRequestError] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SignInValues>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: { email: "", password: "" },
   });
@@ -146,7 +179,7 @@ function SignInForm() {
   const onSubmit = async (values: SignInValues) => {
     setRequestError(null);
     try {
-      const { data, error } = await authClient.signIn.email({
+      const { error } = await authClient.signIn.email({
         email: values.email,
         password: values.password,
       });
@@ -169,13 +202,18 @@ function SignInForm() {
           message: "Sign-in succeeded but the session could not be confirmed",
           metadata: { flow: "sign-in" },
         });
-        setRequestError("تم قبول بيانات الدخول، لكن تعذّر تثبيت الجلسة. حاول مرة أخرى.");
+        setRequestError(
+          "تم قبول بيانات الدخول، لكن تعذّر تثبيت الجلسة. حاول مرة أخرى.",
+        );
         return;
       }
 
-      openAuthenticatedArea(session.user.role ?? data?.user.role);
+      await openAuthenticatedArea();
     } catch (error) {
-      const reason = error instanceof Error ? error : new Error("Sign-in network request failed");
+      const reason =
+        error instanceof Error
+          ? error
+          : new Error("Sign-in network request failed");
       reportClientIncident({
         level: "error",
         event: "auth.sign_in_network_error",
@@ -212,7 +250,11 @@ function SignInForm() {
             placeholder="name@business.com"
           />
         </div>
-        {errors.email ? <p className={styles.fieldError} id="sign-in-email-error">{errors.email.message}</p> : null}
+        {errors.email ? (
+          <p className={styles.fieldError} id="sign-in-email-error">
+            {errors.email.message}
+          </p>
+        ) : null}
       </div>
 
       <PasswordField
@@ -223,7 +265,11 @@ function SignInForm() {
         registration={register("password")}
       />
 
-      <button className={styles.submitButton} type="submit" disabled={isSubmitting}>
+      <button
+        className={styles.submitButton}
+        type="submit"
+        disabled={isSubmitting}
+      >
         {isSubmitting ? (
           <>
             <Loader2 className={styles.spinner} aria-hidden="true" size={20} />
@@ -242,7 +288,11 @@ function SignInForm() {
 
 function SignUpForm() {
   const [requestError, setRequestError] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SignUpValues>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
@@ -274,13 +324,18 @@ function SignUpForm() {
           message: "Sign-up succeeded but the session could not be confirmed",
           metadata: { flow: "sign-up" },
         });
-        setRequestError("تم إنشاء الحساب، لكن تعذّر تثبيت الجلسة. سجّل الدخول للمتابعة.");
+        setRequestError(
+          "تم إنشاء الحساب، لكن تعذّر تثبيت الجلسة. سجّل الدخول للمتابعة.",
+        );
         return;
       }
 
-      openAuthenticatedArea(session.user.role);
+      await openAuthenticatedArea();
     } catch (error) {
-      const reason = error instanceof Error ? error : new Error("Sign-up network request failed");
+      const reason =
+        error instanceof Error
+          ? error
+          : new Error("Sign-up network request failed");
       reportClientIncident({
         level: "error",
         event: "auth.sign_up_network_error",
@@ -315,7 +370,11 @@ function SignUpForm() {
             placeholder="مثال: أحمد الفرج"
           />
         </div>
-        {errors.name ? <p className={styles.fieldError} id="sign-up-name-error">{errors.name.message}</p> : null}
+        {errors.name ? (
+          <p className={styles.fieldError} id="sign-up-name-error">
+            {errors.name.message}
+          </p>
+        ) : null}
       </div>
 
       <div className={styles.field}>
@@ -334,7 +393,11 @@ function SignUpForm() {
             placeholder="name@business.com"
           />
         </div>
-        {errors.email ? <p className={styles.fieldError} id="sign-up-email-error">{errors.email.message}</p> : null}
+        {errors.email ? (
+          <p className={styles.fieldError} id="sign-up-email-error">
+            {errors.email.message}
+          </p>
+        ) : null}
       </div>
 
       <PasswordField
@@ -351,9 +414,15 @@ function SignUpForm() {
         error={errors.confirmPassword?.message}
         registration={register("confirmPassword")}
       />
-      <p className={styles.passwordHint}>8 أحرف على الأقل. يمكنك اللصق واستخدام مدير كلمات المرور.</p>
+      <p className={styles.passwordHint}>
+        8 أحرف على الأقل. يمكنك اللصق واستخدام مدير كلمات المرور.
+      </p>
 
-      <button className={styles.submitButton} type="submit" disabled={isSubmitting}>
+      <button
+        className={styles.submitButton}
+        type="submit"
+        disabled={isSubmitting}
+      >
         {isSubmitting ? (
           <>
             <Loader2 className={styles.spinner} aria-hidden="true" size={20} />
@@ -376,9 +445,15 @@ export function AdminAuthScreen() {
 
   return (
     <main className={styles.page}>
-      <a className={styles.skipLink} href="#auth-form">انتقل إلى نموذج الدخول</a>
+      <a className={styles.skipLink} href="#auth-form">
+        انتقل إلى نموذج الدخول
+      </a>
       <div className={styles.shell}>
-        <section className={styles.authPanel} id="auth-form" aria-labelledby="auth-title">
+        <section
+          className={styles.authPanel}
+          id="auth-form"
+          aria-labelledby="auth-title"
+        >
           <div className={styles.mobileBrand}>
             <Link href="/" aria-label="DineHub، العودة إلى الصفحة الرئيسية">
               <Image src={logo} alt="" width={58} priority />
@@ -387,9 +462,14 @@ export function AdminAuthScreen() {
           </div>
 
           <div className={styles.authHeader}>
-            <p className={styles.eyebrow}><span aria-hidden="true" />لوحة التحكم</p>
+            <p className={styles.eyebrow}>
+              <span aria-hidden="true" />
+              لوحة التحكم
+            </p>
             <h1 id="auth-title">
-              {isSignIn ? "أهلاً بعودتك إلى خط الخدمة." : "ابدأ مسار طلباتك من مكان واحد."}
+              {isSignIn
+                ? "أهلاً بعودتك إلى خط الخدمة."
+                : "ابدأ مسار طلباتك من مكان واحد."}
             </h1>
             <p>
               {isSignIn
@@ -398,50 +478,102 @@ export function AdminAuthScreen() {
             </p>
           </div>
 
-          <div className={styles.modeTabs} role="tablist" aria-label="اختر طريقة المتابعة">
-            <button type="button" role="tab" aria-selected={isSignIn} onClick={() => setMode("sign-in")}>
+          <div
+            className={styles.modeTabs}
+            role="tablist"
+            aria-label="اختر طريقة المتابعة"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isSignIn}
+              onClick={() => setMode("sign-in")}
+            >
               تسجيل الدخول
             </button>
-            <button type="button" role="tab" aria-selected={!isSignIn} onClick={() => setMode("sign-up")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!isSignIn}
+              onClick={() => setMode("sign-up")}
+            >
               إنشاء حساب
             </button>
-            <span className={styles.tabSignal} data-mode={mode} aria-hidden="true" />
+            <span
+              className={styles.tabSignal}
+              data-mode={mode}
+              aria-hidden="true"
+            />
           </div>
 
-          <div role="tabpanel" aria-live="polite">{isSignIn ? <SignInForm /> : <SignUpForm />}</div>
+          <div role="tabpanel" aria-live="polite">
+            {isSignIn ? <SignInForm /> : <SignUpForm />}
+          </div>
           <p className={styles.secureNote}>
             <ShieldCheck aria-hidden="true" size={17} />
             جلسة دخول آمنة ومشفّرة
           </p>
         </section>
 
-        <aside className={styles.storyPanel} aria-label="كيف يربط DineHub رحلة الطلب">
-          <Link className={styles.brand} href="/" aria-label="DineHub، الصفحة الرئيسية">
-            <Image className={styles.logo} src={logo} alt="" width={92} priority />
+        <aside
+          className={styles.storyPanel}
+          aria-label="كيف يربط DineHub رحلة الطلب"
+        >
+          <Link
+            className={styles.brand}
+            href="/"
+            aria-label="DineHub، الصفحة الرئيسية"
+          >
+            <Image
+              className={styles.logo}
+              src={logo}
+              alt=""
+              width={92}
+              priority
+            />
             <span dir="ltr">DineHub</span>
           </Link>
 
           <div className={styles.storyCopy}>
-            <p className={styles.liveLabel}><span aria-hidden="true" />الإشارة متصلة</p>
+            <p className={styles.liveLabel}>
+              <span aria-hidden="true" />
+              الإشارة متصلة
+            </p>
             <h2>من مسح واحد، يبدأ يوم أوضح.</h2>
-            <p>نفس المسار الذي يبدأ عند العميل يصل إلى فريقك مرتبًا، ويبقى ظاهرًا لك حتى التسليم.</p>
+            <p>
+              نفس المسار الذي يبدأ عند العميل يصل إلى فريقك مرتبًا، ويبقى ظاهرًا
+              لك حتى التسليم.
+            </p>
           </div>
 
           <div className={styles.signalScene} aria-hidden="true">
             <div className={styles.signalTrack} />
             <div className={styles.signalPulse} />
             <div className={styles.signalNode} data-step="scan">
-              <span><ScanLine size={22} /></span><small>يمسح</small>
+              <span>
+                <ScanLine size={22} />
+              </span>
+              <small>يمسح</small>
             </div>
             <div className={styles.signalNode} data-step="order">
-              <span><ReceiptText size={22} /></span><small>يصل</small>
+              <span>
+                <ReceiptText size={22} />
+              </span>
+              <small>يصل</small>
             </div>
             <div className={styles.signalNode} data-step="ready">
-              <span><ChefHat size={22} /></span><small>يُجهّز</small>
+              <span>
+                <ChefHat size={22} />
+              </span>
+              <small>يُجهّز</small>
             </div>
           </div>
 
-          <div className={styles.storyFoot}><span>العميل</span><span>الفريق</span><span>الفروع</span></div>
+          <div className={styles.storyFoot}>
+            <span>العميل</span>
+            <span>الفريق</span>
+            <span>الفروع</span>
+          </div>
         </aside>
       </div>
     </main>

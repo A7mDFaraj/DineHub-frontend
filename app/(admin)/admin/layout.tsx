@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  AccessProvider,
+  useAccess,
+  permissionForPage,
+} from "@/lib/access-context";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Building2,
@@ -22,7 +27,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { AdminGuideTrigger, AdminOnboardingGuide } from "@/components/admin/admin-onboarding-guide";
+import {
+  AdminGuideTrigger,
+  AdminOnboardingGuide,
+} from "@/components/admin/admin-onboarding-guide";
 import { AdminBranchProvider } from "@/lib/admin-branch-context";
 import { authClient, signOut } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -38,7 +46,7 @@ const navigation = [
   { name: "رموز QR", href: "/admin/qr-code", icon: QrCode },
   { name: "المستخدمون", href: "/admin/users", icon: UsersRound },
   { name: "سجل النظام", href: "/admin/logs", icon: ScrollText },
-  { name: "طلبات المطبخ", href: "/staff", icon: ChefHat },
+  { name: "مركز العمليات", href: "/staff", icon: ChefHat },
   { name: "الإعدادات", href: "/admin/settings", icon: Settings },
 ] as const;
 
@@ -49,34 +57,44 @@ function NavigationLinks({
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const { can } = useAccess();
   return (
     <nav className={styles.navigation} aria-label="التنقل في الإدارة">
-      {navigation.map((item) => {
-        const isActive = item.href === "/admin"
-          ? pathname === item.href
-          : pathname.startsWith(item.href);
+      {navigation
+        .filter((item) => can(permissionForPage(item.href) ?? "denied"))
+        .map((item) => {
+          const isActive =
+            item.href === "/admin"
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
 
-        return (
-          <Link
-            className={cn(styles.navLink, isActive && styles.navLinkActive)}
-            href={item.href}
-            key={item.href}
-            onClick={onNavigate}
-            aria-current={isActive ? "page" : undefined}
-          >
-            <span className={styles.navIcon}><item.icon aria-hidden="true" size={19} strokeWidth={1.7} /></span>
-            <span>{item.name}</span>
-            <i aria-hidden="true" />
-          </Link>
-        );
-      })}
+          return (
+            <Link
+              className={cn(styles.navLink, isActive && styles.navLinkActive)}
+              href={item.href}
+              key={item.href}
+              onClick={onNavigate}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <span className={styles.navIcon}>
+                <item.icon aria-hidden="true" size={19} strokeWidth={1.7} />
+              </span>
+              <span>{item.name}</span>
+              <i aria-hidden="true" />
+            </Link>
+          );
+        })}
     </nav>
   );
 }
 
 function BrandLockup() {
   return (
-    <Link className={styles.brand} href="/" aria-label="DineHub، الصفحة الرئيسية">
+    <Link
+      className={styles.brand}
+      href="/"
+      aria-label="DineHub، الصفحة الرئيسية"
+    >
       <Image src={logo} alt="" width={58} priority />
       <span>
         <strong dir="ltr">DineHub</strong>
@@ -91,7 +109,9 @@ function SessionLoading() {
     <main className={styles.sessionState} aria-busy="true">
       <div className={styles.loadingSignal}>
         <Image src={logo} alt="" width={72} priority />
-        <span><Loader2 aria-hidden="true" size={20} /></span>
+        <span>
+          <Loader2 aria-hidden="true" size={20} />
+        </span>
       </div>
       <p>نصل إشارتك بلوحة التحكم…</p>
     </main>
@@ -101,10 +121,14 @@ function SessionLoading() {
 function SessionError() {
   return (
     <main className={styles.sessionState}>
-      <div className={styles.errorIcon}><CircleAlert aria-hidden="true" size={24} /></div>
+      <div className={styles.errorIcon}>
+        <CircleAlert aria-hidden="true" size={24} />
+      </div>
       <h1>تعذّر التحقق من جلسة الدخول</h1>
       <p>تحقق من اتصالك، ثم أعد المحاولة.</p>
-      <button type="button" onClick={() => window.location.reload()}>إعادة المحاولة</button>
+      <button type="button" onClick={() => window.location.reload()}>
+        إعادة المحاولة
+      </button>
     </main>
   );
 }
@@ -117,6 +141,7 @@ function AuthenticatedAdminShell({
   pathname: string;
 }) {
   const router = useRouter();
+  const { can, loading: accessLoading, error: accessError } = useAccess();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: session, isPending, error } = authClient.useSession();
@@ -125,10 +150,6 @@ function AuthenticatedAdminShell({
     if (!isPending && !session && !error) {
       router.replace("/admin/login");
       return;
-    }
-
-    if (!isPending && session && session.user.role !== "admin") {
-      router.replace("/staff");
     }
   }, [error, isPending, router, session]);
 
@@ -144,13 +165,15 @@ function AuthenticatedAdminShell({
     return <SessionLoading />;
   }
 
-  if (session.user.role !== "admin") {
-    return <SessionLoading />;
-  }
+  if (accessLoading) return <SessionLoading />;
+  if (accessError) return <SessionError />;
 
-  const currentPage = navigation.find((item) => (
-    item.href === "/admin" ? pathname === item.href : pathname.startsWith(item.href)
-  ))?.name ?? "الإدارة";
+  const currentPage =
+    navigation.find((item) =>
+      item.href === "/admin"
+        ? pathname === item.href
+        : pathname.startsWith(item.href),
+    )?.name ?? "الإدارة";
 
   const handleLogout = async () => {
     setIsSigningOut(true);
@@ -165,7 +188,9 @@ function AuthenticatedAdminShell({
 
   return (
     <div className={cn(tokenStyles.theme, styles.shell)}>
-      <a className={styles.skipLink} href="#admin-main">انتقل إلى المحتوى</a>
+      <a className={styles.skipLink} href="#admin-main">
+        انتقل إلى المحتوى
+      </a>
 
       <aside className={styles.sidebar}>
         <BrandLockup />
@@ -186,14 +211,29 @@ function AuthenticatedAdminShell({
           </AdminGuideTrigger>
 
           <div className={styles.userCard}>
-            <span aria-hidden="true">{session.user.name.slice(0, 1).toUpperCase()}</span>
+            <span aria-hidden="true">
+              {session.user.name.slice(0, 1).toUpperCase()}
+            </span>
             <div>
               <strong>{session.user.name}</strong>
               <small dir="ltr">{session.user.email}</small>
             </div>
           </div>
-          <button className={styles.logoutButton} type="button" onClick={handleLogout} disabled={isSigningOut}>
-            {isSigningOut ? <Loader2 className={styles.spinner} aria-hidden="true" size={19} /> : <LogOut aria-hidden="true" size={19} />}
+          <button
+            className={styles.logoutButton}
+            type="button"
+            onClick={handleLogout}
+            disabled={isSigningOut}
+          >
+            {isSigningOut ? (
+              <Loader2
+                className={styles.spinner}
+                aria-hidden="true"
+                size={19}
+              />
+            ) : (
+              <LogOut aria-hidden="true" size={19} />
+            )}
             <span>{isSigningOut ? "جارٍ الخروج…" : "تسجيل الخروج"}</span>
           </button>
         </div>
@@ -204,7 +244,11 @@ function AuthenticatedAdminShell({
           <BrandLockup />
           <Dialog.Root open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <Dialog.Trigger asChild>
-              <button className={styles.menuButton} type="button" aria-label="فتح قائمة الإدارة">
+              <button
+                className={styles.menuButton}
+                type="button"
+                aria-label="فتح قائمة الإدارة"
+              >
                 <Menu aria-hidden="true" size={22} />
               </button>
             </Dialog.Trigger>
@@ -214,19 +258,33 @@ function AuthenticatedAdminShell({
                 <div className={styles.drawerHeader}>
                   <Dialog.Title>التنقل في الإدارة</Dialog.Title>
                   <Dialog.Close asChild>
-                    <button type="button" aria-label="إغلاق القائمة"><X aria-hidden="true" size={21} /></button>
+                    <button type="button" aria-label="إغلاق القائمة">
+                      <X aria-hidden="true" size={21} />
+                    </button>
                   </Dialog.Close>
                 </div>
-                <NavigationLinks pathname={pathname} onNavigate={() => setMobileNavOpen(false)} />
+                <NavigationLinks
+                  pathname={pathname}
+                  onNavigate={() => setMobileNavOpen(false)}
+                />
                 <div className={styles.drawerFoot}>
                   <AdminGuideTrigger
                     className={styles.guideButton}
                     onClick={() => setMobileNavOpen(false)}
                   >
-                    <HelpCircle aria-hidden="true" size={17} strokeWidth={1.8} />
+                    <HelpCircle
+                      aria-hidden="true"
+                      size={17}
+                      strokeWidth={1.8}
+                    />
                     <span>الدليل الإرشادي</span>
                   </AdminGuideTrigger>
-                  <button className={styles.logoutButton} type="button" onClick={handleLogout} disabled={isSigningOut}>
+                  <button
+                    className={styles.logoutButton}
+                    type="button"
+                    onClick={handleLogout}
+                    disabled={isSigningOut}
+                  >
                     <LogOut aria-hidden="true" size={19} />
                     <span>تسجيل الخروج</span>
                   </button>
@@ -241,11 +299,21 @@ function AuthenticatedAdminShell({
             <span>الإدارة</span>
             <strong>{currentPage}</strong>
           </div>
-          <p><i aria-hidden="true" />الإشارة متصلة</p>
+          <p>
+            <i aria-hidden="true" />
+            الإشارة متصلة
+          </p>
         </div>
 
         <main className={styles.main} id="admin-main">
-          {children}
+          {can(permissionForPage(pathname) ?? "denied") ? (
+            children
+          ) : (
+            <section role="alert">
+              <h1>هذه الصفحة غير متاحة لحسابك</h1>
+              <p>اختر إحدى الصفحات المسموح بها من القائمة.</p>
+            </section>
+          )}
         </main>
       </div>
 
@@ -262,10 +330,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AdminBranchProvider>
-      <AuthenticatedAdminShell pathname={pathname}>
-        {children}
-      </AuthenticatedAdminShell>
-    </AdminBranchProvider>
+    <AccessProvider>
+      <AdminBranchProvider>
+        <AuthenticatedAdminShell pathname={pathname}>
+          {children}
+        </AuthenticatedAdminShell>
+      </AdminBranchProvider>
+    </AccessProvider>
   );
 }

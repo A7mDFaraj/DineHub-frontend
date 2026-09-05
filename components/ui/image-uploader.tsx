@@ -1,5 +1,7 @@
 "use client"
 
+import { apiErrorMessage } from "@/lib/api-error";
+
 import { useState, useRef, ChangeEvent, DragEvent } from "react"
 import { Upload, Link as LinkIcon, X, Loader2, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
@@ -65,9 +67,9 @@ export function ImageUploader({
       } else {
         throw new Error("لم يتم استلام رابط الصورة من الخادم.")
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Upload error:", err)
-      setError(err?.response?.data?.message || err?.message || "تعذر رفع الصورة. يرجى المحاولة مرة أخرى.")
+      setError(apiErrorMessage(err) || "تعذر رفع الصورة. يرجى المحاولة مرة أخرى.")
     } finally {
       setIsUploading(false)
     }

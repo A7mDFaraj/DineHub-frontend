@@ -1,21 +1,31 @@
-"use client"
+"use client";
 
-import { useCartStore } from "@/store/cart-store"
-import { AnimatePresence, motion } from "framer-motion"
-import { Minus, Plus, ShoppingBag, X, Trash2, ArrowLeft, Loader2, MessageSquare } from "lucide-react"
-import axios from "axios"
-import { apiClient } from "@/lib/api-client"
-import { useRef, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useCartStore } from "@/store/cart-store";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Minus,
+  Plus,
+  ShoppingBag,
+  X,
+  Trash2,
+  ArrowLeft,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
+import { armOrderSound } from "@/lib/order-alert";
+import axios from "axios";
+import { apiClient } from "@/lib/api-client";
+import { useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 
 export function CartDrawer({
   branchId,
   tableId,
   themeColor = "#f2644b",
 }: {
-  branchId: string
-  tableId?: string
-  themeColor?: string
+  branchId: string;
+  tableId?: string;
+  themeColor?: string;
 }) {
   const {
     items,
@@ -28,78 +38,84 @@ export function CartDrawer({
     setNote,
     clearCart,
     totalItems,
-  } = useCartStore()
+  } = useCartStore();
 
-  const params = useParams()
-  const router = useRouter()
-  const submittingRef = useRef(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState("")
-  const tableNumber = params?.tableNumber as string
+  const params = useParams();
+  const router = useRouter();
+  const submittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const tableNumber = params?.tableNumber as string;
 
-  if (!isCartOpen && items.length === 0) return null
+  if (!isCartOpen && items.length === 0) return null;
 
   const buildFormattedOrderNote = () => {
-    const customizedLines: string[] = []
+    const customizedLines: string[] = [];
 
     items.forEach((item) => {
-      const hasAttrs = item.selectedAttributes && item.selectedAttributes.length > 0
-      const hasItemNote = Boolean(item.itemNote)
+      const hasAttrs =
+        item.selectedAttributes && item.selectedAttributes.length > 0;
+      const hasItemNote = Boolean(item.itemNote);
 
       if (hasAttrs || hasItemNote) {
-        let line = `• ${item.quantity}× ${item.nameAr || item.nameEn}`
+        let line = `• ${item.quantity}× ${item.nameAr || item.nameEn}`;
         if (hasAttrs) {
-          line += ` [${item.selectedAttributes!.join(", ")}]`
+          line += ` [${item.selectedAttributes!.join(", ")}]`;
         }
         if (hasItemNote) {
-          line += ` (ملاحظة: ${item.itemNote})`
+          line += ` (ملاحظة: ${item.itemNote})`;
         }
-        customizedLines.push(line)
+        customizedLines.push(line);
       }
-    })
+    });
 
-    const generalNote = note.trim()
+    const generalNote = note.trim();
 
     if (customizedLines.length > 0 && generalNote) {
-      return `خيارات الطلبات:\n${customizedLines.join("\n")}\n\nملاحظة عامة: ${generalNote}`
+      return `خيارات الطلبات:\n${customizedLines.join("\n")}\n\nملاحظة عامة: ${generalNote}`;
     } else if (customizedLines.length > 0) {
-      return `خيارات الطلبات:\n${customizedLines.join("\n")}`
+      return `خيارات الطلبات:\n${customizedLines.join("\n")}`;
     } else {
-      return generalNote
+      return generalNote;
     }
-  }
+  };
 
   const handleSubmitOrder = async () => {
-    if (submittingRef.current || items.length === 0) return
+    if (submittingRef.current || items.length === 0) return;
     if (!tableNumber) {
-      alert("رقم الطاولة غير محدد")
-      return
+      alert("رقم الطاولة غير محدد");
+      return;
     }
 
-    submittingRef.current = true
-    setIsSubmitting(true)
-    setSubmitError("")
+    armOrderSound();
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setSubmitError("");
 
     try {
-      let resolvedTableId = tableId
+      let resolvedTableId = tableId;
 
       // Fetch table UUID if not present
       if (!resolvedTableId) {
-        const tableRes = await apiClient.get(`/table/${branchId}/${tableNumber}`)
-        resolvedTableId = tableRes.data?.id
+        const tableRes = await apiClient.get(
+          `/table/${branchId}/${tableNumber}`,
+        );
+        resolvedTableId = tableRes.data?.id;
       }
 
       if (!resolvedTableId) {
-        throw new Error("تعذر التحقق من بيانات الطاولة. يرجى تحديث الصفحة والمحاولة مجدداً.")
+        throw new Error(
+          "تعذر التحقق من بيانات الطاولة. يرجى تحديث الصفحة والمحاولة مجدداً.",
+        );
       }
 
-      const formattedNote = buildFormattedOrderNote()
+      const formattedNote = buildFormattedOrderNote();
 
       const payload: {
-        branchId: string
-        tableId: string
-        note?: string
-        items: { productId: string; quantity: number }[]
+        branchId: string;
+        tableId: string;
+        note?: string;
+        items: { productId: string; quantity: number }[];
       } = {
         branchId,
         tableId: resolvedTableId,
@@ -107,34 +123,45 @@ export function CartDrawer({
           productId: i.productId,
           quantity: i.quantity,
         })),
-      }
+      };
 
       if (formattedNote) {
-        payload.note = formattedNote
+        payload.note = formattedNote;
       }
 
-      const res = await apiClient.post("/orders", payload)
-      const trackingPath = res.data?.trackingPath
+      const res = await apiClient.post("/orders", payload);
+      const trackingPath = res.data?.trackingPath;
 
-      if (typeof trackingPath === "string" && trackingPath.startsWith("/order/")) {
-        clearCart()
-        toggleCart()
-        router.push(trackingPath)
+      if (
+        typeof trackingPath === "string" &&
+        trackingPath.startsWith("/order/")
+      ) {
+        clearCart();
+        toggleCart();
+        router.push(trackingPath);
       } else {
-        throw new Error("تم إرسال الطلب ولكن لم يتم استلام رقم التأكيد.")
+        throw new Error("تم إرسال الطلب ولكن لم يتم استلام رقم التأكيد.");
       }
     } catch (err: unknown) {
-      console.error("Order error:", err)
-      const message = axios.isAxiosError(err) ? err.response?.data?.message : err instanceof Error ? err.message : null
-      setSubmitError(typeof message === "string" ? message : "تعذر إرسال الطلب. يرجى المحاولة مرة أخرى.")
+      console.error("Order error:", err);
+      const message = axios.isAxiosError(err)
+        ? err.response?.data?.message
+        : err instanceof Error
+          ? err.message
+          : null;
+      setSubmitError(
+        typeof message === "string"
+          ? message
+          : "تعذر إرسال الطلب. يرجى المحاولة مرة أخرى.",
+      );
     } finally {
-      submittingRef.current = false
-      setIsSubmitting(false)
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
-  }
+  };
 
-  const count = totalItems()
-  const total = totalAmount()
+  const count = totalItems();
+  const total = totalAmount();
 
   return (
     <>
@@ -147,7 +174,10 @@ export function CartDrawer({
             exit={{ y: 80, opacity: 0 }}
             className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md"
             dir="rtl"
-            style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
+            style={{
+              fontFamily:
+                "var(--font-thmanyah), var(--font-arabic), sans-serif",
+            }}
           >
             <button
               onClick={toggleCart}
@@ -158,7 +188,9 @@ export function CartDrawer({
                 <div className="bg-black/20 w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white tabular-nums">
                   {count}
                 </div>
-                <span className="text-xs sm:text-sm font-bold">عرض ومراجعة الطلب</span>
+                <span className="text-xs sm:text-sm font-bold">
+                  عرض ومراجعة الطلب
+                </span>
               </div>
               <span className="font-mono text-sm sm:text-base font-black tabular-nums">
                 {total.toFixed(2)} ر.س
@@ -171,10 +203,13 @@ export function CartDrawer({
       {/* Cart Drawer / Bottom Sheet */}
       <AnimatePresence>
         {isCartOpen && (
-          <div 
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" 
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             dir="rtl"
-            style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
+            style={{
+              fontFamily:
+                "var(--font-thmanyah), var(--font-arabic), sans-serif",
+            }}
           >
             {/* Backdrop */}
             <motion.div
@@ -198,12 +233,17 @@ export function CartDrawer({
                 <div className="flex items-center gap-2.5">
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
-                    style={{ backgroundColor: `${themeColor}20`, color: themeColor }}
+                    style={{
+                      backgroundColor: `${themeColor}20`,
+                      color: themeColor,
+                    }}
                   >
                     <ShoppingBag size={18} />
                   </div>
                   <div>
-                    <h2 className="text-base sm:text-lg font-black text-stone-900">سلة الطلبات</h2>
+                    <h2 className="text-base sm:text-lg font-black text-stone-900">
+                      سلة الطلبات
+                    </h2>
                     <p className="text-[0.72rem] text-stone-500 font-medium">
                       طاولة رقم #{tableNumber} • {count} عناصر
                     </p>
@@ -224,14 +264,20 @@ export function CartDrawer({
               <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
                 {items.length === 0 ? (
                   <div className="py-12 text-center text-stone-400 space-y-2">
-                    <p className="text-sm font-bold text-stone-900">سلة الطلبات فارغة</p>
-                    <p className="text-xs text-stone-500">أضف بعض الأطباق والمشروبات من القائمة لتأكيد طلبك.</p>
+                    <p className="text-sm font-bold text-stone-900">
+                      سلة الطلبات فارغة
+                    </p>
+                    <p className="text-xs text-stone-500">
+                      أضف بعض الأطباق والمشروبات من القائمة لتأكيد طلبك.
+                    </p>
                   </div>
                 ) : (
                   items.map((item, idx) => {
-                    const itemName = item.nameAr || item.nameEn || "عنصر"
-                    const itemTotal = Number(item.price) * item.quantity
-                    const hasAttrs = item.selectedAttributes && item.selectedAttributes.length > 0
+                    const itemName = item.nameAr || item.nameEn || "عنصر";
+                    const itemTotal = Number(item.price) * item.quantity;
+                    const hasAttrs =
+                      item.selectedAttributes &&
+                      item.selectedAttributes.length > 0;
 
                     return (
                       <div
@@ -276,22 +322,31 @@ export function CartDrawer({
                             type="button"
                             onClick={() => {
                               if (item.quantity > 1) {
-                                updateQuantity(item.productId, item.quantity - 1)
+                                updateQuantity(
+                                  item.productId,
+                                  item.quantity - 1,
+                                );
                               } else {
-                                removeItem(item.productId)
+                                removeItem(item.productId);
                               }
                             }}
                             className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-red-50 hover:text-red-600 text-stone-700 flex items-center justify-center transition-colors"
                             aria-label="إنقاص أو حذف"
                           >
-                            {item.quantity === 1 ? <Trash2 size={13} /> : <Minus size={13} />}
+                            {item.quantity === 1 ? (
+                              <Trash2 size={13} />
+                            ) : (
+                              <Minus size={13} />
+                            )}
                           </button>
                           <span className="w-6 text-center font-mono font-extrabold text-xs tabular-nums text-stone-900">
                             {item.quantity}
                           </span>
                           <button
                             type="button"
-                            onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                            onClick={() =>
+                              updateQuantity(item.productId, item.quantity + 1)
+                            }
                             className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 flex items-center justify-center transition-colors"
                             aria-label="زيادة الكمية"
                           >
@@ -299,7 +354,7 @@ export function CartDrawer({
                           </button>
                         </div>
                       </div>
-                    )
+                    );
                   })
                 )}
 
@@ -363,5 +418,5 @@ export function CartDrawer({
         )}
       </AnimatePresence>
     </>
-  )
+  );
 }

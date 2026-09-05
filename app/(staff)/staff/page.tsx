@@ -1,67 +1,69 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import axios from "axios"
-import { apiClient } from "@/lib/api-client"
-import { OrderCard, Order } from "@/components/staff/order-card"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { AnimatePresence } from "framer-motion"
-import { Building2, ChevronDown, Inbox, RefreshCw } from "lucide-react"
-import { useSession } from "@/lib/auth-client"
+import { useAccess } from "@/lib/access-context";
+import { useCallback, useEffect, useRef, useState } from "react";
+import axios from "axios";
+import { apiClient } from "@/lib/api-client";
+import { OrderCard, Order } from "@/components/staff/order-card";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { AnimatePresence } from "framer-motion";
+import { Building2, ChevronDown, Inbox, RefreshCw } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 
 interface Branch {
-  id: string
-  name?: string
-  nameEn?: string
-  nameAr?: string
+  id: string;
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
 }
 
 interface RawOrderItem {
-  id?: string
-  productId?: string
-  product?: { nameAr?: string; nameEn?: string }
-  name?: string
-  nameEn?: string
-  nameAr?: string
-  quantity?: number
-  note?: string
-  selectedAttributes?: string[]
+  id?: string;
+  productId?: string;
+  product?: { nameAr?: string; nameEn?: string };
+  name?: string;
+  nameEn?: string;
+  nameAr?: string;
+  quantity?: number;
+  note?: string;
+  selectedAttributes?: string[];
 }
 
 interface RawOrder {
-  id: string
-  orderNumber?: number
-  updatedAt?: string
-  acceptedAt?: string | null
-  readyAt?: string | null
-  deliveredAt?: string | null
-  table?: { number?: number }
-  tableId?: string
-  status?: Order["status"]
-  notes?: string
-  note?: string
-  createdAt?: string
-  items?: RawOrderItem[]
+  id: string;
+  orderNumber?: number;
+  updatedAt?: string;
+  acceptedAt?: string | null;
+  readyAt?: string | null;
+  deliveredAt?: string | null;
+  table?: { number?: number };
+  tableId?: string;
+  status?: Order["status"];
+  notes?: string;
+  note?: string;
+  createdAt?: string;
+  items?: RawOrderItem[];
 }
 
-type StatusFilter = "active" | "pending" | "preparing" | "ready" | "delivered" | "all"
+type StatusFilter =
+  "active" | "pending" | "preparing" | "ready" | "delivered" | "all";
 
 function readBranches(data: unknown): Branch[] {
-  if (Array.isArray(data)) return data as Branch[]
-  if (!data || typeof data !== "object") return []
-  const envelope = data as { data?: unknown; branches?: unknown }
-  if (Array.isArray(envelope.data)) return envelope.data as Branch[]
-  if (Array.isArray(envelope.branches)) return envelope.branches as Branch[]
-  return []
+  if (Array.isArray(data)) return data as Branch[];
+  if (!data || typeof data !== "object") return [];
+  const envelope = data as { data?: unknown; branches?: unknown };
+  if (Array.isArray(envelope.data)) return envelope.data as Branch[];
+  if (Array.isArray(envelope.branches)) return envelope.branches as Branch[];
+  return [];
 }
 
 function readOrders(data: unknown): RawOrder[] {
-  if (Array.isArray(data)) return data as RawOrder[]
-  if (!data || typeof data !== "object") return []
-  const envelope = data as { data?: unknown; orders?: unknown }
-  if (Array.isArray(envelope.data)) return envelope.data as RawOrder[]
-  if (Array.isArray(envelope.orders)) return envelope.orders as RawOrder[]
-  return []
+  if (Array.isArray(data)) return data as RawOrder[];
+  if (!data || typeof data !== "object") return [];
+  const envelope = data as { data?: unknown; orders?: unknown };
+  if (Array.isArray(envelope.data)) return envelope.data as RawOrder[];
+  if (Array.isArray(envelope.orders)) return envelope.orders as RawOrder[];
+  return [];
 }
 
 function normalizeOrders(rawOrders: RawOrder[]): Order[] {
@@ -86,157 +88,195 @@ function normalizeOrders(rawOrders: RawOrder[]): Order[] {
           selectedAttributes: item.selectedAttributes ?? [],
         }))
       : [],
-  }))
+  }));
 }
 
 function requestMessage(error: unknown, fallback: string) {
-  if (!axios.isAxiosError(error)) return fallback
-  const message = error.response?.data?.message
-  return typeof message === "string" ? message : fallback
+  if (!axios.isAxiosError(error)) return fallback;
+  const message = error.response?.data?.message;
+  return typeof message === "string" ? message : fallback;
 }
 
 export default function StaffDashboard() {
-  const { data: session } = useSession()
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [selectedBranchId, setSelectedBranchId] = useState<string>("")
-  const [orders, setOrders] = useState<Order[]>([])
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active")
-  const [loading, setLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState("")
+  const { can } = useAccess();
+  const { data: session } = useSession();
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState("");
 
-  const fetchingBranches = useRef(new Set<string>())
-  const pendingRef = useRef(new Set<string>())
-  const requestVersion = useRef(0)
-  const branchRef = useRef("")
-  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
-  const [actionErrors, setActionErrors] = useState<Record<string, string>>({})
+  const fetchingBranches = useRef(new Set<string>());
+  const pendingRef = useRef(new Set<string>());
+  const requestVersion = useRef(0);
+  const branchRef = useRef("");
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
 
   const fetchBranches = useCallback(async () => {
     try {
-      const { data } = await apiClient.get("/staff/branches")
-      const list = readBranches(data)
-      setBranches(list)
+      const { data } = await apiClient.get("/staff/branches");
+      const list = readBranches(data);
+      setBranches(list);
       setSelectedBranchId((current) =>
-        list.some((branch) => branch.id === current) ? current : (list[0]?.id ?? "")
-      )
-      if (list.length === 0) setLoading(false)
+        list.some((branch) => branch.id === current)
+          ? current
+          : (list[0]?.id ?? ""),
+      );
+      if (list.length === 0) setLoading(false);
     } catch (err: unknown) {
-      console.error("Failed to load branches:", err)
+      console.error("Failed to load branches:", err);
       setError(
         requestMessage(
           err,
-          "تعذر تحميل الفرع المعين لحسابك. يرجى إعادة تسجيل الدخول أو مراجعة المشرف."
-        )
-      )
-      setLoading(false)
+          "تعذر تحميل الفرع المعين لحسابك. يرجى إعادة تسجيل الدخول أو مراجعة المشرف.",
+        ),
+      );
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   const fetchOrders = useCallback(
     async (branchId: string, isManual = false) => {
-      if (fetchingBranches.current.has(branchId)) return
-      fetchingBranches.current.add(branchId)
-      const version = ++requestVersion.current
-      if (isManual) setIsRefreshing(true)
+      if (fetchingBranches.current.has(branchId)) return;
+      fetchingBranches.current.add(branchId);
+      const version = ++requestVersion.current;
+      if (isManual) setIsRefreshing(true);
       try {
         const [liveRes, historyRes] = await Promise.allSettled([
           apiClient.get(`/staff/orders/${branchId}`),
           apiClient.get(`/staff/orders/${branchId}/history`),
-        ])
+        ]);
 
         if (liveRes.status === "rejected" && historyRes.status === "rejected") {
-          throw liveRes.reason
+          throw liveRes.reason;
         }
 
-        let combinedRaw: RawOrder[] = []
+        let combinedRaw: RawOrder[] = [];
 
         if (liveRes.status === "fulfilled") {
-          const liveList = readOrders(liveRes.value.data)
-          combinedRaw = [...combinedRaw, ...liveList]
+          const liveList = readOrders(liveRes.value.data);
+          combinedRaw = [...combinedRaw, ...liveList];
         }
 
         if (historyRes.status === "fulfilled") {
-          const histList = readOrders(historyRes.value.data)
-          const existingIds = new Set(combinedRaw.map((o) => o.id))
-          const uniqueHist = histList.filter((order) => !existingIds.has(order.id))
-          combinedRaw = [...combinedRaw, ...uniqueHist]
+          const histList = readOrders(historyRes.value.data);
+          const existingIds = new Set(combinedRaw.map((o) => o.id));
+          const uniqueHist = histList.filter(
+            (order) => !existingIds.has(order.id),
+          );
+          combinedRaw = [...combinedRaw, ...uniqueHist];
         }
 
-        if (version !== requestVersion.current || branchRef.current !== branchId) return
+        if (
+          version !== requestVersion.current ||
+          branchRef.current !== branchId
+        )
+          return;
         if (liveRes.status === "rejected" || historyRes.status === "rejected") {
-          throw new Error("Partial refresh failed")
+          throw new Error("Partial refresh failed");
         }
-        setOrders(previous => {
-          const existing = new Map(previous.map(order => [order.id, order]))
-          const rank = { pending: 0, preparing: 1, ready: 2, delivered: 3 }
-          const receivedIds = new Set(combinedRaw.map(order => order.id))
-          return [...normalizeOrders(combinedRaw).map(order => {
-            const old = existing.get(order.id)
-            return old && (pendingRef.current.has(order.id) || rank[old.status] > rank[order.status]) ? old : order
-          }), ...previous.filter(order => !receivedIds.has(order.id))]
-        })
-        setError("")
+        setOrders((previous) => {
+          const existing = new Map(previous.map((order) => [order.id, order]));
+          const rank = { pending: 0, preparing: 1, ready: 2, delivered: 3 };
+          const receivedIds = new Set(combinedRaw.map((order) => order.id));
+          return [
+            ...normalizeOrders(combinedRaw).map((order) => {
+              const old = existing.get(order.id);
+              return old &&
+                (pendingRef.current.has(order.id) ||
+                  rank[old.status] > rank[order.status])
+                ? old
+                : order;
+            }),
+            ...previous.filter((order) => !receivedIds.has(order.id)),
+          ];
+        });
+        setError("");
       } catch (err: unknown) {
-        if (version !== requestVersion.current || branchRef.current !== branchId) return
-        console.error("Failed to fetch live orders:", err)
-        setError(requestMessage(err, "تعذر استرجاع قائمة الطلبات الحالية."))
+        if (
+          version !== requestVersion.current ||
+          branchRef.current !== branchId
+        )
+          return;
+        console.error("Failed to fetch live orders:", err);
+        setError(requestMessage(err, "تعذر استرجاع قائمة الطلبات الحالية."));
       } finally {
-        fetchingBranches.current.delete(branchId)
-        if (version === requestVersion.current) setLoading(false)
-        if (isManual) setIsRefreshing(false)
+        fetchingBranches.current.delete(branchId);
+        if (version === requestVersion.current) setLoading(false);
+        if (isManual) setIsRefreshing(false);
       }
     },
-    []
-  )
+    [],
+  );
 
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => void fetchBranches(), 0)
-    return () => window.clearTimeout(initialLoad)
-  }, [fetchBranches])
+    const initialLoad = window.setTimeout(() => void fetchBranches(), 0);
+    return () => window.clearTimeout(initialLoad);
+  }, [fetchBranches]);
 
   useEffect(() => {
-    branchRef.current = selectedBranchId
-    if (!selectedBranchId) return
+    branchRef.current = selectedBranchId;
+    if (!selectedBranchId) return;
 
-    const invalidateRequests = () => { ++requestVersion.current }
+    const invalidateRequests = () => {
+      ++requestVersion.current;
+    };
     const refreshOrders = () => {
-      if (document.visibilityState === "visible") void fetchOrders(selectedBranchId)
-    }
-    const initialLoad = window.setTimeout(() => void fetchOrders(selectedBranchId), 0)
-    const intervalId = window.setInterval(refreshOrders, 4000)
+      if (document.visibilityState === "visible")
+        void fetchOrders(selectedBranchId);
+    };
+    const initialLoad = window.setTimeout(
+      () => void fetchOrders(selectedBranchId),
+      0,
+    );
+    const intervalId = window.setInterval(refreshOrders, 4000);
 
     return () => {
-      invalidateRequests()
-      window.clearTimeout(initialLoad)
-      window.clearInterval(intervalId)
-    }
-  }, [fetchOrders, selectedBranchId])
+      invalidateRequests();
+      window.clearTimeout(initialLoad);
+      window.clearInterval(intervalId);
+    };
+  }, [fetchOrders, selectedBranchId]);
 
-  const handleStatusChange = async (orderId: string, newStatus: Order["status"]) => {
-    if (pendingRef.current.has(orderId)) return
-    const branchId = selectedBranchId
-    pendingRef.current.add(orderId)
-    setPendingIds(new Set(pendingRef.current))
-    setActionErrors(previous => ({ ...previous, [orderId]: "" }))
-    ++requestVersion.current
+  const handleStatusChange = async (
+    orderId: string,
+    newStatus: Order["status"],
+  ) => {
+    if (pendingRef.current.has(orderId)) return;
+    const branchId = selectedBranchId;
+    pendingRef.current.add(orderId);
+    setPendingIds(new Set(pendingRef.current));
+    setActionErrors((previous) => ({ ...previous, [orderId]: "" }));
+    ++requestVersion.current;
     try {
-      const { data } = await apiClient.patch(`/staff/orders/${orderId}/status`, { status: newStatus })
+      const { data } = await apiClient.patch(
+        `/staff/orders/${orderId}/status`,
+        { status: newStatus },
+      );
       if (branchRef.current === branchId) {
-        const confirmed = normalizeOrders([data.data || data])[0]
-        ++requestVersion.current
-        setOrders(previous => previous.map(order => order.id === orderId ? confirmed : order))
+        const confirmed = normalizeOrders([data.data || data])[0];
+        ++requestVersion.current;
+        setOrders((previous) =>
+          previous.map((order) => (order.id === orderId ? confirmed : order)),
+        );
       }
     } catch {
       if (branchRef.current === branchId) {
-        setActionErrors(previous => ({ ...previous, [orderId]: "تعذر تأكيد التحديث. سنحدّث حالة الطلب؛ تحقق منها قبل المحاولة مجدداً." }))
+        setActionErrors((previous) => ({
+          ...previous,
+          [orderId]:
+            "تعذر تأكيد التحديث. سنحدّث حالة الطلب؛ تحقق منها قبل المحاولة مجدداً.",
+        }));
       }
     } finally {
-      pendingRef.current.delete(orderId)
-      setPendingIds(new Set(pendingRef.current))
-      if (branchRef.current === branchId) void fetchOrders(branchId)
+      pendingRef.current.delete(orderId);
+      setPendingIds(new Set(pendingRef.current));
+      if (branchRef.current === branchId) void fetchOrders(branchId);
     }
-  }
+  };
 
   const counts = {
     active: orders.filter((o) => o.status !== "delivered").length,
@@ -245,29 +285,31 @@ export default function StaffDashboard() {
     ready: orders.filter((o) => o.status === "ready").length,
     delivered: orders.filter((o) => o.status === "delivered").length,
     all: orders.length,
-  }
+  };
 
   const filteredOrders = orders
     .filter((o) => {
-      if (statusFilter === "active") return o.status !== "delivered"
-      if (statusFilter === "all") return true
-      return o.status === statusFilter
+      if (statusFilter === "active") return o.status !== "delivered";
+      if (statusFilter === "all") return true;
+      return o.status === statusFilter;
     })
     .sort((a, b) => {
-      const statusWeight = { pending: 1, preparing: 2, ready: 3, delivered: 4 }
+      const statusWeight = { pending: 1, preparing: 2, ready: 3, delivered: 4 };
       if (statusWeight[a.status] !== statusWeight[b.status]) {
-        return statusWeight[a.status] - statusWeight[b.status]
+        return statusWeight[a.status] - statusWeight[b.status];
       }
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    })
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
 
-  const isAdmin = session?.user?.role === "admin"
+  const isAdmin = can("branches.all");
 
   return (
     <div className="space-y-4 pb-16">
       {/* Action Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#181120] border border-white/[0.08] p-3 sm:p-4 rounded-2xl">
-        <h1 className="text-lg sm:text-xl font-black text-white">الطلبات الواردة</h1>
+        <h1 className="text-lg sm:text-xl font-black text-white">
+          الطلبات الواردة
+        </h1>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Branch Selector / Fixed Assigned Branch */}
@@ -277,39 +319,56 @@ export default function StaffDashboard() {
               <select
                 value={selectedBranchId}
                 onChange={(e) => {
-                  branchRef.current = e.target.value
-                  ++requestVersion.current
-                  setOrders([])
-                  setError("")
-                  setLoading(true)
-                  setSelectedBranchId(e.target.value)
+                  branchRef.current = e.target.value;
+                  ++requestVersion.current;
+                  setOrders([]);
+                  setError("");
+                  setLoading(true);
+                  setSelectedBranchId(e.target.value);
                 }}
                 className="bg-transparent text-xs sm:text-sm text-white font-bold focus:outline-none cursor-pointer appearance-none pl-6 pr-1"
               >
                 {branches.map((b) => (
-                  <option key={b.id} value={b.id} className="bg-[#1a1222] text-white">
+                  <option
+                    key={b.id}
+                    value={b.id}
+                    className="bg-[#1a1222] text-white"
+                  >
                     {b.nameAr || b.name || b.nameEn || "فرع"}
                   </option>
                 ))}
               </select>
-              <ChevronDown size={14} className="text-zinc-400 absolute left-2 pointer-events-none" />
+              <ChevronDown
+                size={14}
+                className="text-zinc-400 absolute left-2 pointer-events-none"
+              />
             </div>
           ) : branches[0] ? (
             <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white font-bold">
               <Building2 size={13} className="text-[#8cd1ca]" />
-              <span>{branches[0].nameAr || branches[0].name || branches[0].nameEn || "الفرع المعين"}</span>
+              <span>
+                {branches[0].nameAr ||
+                  branches[0].name ||
+                  branches[0].nameEn ||
+                  "الفرع المعين"}
+              </span>
             </div>
           ) : null}
 
           {/* Refresh Button */}
           <button
             type="button"
-            onClick={() => selectedBranchId && fetchOrders(selectedBranchId, true)}
+            onClick={() =>
+              selectedBranchId && fetchOrders(selectedBranchId, true)
+            }
             disabled={isRefreshing || !selectedBranchId}
             className="h-9 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors disabled:opacity-50"
             title="تحديث"
           >
-            <RefreshCw size={13} className={isRefreshing ? "animate-spin text-[#8cd1ca]" : ""} />
+            <RefreshCw
+              size={13}
+              className={isRefreshing ? "animate-spin text-[#8cd1ca]" : ""}
+            />
             <span>تحديث</span>
           </button>
         </div>
@@ -325,7 +384,7 @@ export default function StaffDashboard() {
           { id: "delivered", label: "سجل التسليم", count: counts.delivered },
           { id: "all", label: "الكل", count: counts.all },
         ].map((tab) => {
-          const isActive = statusFilter === tab.id
+          const isActive = statusFilter === tab.id;
           return (
             <button
               key={tab.id}
@@ -339,19 +398,24 @@ export default function StaffDashboard() {
               <span>{tab.label}</span>
               <span
                 className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-extrabold tabular-nums ${
-                  isActive ? "bg-black/25 text-white" : "bg-white/[0.08] text-zinc-300"
+                  isActive
+                    ? "bg-black/25 text-white"
+                    : "bg-white/[0.08] text-zinc-300"
                 }`}
               >
                 {tab.count}
               </span>
             </button>
-          )
+          );
         })}
       </div>
 
       {/* Error Alert */}
       {error && (
-        <div role="alert" className="bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl text-xs font-bold">
+        <div
+          role="alert"
+          className="bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl text-xs font-bold"
+        >
           {error}
         </div>
       )}
@@ -377,6 +441,13 @@ export default function StaffDashboard() {
               <OrderCard
                 key={order.id}
                 order={order}
+                canUpdate={can(
+                  order.status === "pending"
+                    ? "orders.prepare"
+                    : order.status === "preparing"
+                      ? "orders.ready"
+                      : "orders.deliver",
+                )}
                 isUpdating={pendingIds.has(order.id)}
                 error={actionErrors[order.id]}
                 onStatusChange={handleStatusChange}
@@ -389,7 +460,9 @@ export default function StaffDashboard() {
               <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-400 mb-1">
                 <Inbox size={22} />
               </div>
-              <p className="text-base font-bold text-white">لا توجد طلبات في هذا القسم حالياً</p>
+              <p className="text-base font-bold text-white">
+                لا توجد طلبات في هذا القسم حالياً
+              </p>
               <p className="text-xs text-zinc-400 max-w-sm">
                 {statusFilter === "delivered"
                   ? "الطلبات التي تم تسليمها للعملاء ستظهر في هذا السجل."
@@ -400,5 +473,5 @@ export default function StaffDashboard() {
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Plus, Minus, Check, MessageSquare, SlidersHorizontal } from "lucide-react"
 
@@ -53,13 +53,15 @@ export function ProductModal({
   const [itemNote, setItemNote] = useState("")
   const [quantity, setQuantity] = useState(1)
 
-  useEffect(() => {
+  const [previous, setPrevious] = useState({ isOpen, product })
+  if (previous.isOpen !== isOpen || previous.product !== product) {
+    setPrevious({ isOpen, product })
     if (isOpen && product) {
       setSelectedAttributes([])
       setItemNote("")
       setQuantity(1)
     }
-  }, [isOpen, product])
+  }
 
   if (!product) return null
 
