@@ -11,7 +11,11 @@ interface Role {
   name: string;
   permissions: string[];
 }
+interface Credential { temporaryPassword: string; expiresAt: string; email: string; }
 interface User {
+  mustChangePassword?: boolean;
+  isBusinessOwner?: boolean;
+  isPlatformAdmin?: boolean;
   id: string;
   name: string;
   email: string;
@@ -160,7 +164,9 @@ export default function UsersPage() {
   const [create, setCreate] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [credential, setCredential] = useState<Credential | null>(null);
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [copyNotice, setCopyNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
   const load = useCallback(async () => {
@@ -248,15 +254,15 @@ export default function UsersPage() {
     setBusy(true);
     setDialogError("");
     try {
-      await apiClient.post("/admin/users", {
+      const { data } = await apiClient.post<Credential>("/admin/users", {
         name,
         email,
-        password,
         role,
         branchId: branch || undefined,
       });
       setCreate(false);
-      setPassword("");
+      setCredential({ ...data, email });
+      setCopyNotice("");
       setNotice("تم إنشاء الحساب. يمكنك تخصيص صلاحياته من زر الصلاحيات.");
       await load();
     } catch (e) {
@@ -285,7 +291,6 @@ export default function UsersPage() {
               setBranch(branches[0]?.id ?? "");
               setName("");
               setEmail("");
-              setPassword("");
               setDialogError("");
             }}
           >
@@ -390,7 +395,9 @@ export default function UsersPage() {
                         "جميع الفروع"}
                     </small>
                   </div>
-                  {can("access.manage") && (
+                  {u.mustChangePassword && <small>بانتظار اختيار كلمة مرور شخصية</small>}
+                  {u.isBusinessOwner && <small>مالك النشاط · الاستعادة عبر دعم المنصة</small>}
+                  {can("access.manage") && !u.isBusinessOwner && !u.isPlatformAdmin && (
                     <button
                       className={styles.button}
                       onClick={() => openUser(u)}
@@ -400,6 +407,9 @@ export default function UsersPage() {
                       الصلاحيات
                     </button>
                   )}
+                  {u.id !== access?.id && !u.isPlatformAdmin && ((can("access.manage") && !u.isBusinessOwner) || access?.isPlatformAdmin) && (
+                    <button className={styles.button} onClick={() => { setResetTarget(u); setDialogError(""); }}>إعادة تعيين كلمة المرور</button>
+                  )}
                 </li>
               ))}
           </ul>
@@ -408,6 +418,25 @@ export default function UsersPage() {
           <p className={styles.muted}>لا يوجد أعضاء حتى الآن.</p>
         )}
       </section>
+      <Modal open={!!credential} onClose={() => setCredential(null)} title="بيانات الدخول المؤقتة" description="تظهر كلمة المرور هنا مرة واحدة. انسخها وشاركها مع صاحب الحساب عبر وسيلة خاصة. سيختار كلمة جديدة عند الدخول.">
+        <p dir="ltr">{credential?.email}</p>
+        <label className={styles.field}>كلمة المرور المؤقتة<input className={styles.input} dir="ltr" readOnly value={credential?.temporaryPassword ?? ""} onFocus={e => e.target.select()} /></label>
+        <p className={styles.muted}>صالحة حتى {credential && new Date(credential.expiresAt).toLocaleString("ar-SA")}</p>
+        <button className={styles.button} onClick={async () => { if (!credential) return; try { await navigator.clipboard.writeText(credential.temporaryPassword); setCopyNotice("تم النسخ"); } catch { setCopyNotice("حدد كلمة المرور وانسخها يدوياً."); } }}>نسخ كلمة المرور</button>
+        <p role="status">{copyNotice}</p>
+      </Modal>
+      <Modal open={!!resetTarget} onClose={() => { if (!busy) setResetTarget(null); }} title={`إعادة تعيين كلمة مرور ${resetTarget?.name ?? ""}`} description="ستنتهي جميع جلسات هذا المستخدم. ستصدر كلمة مرور مؤقتة لمدة 48 ساعة، وعليه اختيار كلمة شخصية عند الدخول.">
+        {dialogError && <p className={styles.error} role="alert">{dialogError}</p>}
+        <button className={`${styles.button} ${styles.primary}`} disabled={busy} onClick={async () => {
+          if (!resetTarget || busy) return;
+          setBusy(true); setDialogError("");
+          try {
+            const prefix = access?.isPlatformAdmin && resetTarget.isBusinessOwner ? "platform" : "admin";
+            const { data } = await apiClient.post<Credential>(`/${prefix}/users/${resetTarget.id}/reset-password`);
+            setCredential({ ...data, email: resetTarget.email }); setCopyNotice(""); setResetTarget(null); await load();
+          } catch (e) { setDialogError(message(e)); } finally { setBusy(false); }
+        }}>{busy ? "جارٍ الإصدار…" : "إصدار كلمة مرور مؤقتة"}</button>
+      </Modal>
       <Modal
         open={!!target}
         onClose={() => {
@@ -544,13 +573,12 @@ export default function UsersPage() {
           if (!busy) setCreate(false);
         }}
         title="إضافة عضو للفريق"
-        description="أنشئ الحساب، ثم خصص صلاحياته إذا احتجت."
+        description="سننشئ كلمة مرور مؤقتة آمنة، ويختار عضو الفريق كلمته الشخصية عند أول دخول."
       >
         <form onSubmit={createUser} className={styles.fields}>
           {[
             ["الاسم", name, setName, "text"],
             ["البريد الإلكتروني", email, setEmail, "email"],
-            ["كلمة المرور", password, setPassword, "password"],
           ].map(([label, value, setter, type]) => (
             <label className={styles.field} key={String(label)}>
               {String(label)}

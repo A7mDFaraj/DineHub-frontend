@@ -104,13 +104,17 @@ function describeLog(log: OperationalLog) {
     : log.path === "/api/auth/sign-out" || log.event.startsWith("auth.sign_out") ? "تسجيل الخروج"
     : log.path === "/api/auth/sign-up/email" || log.event.startsWith("auth.sign_up") ? "إنشاء حساب" : null;
   if (action) {
-    const explanation = log.statusCode === 401 ? "لم تُقبل بيانات الدخول أو الجلسة. لا يمكن الجزم إن كان السبب البريد أم كلمة المرور."
+    const confirmedReason = log.statusCode === 401 ? log.metadata?.reason : undefined;
+    const explanation = confirmedReason === "wrong_password" ? "كلمة المرور غير صحيحة لهذا الحساب. الحساب موجود، لكن كلمة المرور المدخلة لم تطابق المسجلة."
+      : confirmedReason === "password_not_set" ? "هذا الحساب لا يملك كلمة مرور مسجلة. يحتاج إعداد كلمة مرور أو استخدام طريقة الدخول المرتبطة به."
+      : confirmedReason === "password_account_unavailable" ? "لا يوجد حساب يدعم الدخول بالبريد وكلمة المرور لهذا العنوان. قد يكون البريد غير مسجل أو الحساب يستخدم طريقة دخول أخرى."
+      : log.statusCode === 401 ? "لم تُقبل بيانات الدخول أو الجلسة. لا يمكن الجزم إن كان السبب البريد أم كلمة المرور."
       : log.statusCode === 429 ? "محاولات كثيرة خلال وقت قصير. انتظر قليلاً قبل إعادة المحاولة."
       : (log.statusCode ?? 0) >= 500 ? "تعذر إكمال العملية بسبب خطأ في الخادم. افتح التفاصيل وراجع رقم التتبع."
       : log.statusCode === 403 ? "رفض الخادم العملية. راجع صلاحية الحساب وإعدادات الوصول."
       : failed ? "رفضت العملية. راجع رمز الحالة والتفاصيل لمعرفة سبب الرفض."
       : "اكتملت العملية بنجاح؛ لا يلزم اتخاذ إجراء.";
-    return { title: `${failed ? "فشل" : "نجاح"} ${action}`, explanation };
+    return { title: confirmedReason === "wrong_password" ? "فشل الدخول — كلمة المرور غير صحيحة" : `${failed ? "فشل" : "نجاح"} ${action}`, explanation };
   }
   if ((log.statusCode ?? 0) >= 500) return { title: "خطأ في الخادم", explanation: "تعذر إكمال الطلب. استخدم رقم التتبع لتحديد سبب الخطأ في التفاصيل." };
   if (log.statusCode === 401) return { title: "جلسة غير صالحة أو منتهية", explanation: "الطلب يحتاج تسجيل الدخول. قد يظهر طبيعياً بعد انتهاء الجلسة." };

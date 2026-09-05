@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAccess } from "@/lib/access-context";
 import { apiClient } from "@/lib/api-client";
 
 export interface Branch {
@@ -41,6 +42,7 @@ const AdminBranchContext = createContext<AdminBranchContextType | undefined>(
 );
 
 export function AdminBranchProvider({ children }: { children: ReactNode }) {
+  const { access, loading: accessLoading } = useAccess();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchIdState] = useState<string>("");
   const [isLoadingBranches, setIsLoadingBranches] = useState(true);
@@ -90,9 +92,10 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (accessLoading || !access || access.mustChangePassword) return;
     const timer = setTimeout(() => void refreshBranches(), 0);
     return () => clearTimeout(timer);
-  }, [refreshBranches]);
+  }, [refreshBranches, accessLoading, access?.id, access?.mustChangePassword]);
 
   const setSelectedBranchId = useCallback((id: string) => {
     setSelectedBranchIdState(id);

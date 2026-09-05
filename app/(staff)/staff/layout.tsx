@@ -1,4 +1,5 @@
 "use client";
+import { PasswordChangeScreen } from "@/components/auth/password-change-screen";
 
 import { AccessProvider, useAccess } from "@/lib/access-context";
 import { useSession } from "@/lib/auth-client";
@@ -10,7 +11,7 @@ import { useEffect, useState } from "react";
 
 function StaffShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { can, loading: accessLoading } = useAccess();
+  const { access, can, loading: accessLoading } = useAccess();
   const { data: session, isPending } = useSession();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -30,6 +31,8 @@ function StaffShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+
+  if (access?.mustChangePassword) return <PasswordChangeScreen forced expiresAt={access.temporaryPasswordExpiresAt} />;
 
   const handleLogout = async () => {
     setIsSigningOut(true);
@@ -69,6 +72,7 @@ function StaffShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
+          <a href="/account/password" className="p-3 text-sm">أمان الحساب</a>
           <button
             type="button"
             onClick={handleLogout}

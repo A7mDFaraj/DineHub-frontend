@@ -12,7 +12,6 @@ import {
   ReceiptText,
   ScanLine,
   ShieldCheck,
-  UserRound,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -31,24 +30,7 @@ const signInSchema = z.object({
   password: z.string().min(8, "كلمة المرور لا تقل عن 8 أحرف."),
 });
 
-const signUpSchema = z
-  .object({
-    name: z.string().trim().min(2, "اكتب اسمك كما سيظهر لفريقك."),
-    email: z.email("اكتب بريدًا إلكترونيًا صحيحًا."),
-    password: z
-      .string()
-      .min(8, "استخدم 8 أحرف على الأقل.")
-      .max(128, "كلمة المرور طويلة جدًا."),
-    confirmPassword: z.string(),
-  })
-  .refine((values) => values.password === values.confirmPassword, {
-    message: "كلمتا المرور غير متطابقتين.",
-    path: ["confirmPassword"],
-  });
-
-type AuthMode = "sign-in" | "sign-up";
 type SignInValues = z.infer<typeof signInSchema>;
-type SignUpValues = z.infer<typeof signUpSchema>;
 type AuthError = { code?: string; message?: string };
 
 const SESSION_CONFIRMATION_ATTEMPTS = 3;
@@ -77,7 +59,8 @@ async function confirmSession() {
 }
 
 async function openAuthenticatedArea() {
-  const { data } = await apiClient.get<{ permissions: string[] }>("/access/me");
+  const { data } = await apiClient.get<{ permissions: string[]; mustChangePassword?: boolean }>("/access/me");
+  if (data.mustChangePassword) { window.location.replace("/account/password"); return; }
   const destination = [
     "/admin",
     "/staff",
@@ -286,162 +269,8 @@ function SignInForm() {
   );
 }
 
-function SignUpForm() {
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<SignUpValues>({
-    resolver: zodResolver(signUpSchema),
-    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
-  });
-
-  const onSubmit = async (values: SignUpValues) => {
-    setRequestError(null);
-    try {
-      const { error } = await authClient.signUp.email({
-        name: values.name,
-        email: values.email,
-        password: values.password,
-      });
-      if (error) {
-        reportClientIncident({
-          level: "warn",
-          event: "auth.sign_up_rejected",
-          message: error.message ?? "Sign-up was rejected",
-          metadata: { errorCode: error.code ?? "unknown" },
-        });
-        setRequestError(getAuthError(error));
-        return;
-      }
-
-      const session = await confirmSession();
-      if (!session) {
-        reportClientIncident({
-          level: "error",
-          event: "auth.session_confirmation_failed",
-          message: "Sign-up succeeded but the session could not be confirmed",
-          metadata: { flow: "sign-up" },
-        });
-        setRequestError(
-          "تم إنشاء الحساب، لكن تعذّر تثبيت الجلسة. سجّل الدخول للمتابعة.",
-        );
-        return;
-      }
-
-      await openAuthenticatedArea();
-    } catch (error) {
-      const reason =
-        error instanceof Error
-          ? error
-          : new Error("Sign-up network request failed");
-      reportClientIncident({
-        level: "error",
-        event: "auth.sign_up_network_error",
-        message: reason.message,
-        stack: reason.stack,
-        metadata: { errorName: reason.name },
-      });
-      setRequestError(getAuthError(null));
-    }
-  };
-
-  return (
-    <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
-      {requestError ? (
-        <div className={styles.formAlert} role="alert">
-          <CircleAlert aria-hidden="true" size={19} />
-          <p>{requestError}</p>
-        </div>
-      ) : null}
-
-      <div className={styles.field}>
-        <label htmlFor="sign-up-name">اسمك</label>
-        <div className={styles.inputShell} data-invalid={Boolean(errors.name)}>
-          <UserRound aria-hidden="true" size={19} strokeWidth={1.7} />
-          <input
-            {...register("name")}
-            id="sign-up-name"
-            type="text"
-            autoComplete="name"
-            aria-invalid={Boolean(errors.name)}
-            aria-describedby={errors.name ? "sign-up-name-error" : undefined}
-            placeholder="مثال: أحمد الفرج"
-          />
-        </div>
-        {errors.name ? (
-          <p className={styles.fieldError} id="sign-up-name-error">
-            {errors.name.message}
-          </p>
-        ) : null}
-      </div>
-
-      <div className={styles.field}>
-        <label htmlFor="sign-up-email">بريد العمل</label>
-        <div className={styles.inputShell} data-invalid={Boolean(errors.email)}>
-          <Mail aria-hidden="true" size={19} strokeWidth={1.7} />
-          <input
-            {...register("email")}
-            id="sign-up-email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            aria-invalid={Boolean(errors.email)}
-            aria-describedby={errors.email ? "sign-up-email-error" : undefined}
-            dir="ltr"
-            placeholder="name@business.com"
-          />
-        </div>
-        {errors.email ? (
-          <p className={styles.fieldError} id="sign-up-email-error">
-            {errors.email.message}
-          </p>
-        ) : null}
-      </div>
-
-      <PasswordField
-        id="sign-up-password"
-        label="أنشئ كلمة مرور"
-        autoComplete="new-password"
-        error={errors.password?.message}
-        registration={register("password")}
-      />
-      <PasswordField
-        id="sign-up-confirm-password"
-        label="أعد كتابة كلمة المرور"
-        autoComplete="new-password"
-        error={errors.confirmPassword?.message}
-        registration={register("confirmPassword")}
-      />
-      <p className={styles.passwordHint}>
-        8 أحرف على الأقل. يمكنك اللصق واستخدام مدير كلمات المرور.
-      </p>
-
-      <button
-        className={styles.submitButton}
-        type="submit"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className={styles.spinner} aria-hidden="true" size={20} />
-            <span>جارٍ تجهيز حسابك…</span>
-          </>
-        ) : (
-          <>
-            <span>أنشئ حسابك</span>
-            <ArrowLeft aria-hidden="true" size={20} />
-          </>
-        )}
-      </button>
-    </form>
-  );
-}
-
 export function AdminAuthScreen() {
-  const [mode, setMode] = useState<AuthMode>("sign-in");
-  const isSignIn = mode === "sign-in";
+  const isSignIn = true;
 
   return (
     <main className={styles.page}>
@@ -478,37 +307,11 @@ export function AdminAuthScreen() {
             </p>
           </div>
 
-          <div
-            className={styles.modeTabs}
-            role="tablist"
-            aria-label="اختر طريقة المتابعة"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={isSignIn}
-              onClick={() => setMode("sign-in")}
-            >
-              تسجيل الدخول
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={!isSignIn}
-              onClick={() => setMode("sign-up")}
-            >
-              إنشاء حساب
-            </button>
-            <span
-              className={styles.tabSignal}
-              data-mode={mode}
-              aria-hidden="true"
-            />
-          </div>
-
-          <div role="tabpanel" aria-live="polite">
-            {isSignIn ? <SignInForm /> : <SignUpForm />}
-          </div>
+          <SignInForm />
+          <details>
+            <summary>نسيت كلمة المرور؟</summary>
+            <p>مالك النشاط: تواصل مع دعم DineHub. عضو الفريق: اطلب كلمة مرور مؤقتة من مسؤول نشاطك. الحسابات يصدرها المسؤول ولا تحتاج إلى تفعيل بالبريد.</p>
+          </details>
           <p className={styles.secureNote}>
             <ShieldCheck aria-hidden="true" size={17} />
             جلسة دخول آمنة ومشفّرة

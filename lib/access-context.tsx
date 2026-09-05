@@ -26,6 +26,11 @@ export function permissionForPage(path: string) {
   return pagePermissions[path];
 }
 type Access = {
+  id: string;
+  mustChangePassword?: boolean;
+  temporaryPasswordExpiresAt?: string | null;
+  isBusinessOwner?: boolean;
+  isPlatformAdmin?: boolean;
   permissions: string[];
   branchId?: string | null;
   role?: string;
@@ -59,7 +64,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     try {
       const { data } = await apiClient.get<Access>("/access/me", { signal: current.controller.signal });
       if (inFlight.current !== current) return;
-      setAccess((previous) => previous && previous.role === data.role && previous.branchId === data.branchId && previous.permissions.length === data.permissions.length && previous.permissions.every((key) => data.permissions.includes(key)) ? previous : data);
+      setAccess((previous) => previous && previous.id === data.id && previous.mustChangePassword === data.mustChangePassword && previous.temporaryPasswordExpiresAt === data.temporaryPasswordExpiresAt && previous.isBusinessOwner === data.isBusinessOwner && previous.isPlatformAdmin === data.isPlatformAdmin && previous.role === data.role && previous.branchId === data.branchId && previous.permissions.length === data.permissions.length && previous.permissions.every((key) => data.permissions.includes(key)) ? previous : data);
       lastSuccessfulUser.current = current.userId;
       setError(false);
     } catch (error) {
@@ -98,7 +103,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
   const loading = isPending || (!!session && loadedUser !== session.user.id);
   const can = useCallback(
-    (key: string) => !loading && !!access?.permissions.includes(key),
+    (key: string) => !loading && !access?.mustChangePassword && !!access?.permissions.includes(key),
     [loading, access],
   );
   return (

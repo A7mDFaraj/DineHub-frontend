@@ -1,4 +1,5 @@
 "use client";
+import { PasswordChangeScreen } from "@/components/auth/password-change-screen";
 
 import {
   AccessProvider,
@@ -84,6 +85,7 @@ function NavigationLinks({
             </Link>
           );
         })}
+      <Link className={styles.navLink} href="/account/password" onClick={onNavigate}>أمان الحساب</Link>
     </nav>
   );
 }
@@ -141,7 +143,7 @@ function AuthenticatedAdminShell({
   pathname: string;
 }) {
   const router = useRouter();
-  const { can, loading: accessLoading, error: accessError } = useAccess();
+  const { access, can, loading: accessLoading, error: accessError } = useAccess();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: session, isPending, error } = authClient.useSession();
@@ -167,6 +169,8 @@ function AuthenticatedAdminShell({
 
   if (accessLoading) return <SessionLoading />;
   if (accessError) return <SessionError />;
+
+  if (access?.mustChangePassword) return <PasswordChangeScreen forced expiresAt={access.temporaryPasswordExpiresAt} />;
 
   const currentPage =
     navigation.find((item) =>
