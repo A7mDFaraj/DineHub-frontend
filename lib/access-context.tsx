@@ -27,6 +27,8 @@ export function permissionForPage(path: string) {
 }
 type Access = {
   id: string;
+  businessId: string;
+  businessName?: string;
   mustChangePassword?: boolean;
   temporaryPasswordExpiresAt?: string | null;
   isBusinessOwner?: boolean;
@@ -56,15 +58,16 @@ export function AccessProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef<{ userId: string; controller: AbortController } | null>(null);
   const lastRefresh = useRef(0);
   const lastSuccessfulUser = useRef("");
+  const userId = session?.user.id;
   const refresh = useCallback(async () => {
-    if (!session?.user.id || inFlight.current?.userId === session.user.id) return;
+    if (!userId || inFlight.current?.userId === userId) return;
     inFlight.current?.controller.abort();
-    const current = { userId: session.user.id, controller: new AbortController() };
+    const current = { userId, controller: new AbortController() };
     inFlight.current = current;
     try {
       const { data } = await apiClient.get<Access>("/access/me", { signal: current.controller.signal });
       if (inFlight.current !== current) return;
-      setAccess((previous) => previous && previous.id === data.id && previous.mustChangePassword === data.mustChangePassword && previous.temporaryPasswordExpiresAt === data.temporaryPasswordExpiresAt && previous.isBusinessOwner === data.isBusinessOwner && previous.isPlatformAdmin === data.isPlatformAdmin && previous.role === data.role && previous.branchId === data.branchId && previous.permissions.length === data.permissions.length && previous.permissions.every((key) => data.permissions.includes(key)) ? previous : data);
+      setAccess((previous) => previous && previous.id === data.id && previous.businessId === data.businessId && previous.businessName === data.businessName && previous.mustChangePassword === data.mustChangePassword && previous.temporaryPasswordExpiresAt === data.temporaryPasswordExpiresAt && previous.isBusinessOwner === data.isBusinessOwner && previous.isPlatformAdmin === data.isPlatformAdmin && previous.role === data.role && previous.branchId === data.branchId && previous.permissions.length === data.permissions.length && previous.permissions.every((key) => data.permissions.includes(key)) ? previous : data);
       lastSuccessfulUser.current = current.userId;
       setError(false);
     } catch (error) {
@@ -83,8 +86,19 @@ export function AccessProvider({ children }: { children: ReactNode }) {
         setLoadedUser(current.userId);
       }
     }
-  }, [session?.user.id]);
+  }, [userId]);
   useEffect(() => {
+    if (!userId) {
+      inFlight.current?.controller.abort();
+      inFlight.current = null;
+      lastSuccessfulUser.current = "";
+      const reset = setTimeout(() => {
+        setAccess(null);
+        setLoadedUser("");
+        setError(false);
+      }, 0);
+      return () => clearTimeout(reset);
+    }
     const initial = setTimeout(() => void refresh(), 0);
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
@@ -100,7 +114,7 @@ export function AccessProvider({ children }: { children: ReactNode }) {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [refresh]);
+  }, [refresh, userId]);
   const loading = isPending || (!!session && loadedUser !== session.user.id);
   const can = useCallback(
     (key: string) => !loading && !access?.mustChangePassword && !!access?.permissions.includes(key),

@@ -4,6 +4,7 @@ import { PasswordChangeScreen } from "@/components/auth/password-change-screen";
 import { AccessProvider, useAccess } from "@/lib/access-context";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { LogOut, User, Radio } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -72,7 +73,7 @@ function StaffShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
-          <a href="/account/password" className="p-3 text-sm">أمان الحساب</a>
+          <Link href="/account/password" className="p-3 text-sm">أمان الحساب</Link>
           <button
             type="button"
             onClick={handleLogout}

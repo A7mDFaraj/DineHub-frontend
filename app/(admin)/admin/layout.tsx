@@ -19,6 +19,7 @@ import {
   QrCode,
   ScrollText,
   Settings,
+  Store,
   Tags,
   UtensilsCrossed,
   UsersRound,
@@ -58,7 +59,7 @@ function NavigationLinks({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const { can } = useAccess();
+  const { access, can } = useAccess();
   return (
     <nav className={styles.navigation} aria-label="التنقل في الإدارة">
       {navigation
@@ -85,6 +86,11 @@ function NavigationLinks({
             </Link>
           );
         })}
+      {access?.isPlatformAdmin && (
+        <Link className={cn(styles.navLink, pathname.startsWith("/admin/businesses") && styles.navLinkActive)} href="/admin/businesses" onClick={onNavigate}>
+          <span className={styles.navIcon}><Store aria-hidden="true" size={19} /></span><span>عملاء المنصة</span><i aria-hidden="true" />
+        </Link>
+      )}
       <Link className={styles.navLink} href="/account/password" onClick={onNavigate}>أمان الحساب</Link>
     </nav>
   );
@@ -300,7 +306,7 @@ function AuthenticatedAdminShell({
 
         <div className={styles.contextBar}>
           <div>
-            <span>الإدارة</span>
+            <span>{access?.businessName ?? "الإدارة"}</span>
             <strong>{currentPage}</strong>
           </div>
           <p>
@@ -310,7 +316,7 @@ function AuthenticatedAdminShell({
         </div>
 
         <main className={styles.main} id="admin-main">
-          {can(permissionForPage(pathname) ?? "denied") ? (
+          {(pathname.startsWith("/admin/businesses") ? access?.isPlatformAdmin : can(permissionForPage(pathname) ?? "denied")) ? (
             children
           ) : (
             <section role="alert">

@@ -95,7 +95,7 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
     if (accessLoading || !access || access.mustChangePassword) return;
     const timer = setTimeout(() => void refreshBranches(), 0);
     return () => clearTimeout(timer);
-  }, [refreshBranches, accessLoading, access?.id, access?.mustChangePassword]);
+  }, [refreshBranches, accessLoading, access]);
 
   const setSelectedBranchId = useCallback((id: string) => {
     setSelectedBranchIdState(id);
