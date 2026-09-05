@@ -87,38 +87,12 @@
   outline-offset: 3px;
 }
 
-.signalStatus {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 4px 18px 20px;
-  border: 1px solid rgba(71, 170, 161, 0.2);
-  border-radius: 16px;
-  background: rgba(71, 170, 161, 0.08);
-  padding: 12px;
-}
-
-.signalStatus > span {
-  width: 9px;
-  height: 9px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: #77cbc3;
-  box-shadow: 0 0 0 6px rgba(71, 170, 161, 0.12);
-}
-
-.signalStatus div,
 .userCard div {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
 
-.signalStatus strong {
-  font-size: 0.78rem;
-}
-
-.signalStatus small,
 .userCard small {
   color: #a99ead;
   font-size: 0.68rem;

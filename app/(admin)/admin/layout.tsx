@@ -62,6 +62,25 @@ function NavigationLinks({
   const { access, can } = useAccess();
   return (
     <nav className={styles.navigation} aria-label="التنقل في الإدارة">
+      {access?.isPlatformAdmin && (
+        <Link
+          className={cn(
+            styles.navLink,
+            pathname.startsWith("/admin/businesses") && styles.navLinkActive,
+          )}
+          href="/admin/businesses"
+          onClick={onNavigate}
+          aria-current={
+            pathname.startsWith("/admin/businesses") ? "page" : undefined
+          }
+        >
+          <span className={styles.navIcon}>
+            <Store aria-hidden="true" size={19} strokeWidth={1.7} />
+          </span>
+          <span>عملاء المنصة</span>
+          <i aria-hidden="true" />
+        </Link>
+      )}
       {navigation
         .filter((item) => can(permissionForPage(item.href) ?? "denied"))
         .map((item) => {
@@ -86,12 +105,6 @@ function NavigationLinks({
             </Link>
           );
         })}
-      {access?.isPlatformAdmin && (
-        <Link className={cn(styles.navLink, pathname.startsWith("/admin/businesses") && styles.navLinkActive)} href="/admin/businesses" onClick={onNavigate}>
-          <span className={styles.navIcon}><Store aria-hidden="true" size={19} /></span><span>عملاء المنصة</span><i aria-hidden="true" />
-        </Link>
-      )}
-      <Link className={styles.navLink} href="/account/password" onClick={onNavigate}>أمان الحساب</Link>
     </nav>
   );
 }
@@ -179,11 +192,13 @@ function AuthenticatedAdminShell({
   if (access?.mustChangePassword) return <PasswordChangeScreen forced expiresAt={access.temporaryPasswordExpiresAt} />;
 
   const currentPage =
-    navigation.find((item) =>
-      item.href === "/admin"
-        ? pathname === item.href
-        : pathname.startsWith(item.href),
-    )?.name ?? "الإدارة";
+    (pathname.startsWith("/admin/businesses")
+      ? "عملاء المنصة"
+      : navigation.find((item) =>
+          item.href === "/admin"
+            ? pathname === item.href
+            : pathname.startsWith(item.href),
+        )?.name) ?? "الإدارة";
 
   const handleLogout = async () => {
     setIsSigningOut(true);
@@ -204,14 +219,6 @@ function AuthenticatedAdminShell({
 
       <aside className={styles.sidebar}>
         <BrandLockup />
-        <div className={styles.signalStatus}>
-          <span aria-hidden="true" />
-          <div>
-            <strong>النظام متصل</strong>
-            <small>جاهز لاستقبال الطلبات</small>
-          </div>
-        </div>
-
         <NavigationLinks pathname={pathname} />
 
         <div className={styles.sidebarFoot}>

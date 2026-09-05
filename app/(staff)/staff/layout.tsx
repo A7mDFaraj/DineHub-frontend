@@ -33,7 +33,7 @@ function StaffShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (access?.mustChangePassword) return <PasswordChangeScreen forced expiresAt={access.temporaryPasswordExpiresAt} />;
+  if (access?.mustChangePassword) return <PasswordChangeScreen forced expiresAt={access.temporaryPasswordExpiresAt} businessName={access.businessName} />;
 
   const handleLogout = async () => {
     setIsSigningOut(true);
