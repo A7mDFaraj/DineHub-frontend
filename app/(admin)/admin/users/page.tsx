@@ -140,6 +140,7 @@ function Modal({
 }
 export default function UsersPage() {
   const { can, access, refresh } = useAccess();
+  const canManageAccess = can("access.manage");
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [keys, setKeys] = useState<string[]>([]);
@@ -169,7 +170,7 @@ export default function UsersPage() {
       const [u, b, c] = await Promise.all([
         apiClient.get<User[]>("/admin/users"),
         apiClient.get<Branch[]>("/staff/branches"),
-        can("access.manage")
+        canManageAccess
           ? apiClient.get<{ roles: Role[]; permissions: string[] }>(
               "/admin/access",
             )
@@ -184,7 +185,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [can]);
+  }, [canManageAccess]);
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
     return () => clearTimeout(timer);

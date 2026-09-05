@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useAccess } from "@/lib/access-context";
@@ -29,26 +29,47 @@ const number = (value: number | null) =>
         value,
       );
 export function BusinessInsights() {
-  const { can } = useAccess();
+  const { can, access } = useAccess();
+  const canReadAnalytics = can("analytics.read");
+  const canReadAllBranches = can("branches.all");
+  const assignedBranch = access?.branchId;
   const { selectedBranchId, branches, setSelectedBranchId } = useAdminBranch();
   const [days, setDays] = useState(30);
   const [retry, setRetry] = useState(0);
   const [data, setData] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const cache = useRef(new Map<string, { data: Insights; time: number }>());
+  const lastRetry = useRef(0);
+  const displayedKey = useRef("");
   useEffect(() => {
-    if (!can("analytics.read")) return;
+    if (!canReadAnalytics || !selectedBranchId) return;
     const controller = new AbortController();
     let active = true;
     const load = async () => {
-      setLoading(true);
+      const key = `${canReadAllBranches}:${assignedBranch}:${selectedBranchId}:${days}`;
+      const force = lastRetry.current !== retry;
+      lastRetry.current = retry;
+      const cached = cache.current.get(key);
+      if (displayedKey.current !== key) setData(cached?.data ?? null);
+      displayedKey.current = key;
       setError("");
+      if (!force && cached && Date.now() - cached.time < 60000) {
+        setData(cached.data);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       try {
         const res = await apiClient.get<Insights>("/admin/analytics", {
           params: { days, branchId: selectedBranchId || undefined },
           signal: controller.signal,
         });
-        if (active) setData(res.data);
+        if (active) {
+          cache.current.set(key, { data: res.data, time: Date.now() });
+          if (cache.current.size > 12) cache.current.delete(cache.current.keys().next().value!);
+          setData(res.data);
+        }
       } catch {
         if (active) setError("تعذر تحميل مؤشرات الأداء. حاول مجدداً.");
       } finally {
@@ -60,8 +81,8 @@ export function BusinessInsights() {
       active = false;
       controller.abort();
     };
-  }, [days, selectedBranchId, retry, can]);
-  if (!can("analytics.read")) return null;
+  }, [days, selectedBranchId, retry, canReadAnalytics, canReadAllBranches, assignedBranch]);
+  if (!canReadAnalytics) return null;
   const s = data?.summary;
   return (
     <section className={styles.section} aria-labelledby="insights-title">
@@ -105,11 +126,12 @@ export function BusinessInsights() {
           </button>
         </div>
       </div>
-      {error ? (
+      {error && (
         <div className={styles.error} role="alert">
           {error}
         </div>
-      ) : loading ? (
+      )}
+      {loading && !s ? (
         <div className={styles.panel} role="status">
           جارٍ قراءة أداء نشاطك…
         </div>

@@ -67,6 +67,7 @@ interface LogFilters {
   level: FilterValue<LogLevel>;
   source: FilterValue<LogSource>;
   search: string;
+  category: "all" | "auth" | "auth_failures" | "attention";
 }
 
 const EMPTY_SUMMARY: LogSummary = { total: 0, errors: 0, warnings: 0, frontend: 0, backend: 0 };
@@ -89,12 +90,43 @@ const dateFormatter = new Intl.DateTimeFormat("ar-SA", {
 
 function getLoadError(error: unknown): string {
   if (!axios.isAxiosError(error)) return "تعذّر تحميل سجل النظام.";
-  if (error.response?.status === 403) return "هذا السجل متاح للمدير فقط.";
+  if (error.response?.status === 403) return "حسابك لا يملك صلاحية عرض السجل.";
   return "تعذّر الاتصال بسجل النظام. تحقق من الخادم ثم حاول مرة أخرى.";
 }
 
 function copyText(value: string): void {
   void navigator.clipboard?.writeText(value);
+}
+
+function describeLog(log: OperationalLog) {
+  const failed = (log.statusCode ?? 0) >= 400;
+  const action = log.path === "/api/auth/sign-in/email" || log.event.startsWith("auth.sign_in") ? "تسجيل الدخول"
+    : log.path === "/api/auth/sign-out" || log.event.startsWith("auth.sign_out") ? "تسجيل الخروج"
+    : log.path === "/api/auth/sign-up/email" || log.event.startsWith("auth.sign_up") ? "إنشاء حساب" : null;
+  if (action) {
+    const explanation = log.statusCode === 401 ? "لم تُقبل بيانات الدخول أو الجلسة. لا يمكن الجزم إن كان السبب البريد أم كلمة المرور."
+      : log.statusCode === 429 ? "محاولات كثيرة خلال وقت قصير. انتظر قليلاً قبل إعادة المحاولة."
+      : (log.statusCode ?? 0) >= 500 ? "تعذر إكمال العملية بسبب خطأ في الخادم. افتح التفاصيل وراجع رقم التتبع."
+      : log.statusCode === 403 ? "رفض الخادم العملية. راجع صلاحية الحساب وإعدادات الوصول."
+      : failed ? "رفضت العملية. راجع رمز الحالة والتفاصيل لمعرفة سبب الرفض."
+      : "اكتملت العملية بنجاح؛ لا يلزم اتخاذ إجراء.";
+    return { title: `${failed ? "فشل" : "نجاح"} ${action}`, explanation };
+  }
+  if ((log.statusCode ?? 0) >= 500) return { title: "خطأ في الخادم", explanation: "تعذر إكمال الطلب. استخدم رقم التتبع لتحديد سبب الخطأ في التفاصيل." };
+  if (log.statusCode === 401) return { title: "جلسة غير صالحة أو منتهية", explanation: "الطلب يحتاج تسجيل الدخول. قد يظهر طبيعياً بعد انتهاء الجلسة." };
+  if (log.statusCode === 403) return { title: "طلب خارج صلاحيات المستخدم", explanation: "منع الخادم الوصول. راجع صلاحيات المستخدم إذا كان يحتاج هذه العملية." };
+  if (log.statusCode === 404) return { title: "رابط أو عنصر غير موجود", explanation: "قد يكون الرابط قديماً أو العنصر محذوفاً. راجع المسار أدناه." };
+  if (log.statusCode === 409) return { title: "تعارض مع تحديث آخر", explanation: "ربما غيّر موظف آخر الحالة أو توجد بيانات مكررة. حدّث الصفحة قبل المحاولة مجدداً." };
+  if (log.statusCode === 429) return { title: "تجاوز معدل الطلبات", explanation: "أرسل الجهاز طلبات كثيرة. انتظر ثم أعد المحاولة." };
+  if (log.statusCode === 499) return { title: "أُغلق الاتصال قبل اكتمال الطلب", explanation: "قد يحدث عند مغادرة الصفحة أو ضعف الشبكة. لا يعني بالضرورة وجود عطل في الخادم." };
+  if (log.statusCode === 400 || log.statusCode === 422) return { title: "بيانات الطلب غير مقبولة", explanation: "راجع الحقول المدخلة ورسالة التحقق في التفاصيل." };
+  if (log.event === "http.slow_request") return { title: "استجابة بطيئة", explanation: "اكتمل الطلب لكن استغرق وقتاً أطول من الحد المحدد. راقب التكرار؛ المثلث الأصفر لا يعني فشل العملية." };
+  if (log.source === "frontend") return { title: "حدث في متصفح المستخدم", explanation: log.message };
+  return { title: failed ? "طلب لم يكتمل" : "عملية مكتملة", explanation: log.message };
+}
+function logIdentity(log: OperationalLog) {
+  const email = log.metadata?.attemptedEmail;
+  return typeof email === "string" && email ? email : log.userId || "غير مسجل في هذا الحدث";
 }
 
 function LogDetails({ log, onClose }: { log: OperationalLog | null; onClose: () => void }) {
@@ -108,8 +140,8 @@ function LogDetails({ log, onClose }: { log: OperationalLog | null; onClose: () 
               <div className={styles.dialogHeader}>
                 <div>
                   <p><span data-level={log.level}>{LEVEL_LABELS[log.level]}</span>{SOURCE_LABELS[log.source]}</p>
-                  <Dialog.Title>{log.event}</Dialog.Title>
-                  <Dialog.Description id="log-detail-description">{log.message}</Dialog.Description>
+                  <Dialog.Title>{describeLog(log).title}</Dialog.Title>
+                  <Dialog.Description id="log-detail-description">{describeLog(log).explanation}</Dialog.Description>
                 </div>
                 <Dialog.Close asChild>
                   <button type="button" aria-label="إغلاق تفاصيل السجل"><X aria-hidden="true" size={20} /></button>
@@ -128,10 +160,14 @@ function LogDetails({ log, onClose }: { log: OperationalLog | null; onClose: () 
                     {log.requestId ? <button type="button" onClick={() => copyText(log.requestId!)} aria-label="نسخ رقم التتبع"><Copy aria-hidden="true" size={15} /></button> : null}
                   </dd>
                 </div>
-                <div><dt>المستخدم</dt><dd dir="ltr">{log.userId ?? "—"}</dd></div>
+                <div><dt>المستخدم</dt><dd dir="ltr">{logIdentity(log)}</dd></div>
                 <div><dt>الفرع</dt><dd dir="ltr">{log.branchId ?? "—"}</dd></div>
               </dl>
 
+              <section className={styles.codeSection}>
+                <h3>الحدث ورسالة الخادم</h3>
+                <pre dir="auto">{log.event}{"\n"}{log.message}</pre>
+              </section>
               {log.stack ? (
                 <section className={styles.codeSection}>
                   <h3><Braces aria-hidden="true" size={17} />Stack trace</h3>
@@ -157,19 +193,24 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<OperationalLog[]>([]);
   const [summary, setSummary] = useState<LogSummary>(EMPTY_SUMMARY);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [filters, setFilters] = useState<LogFilters>({ level: "all", source: "all", search: "" });
+  const [filters, setFilters] = useState<LogFilters>({ level: "all", source: "all", search: "", category: "all" });
   const [searchDraft, setSearchDraft] = useState("");
   const [selectedLog, setSelectedLog] = useState<OperationalLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isLive, setIsLive] = useState(true);
+  const [isLive, setIsLive] = useState(false);
   const [isSlowMode, setIsSlowMode] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const requestVersion = useRef(0);
+  const pendingRequest = useRef<AbortController | null>(null);
   const nextCursorRef = useRef<string | null>(null);
 
   const loadLogs = useCallback(async (append = false, silent = false) => {
+    if ((append || silent) && pendingRequest.current) return;
+    pendingRequest.current?.abort();
+    const controller = new AbortController();
+    pendingRequest.current = controller;
     const version = append ? requestVersion.current : ++requestVersion.current;
     if (append) setIsLoadingMore(true);
     else if (silent) setIsRefreshing(true);
@@ -181,18 +222,22 @@ export default function LogsPage() {
       if (filters.level !== "all") params.level = filters.level;
       if (filters.source !== "all") params.source = filters.source;
       if (filters.search) params.search = filters.search;
+      if (filters.category !== "all") params.category = filters.category;
       if (append && nextCursorRef.current) params.cursor = nextCursorRef.current;
 
-      const { data } = await apiClient.get<LogsResponse>("/admin/logs", { params });
+      const { data } = await apiClient.get<LogsResponse>("/admin/logs", { params, signal: controller.signal });
       if (version !== requestVersion.current) return;
       setLogs((current) => append ? [...current, ...data.items] : data.items);
       const cursor = isSlowMode ? null : data.nextCursor;
       setNextCursor(cursor);
       nextCursorRef.current = cursor;
       setSummary(data.summary.last24Hours);
+      setLoadError(null);
     } catch (error) {
-      if (version === requestVersion.current && !silent) setLoadError(getLoadError(error));
+      if (version === requestVersion.current && !controller.signal.aborted) setLoadError(getLoadError(error));
     } finally {
+      if (pendingRequest.current !== controller) return;
+      pendingRequest.current = null;
       if (append) setIsLoadingMore(false);
       else if (silent) setIsRefreshing(false);
       else setIsLoading(false);
@@ -200,14 +245,15 @@ export default function LogsPage() {
   }, [filters, isSlowMode]);
 
   useEffect(() => {
-    queueMicrotask(() => void loadLogs());
+    const timer = setTimeout(() => void loadLogs(), 0);
+    return () => { clearTimeout(timer); ++requestVersion.current; pendingRequest.current?.abort(); pendingRequest.current = null; };
   }, [loadLogs]);
 
   useEffect(() => {
     if (!isLive) return;
     const timer = window.setInterval(
-      () => void loadLogs(false, true),
-      isSlowMode ? 60_000 : 20_000,
+      () => { if (document.visibilityState === "visible") void loadLogs(false, true); },
+      isSlowMode ? 120_000 : 60_000,
     );
     return () => window.clearInterval(timer);
   }, [isLive, isSlowMode, loadLogs]);
@@ -225,13 +271,13 @@ export default function LogsPage() {
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const search = searchDraft.trim();
-    if (search === filters.search) void loadLogs();
+    if (search === filters.search) void loadLogs(false, true);
     else setFilters((current) => ({ ...current, search }));
   };
 
   const clearFilters = () => {
     setSearchDraft("");
-    setFilters({ level: "all", source: "all", search: "" });
+    setFilters({ level: "all", source: "all", search: "", category: "all" });
   };
 
   return (
@@ -270,6 +316,18 @@ export default function LogsPage() {
         </div>
       </header>
 
+      <nav className={styles.quickFilters} aria-label="نوع الأحداث">
+        {([
+          ["all", "كل الأحداث"], ["auth", "الدخول والخروج"],
+          ["auth_failures", "محاولات الحساب الفاشلة"], ["attention", "أخطاء وطلبات مرفوضة"],
+        ] as const).map(([category, label]) => (
+          <button type="button" key={category} aria-pressed={filters.category === category}
+            onClick={() => { setSearchDraft(""); setFilters({ category, level: "all", source: "all", search: "" }); }}>
+            {label}
+          </button>
+        ))}
+      </nav>
+      <p className={styles.filterHint}>المثلث الأصفر تنبيه للمراجعة، وقد يعني بطء استجابة فقط. ملخص الأرقام يشمل كل الأحداث خلال 24 ساعة. البريد المعروض هو العنوان المستخدم في المحاولة؛ الأحداث القديمة قد لا تحتويه.</p>
       <section className={styles.summaryGrid} aria-label="ملخص آخر 24 ساعة">
         <article data-tone="healthy">
           <span><Activity aria-hidden="true" size={20} /></span>
@@ -287,7 +345,7 @@ export default function LogsPage() {
           <span><AlertTriangle aria-hidden="true" size={20} /></span>
           <small>تحذيرات</small>
           <strong>{summary.warnings.toLocaleString("ar-SA")}</strong>
-          <p>طلبات مرفوضة أو متعثرة</p>
+          <p>بطء أو رفض طلب؛ ليست كلها أعطالاً</p>
         </article>
         <article data-tone="frontend">
           <span><MonitorSmartphone aria-hidden="true" size={20} /></span>
@@ -306,8 +364,8 @@ export default function LogsPage() {
               {!isLive
                 ? "التحديث متوقف — جمع الأحداث مستمر في الخلفية"
                 : isSlowMode
-                  ? "الوضع البطيء — آخر 3 أحداث كل 60 ثانية"
-                  : "تحديث تلقائي كل 20 ثانية"}
+                  ? "الوضع البطيء — آخر 3 أحداث كل دقيقتين"
+                  : "تحديث هادئ كل دقيقة أثناء عرض الصفحة"}
             </p>
           </div>
 
@@ -315,7 +373,7 @@ export default function LogsPage() {
             <label className={styles.searchField}>
               <span className={styles.srOnly}>ابحث في السجل</span>
               <Search aria-hidden="true" size={18} />
-              <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="رسالة، مسار، أو Request ID" dir="auto" />
+              <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="بريد المستخدم، رسالة، أو رقم تتبع" dir="auto" />
               {searchDraft ? <button type="button" onClick={() => setSearchDraft("")} aria-label="مسح البحث"><X aria-hidden="true" size={16} /></button> : null}
             </label>
 
@@ -344,9 +402,10 @@ export default function LogsPage() {
           </form>
         </div>
 
+        {loadError && logs.length > 0 ? <p className={styles.filterHint} role="alert">{loadError} — آخر نتائج محملة ما زالت ظاهرة.</p> : null}
         {isLoading ? (
           <div className={styles.statePanel} aria-busy="true"><Loader2 className={styles.spinning} aria-hidden="true" size={28} /><h3>نقرأ إشارات النظام…</h3><p>نجمع أحدث أحداث الخادم والمتصفح.</p></div>
-        ) : loadError ? (
+        ) : loadError && !logs.length ? (
           <div className={styles.statePanel} role="alert"><CircleAlert aria-hidden="true" size={28} /><h3>تعذّر فتح السجل</h3><p>{loadError}</p><button type="button" onClick={() => void loadLogs()}>إعادة المحاولة</button></div>
         ) : logs.length ? (
           <>
@@ -360,9 +419,10 @@ export default function LogsPage() {
                     <div className={styles.logTitle}>
                       <span data-level={log.level}>{LEVEL_LABELS[log.level]}</span>
                       <span data-source={log.source}>{log.source === "frontend" ? <MonitorSmartphone aria-hidden="true" size={14} /> : <Server aria-hidden="true" size={14} />}{SOURCE_LABELS[log.source]}</span>
-                      <strong dir="ltr">{log.event}</strong>
+                      <strong>{describeLog(log).title}</strong>
                     </div>
-                    <p>{log.message}</p>
+                    <p>{describeLog(log).explanation}</p>
+                    {log.event.startsWith("auth.") || log.path?.startsWith("/api/auth/") ? <p>الحساب: <bdi>{logIdentity(log)}</bdi></p> : null}
                     <div className={styles.logMeta}>
                       {log.method || log.path ? <code dir="ltr">{[log.method, log.path].filter(Boolean).join(" ")}</code> : null}
                       {log.statusCode ? <span dir="ltr">HTTP {log.statusCode}</span> : null}

@@ -307,3 +307,9 @@
   .spinning { animation-duration: 1.7s; }
   .refreshButton, .loadMoreButton, .logRow { transition-duration: 0.01ms; }
 }
+
+.quickFilters { display: flex; flex-wrap: wrap; gap: 10px; }
+.quickFilters button { min-height: 44px; padding: 10px 16px; border: 1px solid rgba(223,210,235,.16); border-radius: 12px; background: rgba(255,255,255,.04); color: #d8c8dd; font: inherit; cursor: pointer; }
+.quickFilters button[aria-pressed="true"] { background: #24433f; color: #bcebe5; border-color: #659d96; }
+.quickFilters button:focus-visible { outline: 3px solid #8cd1ca; outline-offset: 3px; }
+.filterHint { color: #b9aebd; font-size: .8rem; line-height: 1.8; }
