@@ -4,6 +4,7 @@ import {
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import { SectionHeading } from "@/components/marketing/section-heading";
 
@@ -13,42 +14,41 @@ type FlowStep = {
   icon: LucideIcon;
 };
 
-const steps: FlowStep[] = [
-  {
-    title: "يمسح العميل",
-    description:
-      "يفتح QR تجربة الطلب مباشرة على هاتفه—من دون تنزيل تطبيق أو إنشاء حساب.",
-    icon: QrCode,
-  },
-  {
-    title: "يختار بطريقته",
-    description:
-      "يضيف الخيارات والملاحظات الدقيقة، من نوع الحليب إلى استبعاد مكوّن معيّن.",
-    icon: SlidersHorizontal,
-  },
-  {
-    title: "يصل الطلب واضحًا",
-    description:
-      "يستلم الفريق طلبًا منظمًا على شاشة مريحة للمس، ثم يتابع حالته حتى الاكتمال.",
-    icon: BellRing,
-  },
-];
+export async function FlowSection() {
+  const t = await getTranslations("Flow");
 
-export function FlowSection() {
+  const steps: FlowStep[] = [
+    {
+      title: t("step1Title"),
+      description: t("step1Desc"),
+      icon: QrCode,
+    },
+    {
+      title: t("step2Title"),
+      description: t("step2Desc"),
+      icon: SlidersHorizontal,
+    },
+    {
+      title: t("step3Title"),
+      description: t("step3Desc"),
+      icon: BellRing,
+    },
+  ];
+
   return (
     <section className="landing-section flow-section" id="how-it-works">
       <div className="landing-shell flow-layout">
         <SectionHeading
-          eyebrow="رحلة أقصر للعميل"
+          eyebrow={t("eyebrow")}
           title={
             <>
-              ثلاث خطوات.
+              {t("titleLine1")}{" "}
               <span className="section-title-line">
-                لا طوابير جديدة.
+                {t("titleLine2")}
               </span>
             </>
           }
-          description="من لحظة المسح إلى وصول الطلب، يبقى المسار قصيرًا ومفهومًا؛ يختار العميل بثقة، ويستلم الفريق طلبًا واضحًا."
+          description={t("description")}
         />
 
         <ol className="flow-grid">

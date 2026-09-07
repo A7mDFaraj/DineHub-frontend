@@ -1,14 +1,19 @@
 import Image from "next/image";
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
-const footerLinks = [
-  { href: "#how-it-works", label: "كيف يعمل" },
-  { href: "#experience", label: "تجربة العميل" },
-  { href: "#operations", label: "إدارة التشغيل" },
-  { href: "/admin/login", label: "دخول الإدارة" },
-];
+import { Link } from "@/i18n/navigation";
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const t = await getTranslations("Footer");
+  const tCommon = await getTranslations("Common");
+
+  const footerLinks = [
+    { href: "#how-it-works", label: t("howItWorks") },
+    { href: "#experience", label: t("experience") },
+    { href: "#operations", label: t("operations") },
+    { href: "/admin/login", label: t("adminLogin") },
+  ];
+
   return (
     <footer className="site-footer">
       <div className="landing-shell footer-grid">
@@ -24,12 +29,12 @@ export function SiteFooter() {
               />
             </span>
             <span className="brand-word" dir="ltr" translate="no">
-              DineHub
+              {tCommon("brandName")}
             </span>
           </Link>
-          <p>طلب أسهل للعميل. تشغيل أوضح للفريق.</p>
+          <p>{t("tagline")}</p>
         </div>
-        <nav aria-label="روابط التذييل">
+        <nav aria-label={t("navAria")}>
           {footerLinks.map((item) => (
             <a href={item.href} key={item.href}>
               {item.label}
@@ -38,8 +43,10 @@ export function SiteFooter() {
         </nav>
       </div>
       <div className="landing-shell footer-bottom">
-        <span dir="ltr" translate="no">© {new Date().getFullYear()} DineHub</span>
-        <span>صُمّم للعمل بالعربية ومن الهاتف أولًا.</span>
+        <span dir="ltr" translate="no">
+          {t("copyright", { year: new Date().getFullYear() })}
+        </span>
+        <span>{t("badge")}</span>
       </div>
     </footer>
   );

@@ -5,6 +5,7 @@ import {
   QrCode,
 } from "lucide-react";
 import Image from "next/image";
+import { getTranslations } from "next-intl/server";
 
 import { SectionHeading } from "@/components/marketing/section-heading";
 import {
@@ -15,19 +16,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export function ProductShowcase() {
+export async function ProductShowcase() {
+  const t = await getTranslations("Showcase");
+
   return (
     <section className="landing-section showcase-section" id="experience">
       <div className="landing-shell">
         <SectionHeading
-          eyebrow="تجربتان، نظام واحد"
+          eyebrow={t("eyebrow")}
           title={
             <>
-              سهل للعميل.
-              <span className="section-title-line">قوي لفريقك.</span>
+              {t("titleLine1")}{" "}
+              <span className="section-title-line">{t("titleLine2")}</span>
             </>
           }
-          description="واجهة خفيفة تقود العميل مباشرة إلى طلبه، ونظام تشغيل يمنح فريقك كل ما يحتاجه من دون أن يثقل التجربة."
+          description={t("description")}
           align="center"
         />
 
@@ -37,16 +40,13 @@ export function ProductShowcase() {
               <div className="feature-icon">
                 <QrCode aria-hidden="true" strokeWidth={1.7} />
               </div>
-              <CardTitle>قائمة تبدأ من الكاميرا</CardTitle>
-              <CardDescription>
-                تجربة عربية سريعة، مرتبة حسب الفئات، وتعمل بسلاسة على أصغر
-                الشاشات.
-              </CardDescription>
+              <CardTitle>{t("feature1Title")}</CardTitle>
+              <CardDescription>{t("feature1Desc")}</CardDescription>
             </CardHeader>
             <CardContent className="feature-visual feature-visual--menu">
               <Image
                 src="/brand/feature-qr-menu.png"
-                alt="تصوّر ثلاثي الأبعاد لهاتف يعرض قائمة رقمية بعد مسح رمز QR"
+                alt={t("feature1Alt")}
                 width={1254}
                 height={1254}
                 sizes="(max-width: 767px) 88vw, 52vw"
@@ -59,16 +59,13 @@ export function ProductShowcase() {
               <div className="feature-icon">
                 <MessageSquareText aria-hidden="true" strokeWidth={1.7} />
               </div>
-              <CardTitle>كل ملاحظة تصل كما كُتبت</CardTitle>
-              <CardDescription>
-                إضافات، أحجام، تفضيلات واستثناءات واضحة داخل الطلب بدل
-                التخمين عند التنفيذ.
-              </CardDescription>
+              <CardTitle>{t("feature2Title")}</CardTitle>
+              <CardDescription>{t("feature2Desc")}</CardDescription>
             </CardHeader>
             <CardContent className="feature-visual">
               <Image
                 src="/brand/feature-custom-order.png"
-                alt="تصوّر ثلاثي الأبعاد لخيارات تخصيص الطلب والملاحظات"
+                alt={t("feature2Alt")}
                 width={1230}
                 height={1278}
                 sizes="(max-width: 767px) 88vw, 34vw"
@@ -81,16 +78,13 @@ export function ProductShowcase() {
               <div className="feature-icon">
                 <BarChart3 aria-hidden="true" strokeWidth={1.7} />
               </div>
-              <CardTitle>الصورة الكاملة لكل الفروع</CardTitle>
-              <CardDescription>
-                راقب الطلبات والأصناف والأداء من لوحة واحدة، ثم انتقل إلى أي
-                فرع من دون تبديل الأنظمة.
-              </CardDescription>
+              <CardTitle>{t("feature3Title")}</CardTitle>
+              <CardDescription>{t("feature3Desc")}</CardDescription>
             </CardHeader>
             <CardContent className="feature-visual">
               <Image
                 src="/brand/feature-analytics.png"
-                alt="تصوّر ثلاثي الأبعاد للوحة تحليلات وأداء الفروع"
+                alt={t("feature3Alt")}
                 width={1312}
                 height={1199}
                 sizes="(max-width: 767px) 88vw, 34vw"
@@ -101,10 +95,7 @@ export function ProductShowcase() {
 
         <div className="showcase-footnote">
           <Layers3 aria-hidden="true" strokeWidth={1.7} />
-          <p>
-            عدّل القائمة مرة واحدة، ثم طبّقها على الفرع المناسب مع التحكم في
-            الأسعار والتوفر لكل موقع.
-          </p>
+          <p>{t("footnote")}</p>
         </div>
       </div>
     </section>

@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 import { Alexandria, Outfit } from "next/font/google";
 import localFont from "next/font/local";
-import "./globals.css";
+import { notFound } from "next/navigation";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, setRequestLocale } from "next-intl/server";
+
+import { routing } from "@/i18n/routing";
+import "@/app/globals.css";
 
 const thmanyahSans = localFont({
   src: [
-    { path: "../public/fonts/thmanyahsans-Light.woff2", weight: "300" },
-    { path: "../public/fonts/thmanyahsans-Regular.woff2", weight: "400" },
-    { path: "../public/fonts/thmanyahsans-Medium.woff2", weight: "500" },
-    { path: "../public/fonts/thmanyahsans-Bold.woff2", weight: "700" },
-    { path: "../public/fonts/thmanyahsans-Black.woff2", weight: "900" },
+    { path: "../../public/fonts/thmanyahsans-Light.woff2", weight: "300" },
+    { path: "../../public/fonts/thmanyahsans-Regular.woff2", weight: "400" },
+    { path: "../../public/fonts/thmanyahsans-Medium.woff2", weight: "500" },
+    { path: "../../public/fonts/thmanyahsans-Bold.woff2", weight: "700" },
+    { path: "../../public/fonts/thmanyahsans-Black.woff2", weight: "900" },
   ],
   variable: "--font-thmanyah",
   display: "swap",
@@ -44,20 +49,39 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
+export default async function RootLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale } = await params;
+
+  if (!routing.locales.includes(locale as "ar" | "en")) {
+    notFound();
+  }
+
+  setRequestLocale(locale);
+  const messages = await getMessages();
+  const dir = locale === "ar" ? "rtl" : "ltr";
+
   return (
     <html
-      lang="ar"
-      dir="rtl"
+      lang={locale}
+      dir={dir}
+      data-locale={locale}
       className={`${alexandria.variable} ${outfit.variable} ${thmanyahSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        {children}
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

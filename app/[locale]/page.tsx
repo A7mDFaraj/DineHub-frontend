@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import "./landing.css";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import "@/app/landing.css";
 
 import { FinalCta } from "@/components/marketing/final-cta";
 import { FlowSection } from "@/components/marketing/flow-section";
@@ -10,28 +11,51 @@ import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { UseCasesSection } from "@/components/marketing/use-cases-section";
 
-export const metadata: Metadata = {
-  title: "منصة الطلبات الرقمية وإدارة الفروع",
-  description:
-    "أنشئ تجربة طلب سريعة عبر QR لأي نشاط، وأدر القوائم والطلبات والفروع والتحليلات من لوحة واحدة مع DineHub.",
-  openGraph: {
-    title: "DineHub — كل طلب يبدأ بسهولة",
-    description:
-      "تجربة طلب بدون تطبيق أو تسجيل للعميل، وتحكم كامل للفريق عبر الفروع.",
-    type: "website",
-    locale: "ar_SA",
-  },
-};
-
 export const viewport: Viewport = {
   themeColor: "#f7f3ed",
 };
 
-export default function Home() {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Metadata" });
+
+  return {
+    title: t("title"),
+    description: t("description"),
+    alternates: {
+      canonical: locale === "ar" ? "/" : `/${locale}`,
+      languages: {
+        ar: "/",
+        en: "/en",
+      },
+    },
+    openGraph: {
+      title: t("ogTitle"),
+      description: t("ogDescription"),
+      type: "website",
+      locale: t("ogLocale"),
+    },
+  };
+}
+
+export default async function Home({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
+  const tCommon = await getTranslations({ locale, namespace: "Common" });
+
   return (
     <div className="landing-page">
       <a className="skip-link" href="#main-content">
-        انتقل إلى المحتوى
+        {tCommon("skipToContent")}
       </a>
       <SiteHeader />
       <main id="main-content">

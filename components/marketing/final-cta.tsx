@@ -1,9 +1,14 @@
-import { ArrowUpLeft, QrCode, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { ArrowUpLeft, ArrowUpRight, QrCode, Sparkles } from "lucide-react";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 
-export function FinalCta() {
+export async function FinalCta() {
+  const locale = await getLocale();
+  const isRtl = locale === "ar";
+  const t = await getTranslations("FinalCta");
+
   return (
     <section className="final-cta-section" aria-labelledby="final-cta-title">
       <div className="landing-shell">
@@ -14,13 +19,17 @@ export function FinalCta() {
             <Sparkles strokeWidth={1.4} />
           </div>
           <div>
-            <p>جاهز لرحلة طلب أقصر؟</p>
-            <h2 id="final-cta-title">اجعل أول تفاعل مع مشروعك أسرع من الانتظار.</h2>
+            <p>{t("kicker")}</p>
+            <h2 id="final-cta-title">{t("title")}</h2>
           </div>
           <Button asChild variant="brand" size="xl">
             <Link href="/admin/login">
-              ابدأ إعداد DineHub
-              <ArrowUpLeft aria-hidden="true" strokeWidth={2} />
+              {t("button")}
+              {isRtl ? (
+                <ArrowUpLeft aria-hidden="true" strokeWidth={2} />
+              ) : (
+                <ArrowUpRight aria-hidden="true" strokeWidth={2} />
+              )}
             </Link>
           </Button>
         </div>

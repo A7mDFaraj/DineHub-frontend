@@ -1,36 +1,39 @@
 import { Building2, ShoppingBag, SlidersHorizontal } from "lucide-react";
 import Image from "next/image";
+import { getTranslations } from "next-intl/server";
 
 import { SectionHeading } from "@/components/marketing/section-heading";
 import systemIllustration from "@/public/brand/dinehub-system-illustration.png";
 
-const capabilities = [
-  {
-    title: "الطلب يتحرك من دون أن تضيع تفاصيله",
-    description: "اختيارات العميل وملاحظاته تصل إلى الفريق في مسار واحد واضح.",
-    icon: ShoppingBag,
-  },
-  {
-    title: "كل فرع متصل بالصورة الكاملة",
-    description: "تشغيل مستقل عند الحاجة، ورؤية موحّدة عندما تريد القرار الأشمل.",
-    icon: Building2,
-  },
-  {
-    title: "النظام يتشكّل حول طريقة عملك",
-    description: "القائمة والتوفر والإضافات والأسعار تتبع نموذج خدمتك، لا العكس.",
-    icon: SlidersHorizontal,
-  },
-];
+export async function OperationsSection() {
+  const t = await getTranslations("Operations");
 
-export function OperationsSection() {
+  const capabilities = [
+    {
+      title: t("cap1Title"),
+      description: t("cap1Desc"),
+      icon: ShoppingBag,
+    },
+    {
+      title: t("cap2Title"),
+      description: t("cap2Desc"),
+      icon: Building2,
+    },
+    {
+      title: t("cap3Title"),
+      description: t("cap3Desc"),
+      icon: SlidersHorizontal,
+    },
+  ];
+
   return (
     <section className="operations-section" id="operations">
       <div className="landing-shell operations-grid">
         <div className="operations-copy">
           <SectionHeading
-            eyebrow="منظومة واحدة، من المسح إلى القرار"
-            title="يرى العميل طريقًا قصيرًا. ويرى فريقك الصورة كاملة."
-            description="يربط DineHub لحظة الطلب بما يحدث بعدها: اختيار العميل، تنفيذ الفريق، وحركة الفروع—من دون أن يفرض عليك شاشة أو أسلوب تشغيل واحدًا."
+            eyebrow={t("eyebrow")}
+            title={t("title")}
+            description={t("description")}
             inverse
           />
 
@@ -60,12 +63,12 @@ export function OperationsSection() {
           <Image
             className="operations-illustration"
             src={systemIllustration}
-            alt="تصوّر تجريدي يوضح انتقال الطلب من هاتف العميل إلى فريق التشغيل ثم إلى عدة فروع مترابطة"
+            alt={t("illustrationAlt")}
             sizes="(max-width: 1023px) 94vw, 58vw"
             placeholder="blur"
           />
           <figcaption className="sr-only">
-            رسم توضيحي للمفهوم العام، وليس صورة من واجهة النظام الفعلية.
+            {t("illustrationCaption")}
           </figcaption>
         </figure>
       </div>

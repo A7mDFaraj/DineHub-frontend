@@ -1,5 +1,6 @@
 import {
   ArrowUpLeft,
+  ArrowUpRight,
   BarChart3,
   BellRing,
   Check,
@@ -11,16 +12,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 import heroImage from "@/public/brand/herosection image.png";
-
-const productPromises = [
-  "بدون تطبيق",
-  "بدون تسجيل للعميل",
-  "جاهز لكل شاشة",
-];
 
 type JourneyStep = {
   step: string;
@@ -29,15 +25,25 @@ type JourneyStep = {
   icon: LucideIcon;
 };
 
-const journeySteps: JourneyStep[] = [
-  { step: "01", title: "يمسح", description: "QR", icon: QrCode },
-  { step: "02", title: "يستكشف", description: "القائمة", icon: LayoutGrid },
-  { step: "03", title: "يخصّص", description: "طلبه", icon: SlidersHorizontal },
-  { step: "04", title: "يصل", description: "للفريق", icon: BellRing },
-  { step: "05", title: "يتضح", description: "الأداء", icon: BarChart3 },
-];
+export async function HeroSection() {
+  const locale = await getLocale();
+  const isRtl = locale === "ar";
+  const t = await getTranslations("Hero");
 
-export function HeroSection() {
+  const productPromises = [
+    t("promiseNoApp"),
+    t("promiseNoSignup"),
+    t("promiseAllScreens"),
+  ];
+
+  const journeySteps: JourneyStep[] = [
+    { step: "01", title: t("step1Title"), description: t("step1Desc"), icon: QrCode },
+    { step: "02", title: t("step2Title"), description: t("step2Desc"), icon: LayoutGrid },
+    { step: "03", title: t("step3Title"), description: t("step3Desc"), icon: SlidersHorizontal },
+    { step: "04", title: t("step4Title"), description: t("step4Desc"), icon: BellRing },
+    { step: "05", title: t("step5Title"), description: t("step5Desc"), icon: BarChart3 },
+  ];
+
   return (
     <section className="hero-section" aria-labelledby="hero-title">
       <div className="hero-orbit hero-orbit--one" aria-hidden="true" />
@@ -47,40 +53,40 @@ export function HeroSection() {
         <div className="hero-copy">
           <div className="hero-intro">
             <ScanLine aria-hidden="true" strokeWidth={1.8} />
-            <span>من المسح إلى الخدمة، في مسار واحد</span>
+            <span>{t("intro")}</span>
           </div>
 
           <h1 id="hero-title">
             <span className="hero-title-line">
-              كل طلب يبدأ <em>بسهولة.</em>
+              {t("titleLine1")} <em>{t("titleLine1Em")}</em>
             </span>
             <span className="hero-title-line hero-title-line--secondary">
-              وكل فرع يبقى تحت سيطرتك.
+              {t("titleLine2")}
             </span>
           </h1>
 
-          <p className="hero-lede">
-            يمسح العميل QR، يختار ويخصّص طلبه، ثم يرسله بلا تطبيق ولا تسجيل.
-            وفي الخلفية، يدير فريقك القوائم والطلبات والفروع والتحليلات من مكان
-            واحد.
-          </p>
+          <p className="hero-lede">{t("lede")}</p>
 
           <div className="hero-actions">
             <Button asChild variant="brand" size="xl">
               <Link href="/admin/login">
-                ابدأ تجربة DineHub
-                <ArrowUpLeft aria-hidden="true" strokeWidth={2} />
+                {t("ctaStart")}
+                {isRtl ? (
+                  <ArrowUpLeft aria-hidden="true" strokeWidth={2} />
+                ) : (
+                  <ArrowUpRight aria-hidden="true" strokeWidth={2} />
+                )}
               </Link>
             </Button>
             <Button asChild variant="brandOutline" size="xl">
               <a href="#experience">
-                شاهد التجربة
+                {t("ctaExperience")}
                 <MousePointerClick aria-hidden="true" strokeWidth={1.8} />
               </a>
             </Button>
           </div>
 
-          <ul className="hero-promises" aria-label="مزايا التجربة">
+          <ul className="hero-promises" aria-label={t("promisesAria")}>
             {productPromises.map((item) => (
               <li key={item}>
                 <Check aria-hidden="true" strokeWidth={2.2} />
@@ -98,7 +104,7 @@ export function HeroSection() {
             <Image
               className="hero-illustration"
               src={heroImage}
-              alt="منظومة DineHub للطلب عبر QR تضم هاتف العميل وشاشة نقطة البيع والتحليلات"
+              alt={t("heroImageAlt")}
               sizes="(max-width: 767px) 96vw, (max-width: 1199px) 72vw, 760px"
               loading="eager"
               placeholder="blur"
@@ -110,46 +116,48 @@ export function HeroSection() {
               <ScanLine strokeWidth={1.8} />
             </span>
             <span>
-              <strong>مسح سريع</strong>
-              <small>القائمة جاهزة</small>
+              <strong>{t("signalCustomerTitle")}</strong>
+              <small>{t("signalCustomerDesc")}</small>
             </span>
           </div>
 
           <div className="hero-signal hero-signal--team" aria-hidden="true">
             <span className="signal-pulse" />
             <span>
-              <strong>طلب جديد</strong>
-              <small>وصل إلى الفريق</small>
+              <strong>{t("signalTeamTitle")}</strong>
+              <small>{t("signalTeamDesc")}</small>
             </span>
           </div>
         </div>
       </div>
 
-      <ol
-        className="landing-shell hero-shell hero-journey"
-        aria-label="رحلة الطلب عبر DineHub"
-      >
-        {journeySteps.map((step, idx) => {
-          const Icon = step.icon;
-          return (
-            <li
-              key={step.title}
-              className={`hero-journey-item hero-journey-item--${idx + 1}`}
-            >
-              <span className="hero-journey-step-num" aria-hidden="true">
-                {step.step}
-              </span>
-              <span className="hero-journey-icon">
-                <Icon aria-hidden="true" strokeWidth={1.7} />
-              </span>
-              <span className="hero-journey-text">
-                <strong>{step.title}</strong>
-                <small>{step.description}</small>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      <div className="landing-shell hero-shell hero-journey-wrap">
+        <ol
+          className="hero-journey"
+          aria-label={t("journeyAria")}
+        >
+          {journeySteps.map((step, idx) => {
+            const Icon = step.icon;
+            return (
+              <li
+                key={step.step}
+                className={`hero-journey-item hero-journey-item--${idx + 1}`}
+              >
+                <span className="hero-journey-step-num" aria-hidden="true">
+                  {step.step}
+                </span>
+                <span className="hero-journey-icon">
+                  <Icon aria-hidden="true" strokeWidth={1.7} />
+                </span>
+                <span className="hero-journey-text">
+                  <strong>{step.title}</strong>
+                  <small>{step.description}</small>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </section>
   );
 }
