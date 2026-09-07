@@ -2,6 +2,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Search, ShieldCheck, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import axios from "axios";
 import { apiClient } from "@/lib/api-client";
 import { useAccess } from "@/lib/access-context";
@@ -27,8 +28,10 @@ interface User {
 interface Branch {
   id: string;
   name: string;
+  nameAr?: string;
+  nameEn?: string;
 }
-const resources: Record<string, string> = {
+const defaultResources: Record<string, string> = {
   dashboard: "نظرة عامة",
   analytics: "تحليل الأداء",
   branches: "الفروع",
@@ -42,7 +45,7 @@ const resources: Record<string, string> = {
   upload: "الصور",
   settings: "الإعدادات",
 };
-const actions: Record<string, string> = {
+const defaultActions: Record<string, string> = {
   read: "عرض",
   create: "إنشاء",
   update: "تعديل",
@@ -53,49 +56,66 @@ const actions: Record<string, string> = {
   ready: "تحديد جاهزية الطلب",
   deliver: "تأكيد التسليم",
 };
-function message(error: unknown) {
+function message(error: unknown, fallback: string) {
   return axios.isAxiosError(error) &&
     typeof error.response?.data?.message === "string"
     ? error.response.data.message
-    : "تعذر حفظ التغيير. حاول مجدداً.";
+    : fallback;
 }
 function Permissions({
   keys,
   selected,
   onChange,
   disabled = false,
+  t,
 }: {
   keys: string[];
   selected: string[];
   onChange: (keys: string[]) => void;
   disabled?: boolean;
+  t: (key: string) => string;
 }) {
   return (
     <div className={styles.permissions}>
-      {Object.entries(resources).map(([resource, label]) => {
+      {Object.entries(defaultResources).map(([resource, fallbackLabel]) => {
         const entries = keys.filter((k) => k.startsWith(resource + "."));
         if (!entries.length) return null;
+        let label = fallbackLabel;
+        try {
+          label = t(`resources.${resource}`);
+        } catch {
+          label = fallbackLabel;
+        }
         return (
           <fieldset key={resource} className={styles.group}>
             <legend>{label}</legend>
-            {entries.map((key) => (
-              <label key={key} className={styles.checkRow}>
-                <input
-                  className={styles.check}
-                  type="checkbox"
-                  disabled={disabled}
-                  checked={selected.includes(key)}
-                  onChange={(e) =>
-                    onChange(
-                      e.target.checked
-                        ? [...selected, key]
-                        : selected.filter((k) => k !== key),
-                    )
-                  }
-                />
-                {actions[key.split(".")[1]]}
-              </label>
-            ))}
+            {entries.map((key) => {
+              const actionKey = key.split(".")[1];
+              let actionLabel = defaultActions[actionKey] || actionKey;
+              try {
+                actionLabel = t(`actions.${actionKey}`) || actionLabel;
+              } catch {
+                actionLabel = defaultActions[actionKey] || actionKey;
+              }
+              return (
+                <label key={key} className={styles.checkRow}>
+                  <input
+                    className={styles.check}
+                    type="checkbox"
+                    disabled={disabled}
+                    checked={selected.includes(key)}
+                    onChange={(e) =>
+                      onChange(
+                        e.target.checked
+                          ? [...selected, key]
+                          : selected.filter((k) => k !== key),
+                      )
+                    }
+                  />
+                  {actionLabel}
+                </label>
+              );
+            })}
           </fieldset>
         );
       })}
@@ -108,12 +128,14 @@ function Modal({
   open,
   onClose,
   children,
+  isRtl,
 }: {
   title: string;
   description: string;
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  isRtl?: boolean;
 }) {
   return (
     <Dialog.Root
@@ -124,11 +146,11 @@ function Modal({
     >
       <Dialog.Portal>
         <Dialog.Overlay className={styles.overlay} />
-        <Dialog.Content className={styles.modal} dir="rtl">
+        <Dialog.Content className={styles.modal} dir={isRtl ? "rtl" : "ltr"}>
           <div className={styles.heading}>
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Close asChild>
-              <button className={styles.button} aria-label="إغلاق">
+              <button className={styles.button} aria-label={isRtl ? "إغلاق" : "Close"}>
                 <X size={18} />
               </button>
             </Dialog.Close>
@@ -143,6 +165,11 @@ function Modal({
   );
 }
 export default function UsersPage() {
+  const t = useTranslations("AdminUsers");
+  const tCommon = useTranslations("AdminCommon");
+  const locale = useLocale();
+  const isRtl = locale !== "en";
+
   const { can, access, refresh } = useAccess();
   const canManageAccess = can("access.manage");
   const [users, setUsers] = useState<User[]>([]);
@@ -169,6 +196,7 @@ export default function UsersPage() {
   const [copyNotice, setCopyNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -187,15 +215,17 @@ export default function UsersPage() {
       setRoles(c?.data.roles ?? []);
       setKeys(c?.data.permissions ?? []);
     } catch {
-      setError("تعذر تحميل الفريق. تحقق من الاتصال ثم أعد المحاولة.");
+      setError(isRtl ? "تعذر تحميل الفريق. تحقق من الاتصال ثم أعد المحاولة." : "Failed to load team. Check connection and retry.");
     } finally {
       setLoading(false);
     }
-  }, [canManageAccess]);
+  }, [canManageAccess, isRtl]);
+
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
     return () => clearTimeout(timer);
   }, [load]);
+
   const openUser = (user: User) => {
     setTarget(user);
     setRole(user.role);
@@ -208,6 +238,7 @@ export default function UsersPage() {
     );
     setDialogError("");
   };
+
   const saveUser = async () => {
     if (!target || busy) return;
     setBusy(true);
@@ -221,15 +252,16 @@ export default function UsersPage() {
         denials: base.filter((k) => !selected.includes(k)),
       });
       setTarget(null);
-      setNotice("تم حفظ الصلاحيات. تسري على الطلبات التالية مباشرة.");
+      setNotice(isRtl ? "تم حفظ الصلاحيات. تسري على الطلبات التالية مباشرة." : "Permissions saved successfully.");
       await load();
       await refresh();
     } catch (e) {
-      setDialogError(message(e));
+      setDialogError(message(e, isRtl ? "تعذر حفظ التغيير. حاول مجدداً." : "Failed to save changes."));
     } finally {
       setBusy(false);
     }
   };
+
   const saveRole = async () => {
     if (busy) return;
     setBusy(true);
@@ -240,14 +272,15 @@ export default function UsersPage() {
         permissions: rolePermissions,
       });
       setRoleEdit(null);
-      setNotice("تم حفظ الدور وتحديث صلاحيات أعضائه.");
+      setNotice(isRtl ? "تم حفظ الدور وتحديث صلاحيات أعضائه." : "Role updated successfully.");
       await load();
     } catch (e) {
-      setDialogError(message(e));
+      setDialogError(message(e, isRtl ? "تعذر حفظ التغيير. حاول مجدداً." : "Failed to save role."));
     } finally {
       setBusy(false);
     }
   };
+
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
@@ -263,24 +296,23 @@ export default function UsersPage() {
       setCreate(false);
       setCredential({ ...data, email });
       setCopyNotice("");
-      setNotice("تم إنشاء الحساب. يمكنك تخصيص صلاحياته من زر الصلاحيات.");
+      setNotice(isRtl ? "تم إنشاء الحساب بنجاح." : "User account created successfully.");
       await load();
     } catch (e) {
-      setDialogError(message(e));
+      setDialogError(message(e, isRtl ? "تعذر إنشاء الحساب." : "Failed to create user."));
     } finally {
       setBusy(false);
     }
   };
+
   const allowedKeys = keys.filter((key) => access?.permissions.includes(key));
+
   return (
     <div className={styles.section}>
       <header className={styles.heading}>
         <div>
-          <p className={styles.muted}>إدارة الفريق والصلاحيات</p>
-          <h1>كل شخص، والصلاحيات المناسبة لعمله.</h1>
-          <p className={styles.muted}>
-            استقبال، تنفيذ، إدارة أو دور مخصص لنشاطك.
-          </p>
+          <p className={styles.muted}>{t("pageDesc")}</p>
+          <h1>{t("pageTitle")}</h1>
         </div>
         {can("users.create") && (
           <button
@@ -295,30 +327,35 @@ export default function UsersPage() {
             }}
           >
             <Plus size={18} />
-            إضافة مستخدم
+            <span>{t("addUser")}</span>
           </button>
         )}
       </header>
+
       {notice && (
         <p role="status" className={styles.muted}>
           {notice}
         </p>
       )}
+
       {error && (
         <div role="alert" className={styles.error}>
           {error}
           <button className={styles.button} onClick={() => void load()}>
-            إعادة المحاولة
+            {tCommon("retry")}
           </button>
         </div>
       )}
+
       {can("access.manage") && (
         <section className={styles.panel}>
           <div className={styles.heading}>
             <div>
-              <h2>الأدوار</h2>
+              <h2>{isRtl ? "الأدوار" : "Roles"}</h2>
               <p className={styles.muted}>
-                الدور يجمع الصلاحيات؛ وتخصيص المستخدم يغيّر حسابه فقط.
+                {isRtl
+                  ? "الدور يجمع الصلاحيات؛ وتخصيص المستخدم يغيّر حسابه فقط."
+                  : "Roles group permissions together; user overrides affect individual accounts."}
               </p>
             </div>
             <button
@@ -332,7 +369,7 @@ export default function UsersPage() {
               }}
             >
               <Plus size={16} />
-              دور جديد
+              <span>{isRtl ? "دور جديد" : "New Role"}</span>
             </button>
           </div>
           <div className={styles.controls}>
@@ -350,15 +387,16 @@ export default function UsersPage() {
                 }}
               >
                 <ShieldCheck size={16} />
-                {r.name}
+                <span>{r.name}</span>
                 <small>
-                  {(r.key === "admin" || r.key === "unassigned") ? "محمي" : r.permissions.length}
+                  {(r.key === "admin" || r.key === "unassigned") ? (isRtl ? "محمي" : "Protected") : r.permissions.length}
                 </small>
               </button>
             ))}
           </div>
         </section>
       )}
+
       <section className={styles.panel}>
         <label className={styles.controls}>
           <Search size={18} />
@@ -366,13 +404,13 @@ export default function UsersPage() {
             className={styles.input}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ابحث بالاسم أو البريد"
-            aria-label="البحث عن مستخدم"
+            placeholder={t("searchPlaceholder")}
+            aria-label={t("searchPlaceholder")}
           />
         </label>
         {loading ? (
           <p role="status" className={styles.muted}>
-            جارٍ تحميل الفريق…
+            {tCommon("loading")}
           </p>
         ) : (
           <ul className={styles.list}>
@@ -382,72 +420,144 @@ export default function UsersPage() {
                   .toLowerCase()
                   .includes(query.toLowerCase()),
               )
-              .map((u) => (
-                <li className={styles.row} key={u.id}>
-                  <div>
-                    <strong>{u.name}</strong>
-                    <p dir="ltr" className={styles.muted}>
-                      {u.email}
-                    </p>
-                    <small className={styles.muted}>
-                      {roles.find((r) => r.key === u.role)?.name ?? u.role} ·{" "}
-                      {branches.find((b) => b.id === u.branchId)?.name ??
-                        "جميع الفروع"}
-                    </small>
-                  </div>
-                  {u.mustChangePassword && <small>بانتظار اختيار كلمة مرور شخصية</small>}
-                  {u.isBusinessOwner && <small>مالك النشاط · الاستعادة عبر دعم المنصة</small>}
-                  {can("access.manage") && !u.isBusinessOwner && !u.isPlatformAdmin && (
-                    <button
-                      className={styles.button}
-                      onClick={() => openUser(u)}
-                      aria-label={`صلاحيات ${u.name}`}
-                    >
-                      <ShieldCheck size={18} />
-                      الصلاحيات
-                    </button>
-                  )}
-                  {u.id !== access?.id && !u.isPlatformAdmin && ((can("access.manage") && !u.isBusinessOwner) || access?.isPlatformAdmin) && (
-                    <button className={styles.button} onClick={() => { setResetTarget(u); setDialogError(""); }}>إعادة تعيين كلمة المرور</button>
-                  )}
-                </li>
-              ))}
+              .map((u) => {
+                const assignedBranch = branches.find((b) => b.id === u.branchId);
+                const branchName = assignedBranch
+                  ? (isRtl
+                      ? (assignedBranch.nameAr || assignedBranch.name || assignedBranch.nameEn)
+                      : (assignedBranch.nameEn || assignedBranch.name || assignedBranch.nameAr))
+                  : t("allBranches");
+                const roleObj = roles.find((r) => r.key === u.role);
+                const roleName = roleObj?.name || u.role;
+
+                return (
+                  <li className={styles.row} key={u.id}>
+                    <div>
+                      <strong>{u.name}</strong>
+                      <p dir="ltr" className={styles.muted}>
+                        {u.email}
+                      </p>
+                      <small className={styles.muted}>
+                        {roleName} · {branchName}
+                      </small>
+                    </div>
+                    {u.mustChangePassword && (
+                      <small>{isRtl ? "بانتظار اختيار كلمة مرور شخصية" : "Password change required on next login"}</small>
+                    )}
+                    {u.isBusinessOwner && (
+                      <small>{t("ownerBadge")}</small>
+                    )}
+                    {can("access.manage") && !u.isBusinessOwner && !u.isPlatformAdmin && (
+                      <button
+                        className={styles.button}
+                        onClick={() => openUser(u)}
+                        aria-label={`${t("editUser")} - ${u.name}`}
+                      >
+                        <ShieldCheck size={18} />
+                        <span>{t("editUser")}</span>
+                      </button>
+                    )}
+                    {u.id !== access?.id && !u.isPlatformAdmin && ((can("access.manage") && !u.isBusinessOwner) || access?.isPlatformAdmin) && (
+                      <button className={styles.button} onClick={() => { setResetTarget(u); setDialogError(""); }}>
+                        {t("resetPassword")}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
           </ul>
         )}
         {!loading && !users.length && (
-          <p className={styles.muted}>لا يوجد أعضاء حتى الآن.</p>
+          <p className={styles.muted}>{t("emptyTitle")}</p>
         )}
       </section>
-      <Modal open={!!credential} onClose={() => setCredential(null)} title="بيانات الدخول المؤقتة" description="تظهر كلمة المرور هنا مرة واحدة. انسخها وشاركها مع صاحب الحساب عبر وسيلة خاصة. سيختار كلمة جديدة عند الدخول.">
-        <p dir="ltr">{credential?.email}</p>
-        <label className={styles.field}>كلمة المرور المؤقتة<input className={styles.input} dir="ltr" readOnly value={credential?.temporaryPassword ?? ""} onFocus={e => e.target.select()} /></label>
-        <p className={styles.muted}>صالحة حتى {credential && new Date(credential.expiresAt).toLocaleString("ar-SA")}</p>
-        <button className={styles.button} onClick={async () => { if (!credential) return; try { await navigator.clipboard.writeText(credential.temporaryPassword); setCopyNotice("تم النسخ"); } catch { setCopyNotice("حدد كلمة المرور وانسخها يدوياً."); } }}>نسخ كلمة المرور</button>
-        <p role="status">{copyNotice}</p>
+
+      {/* Temporary Credentials Modal */}
+      <Modal
+        open={!!credential}
+        onClose={() => setCredential(null)}
+        title={t("modalCredTitle")}
+        description={t("modalCredDesc")}
+        isRtl={isRtl}
+      >
+        <p dir="ltr" style={{ fontWeight: 600 }}>{credential?.email}</p>
+        <label className={styles.field}>
+          {t("tempPasswordLabel")}
+          <input
+            className={styles.input}
+            dir="ltr"
+            readOnly
+            value={credential?.temporaryPassword ?? ""}
+            onFocus={(e) => e.target.select()}
+          />
+        </label>
+        <p className={styles.muted}>
+          {credential && t("expiresAt", { time: new Date(credential.expiresAt).toLocaleString(locale) })}
+        </p>
+        <button
+          className={styles.button}
+          onClick={async () => {
+            if (!credential) return;
+            try {
+              await navigator.clipboard.writeText(credential.temporaryPassword);
+              setCopyNotice(t("copiedNotice"));
+            } catch {
+              setCopyNotice(isRtl ? "حدد كلمة المرور وانسخها يدوياً." : "Please select and copy manually.");
+            }
+          }}
+        >
+          {t("copyPassword")}
+        </button>
+        {copyNotice && <p role="status" className={styles.muted}>{copyNotice}</p>}
       </Modal>
-      <Modal open={!!resetTarget} onClose={() => { if (!busy) setResetTarget(null); }} title={`إعادة تعيين كلمة مرور ${resetTarget?.name ?? ""}`} description="ستنتهي جميع جلسات هذا المستخدم. ستصدر كلمة مرور مؤقتة لمدة 48 ساعة، وعليه اختيار كلمة شخصية عند الدخول.">
+
+      {/* Reset Password Confirmation Modal */}
+      <Modal
+        open={!!resetTarget}
+        onClose={() => { if (!busy) setResetTarget(null); }}
+        title={`${t("confirmResetTitle")} - ${resetTarget?.name ?? ""}`}
+        description={t("confirmResetDesc", { email: resetTarget?.email ?? "" })}
+        isRtl={isRtl}
+      >
         {dialogError && <p className={styles.error} role="alert">{dialogError}</p>}
-        <button className={`${styles.button} ${styles.primary}`} disabled={busy} onClick={async () => {
-          if (!resetTarget || busy) return;
-          setBusy(true); setDialogError("");
-          try {
-            const prefix = access?.isPlatformAdmin && resetTarget.isBusinessOwner ? "platform" : "admin";
-            const { data } = await apiClient.post<Credential>(`/${prefix}/users/${resetTarget.id}/reset-password`);
-            setCredential({ ...data, email: resetTarget.email }); setCopyNotice(""); setResetTarget(null); await load();
-          } catch (e) { setDialogError(message(e)); } finally { setBusy(false); }
-        }}>{busy ? "جارٍ الإصدار…" : "إصدار كلمة مرور مؤقتة"}</button>
+        <button
+          className={`${styles.button} ${styles.primary}`}
+          disabled={busy}
+          onClick={async () => {
+            if (!resetTarget || busy) return;
+            setBusy(true);
+            setDialogError("");
+            try {
+              const prefix = access?.isPlatformAdmin && resetTarget.isBusinessOwner ? "platform" : "admin";
+              const { data } = await apiClient.post<Credential>(`/${prefix}/users/${resetTarget.id}/reset-password`);
+              setCredential({ ...data, email: resetTarget.email });
+              setCopyNotice("");
+              setResetTarget(null);
+              await load();
+            } catch (e) {
+              setDialogError(message(e, isRtl ? "تعذر إعادة تعيين كلمة المرور." : "Failed to reset password."));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? tCommon("loading") : t("resetAction")}
+        </button>
       </Modal>
+
+      {/* Edit User Permissions Modal */}
       <Modal
         open={!!target}
         onClose={() => {
           if (!busy) setTarget(null);
         }}
-        title={`صلاحيات ${target?.name ?? "المستخدم"}`}
-        description="ألغِ تحديد صفحة لمنع عرضها وتحميل بياناتها. الصلاحيات تُطبق على الخادم أيضاً."
+        title={`${t("modalEditTitle")} - ${target?.name ?? ""}`}
+        description={t("modalEditDesc")}
+        isRtl={isRtl}
       >
         <div className={styles.fields}>
           <label className={styles.field}>
-            الدور
+            {t("roleLabel")}
             <select
               className={styles.select}
               disabled={busy}
@@ -455,8 +565,7 @@ export default function UsersPage() {
               onChange={(e) => {
                 setRole(e.target.value);
                 setSelected(
-                  roles.find((r) => r.key === e.target.value)?.permissions ??
-                    [],
+                  roles.find((r) => r.key === e.target.value)?.permissions ?? [],
                 );
               }}
             >
@@ -468,17 +577,17 @@ export default function UsersPage() {
             </select>
           </label>
           <label className={styles.field}>
-            الفرع
+            {t("branchLabel")}
             <select
               className={styles.select}
               disabled={busy}
               value={branch}
               onChange={(e) => setBranch(e.target.value)}
             >
-              <option value="">اختر الفرع</option>
+              <option value="">{t("noBranch")}</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name}
+                  {isRtl ? (b.nameAr || b.name || b.nameEn) : (b.nameEn || b.name || b.nameAr)}
                 </option>
               ))}
             </select>
@@ -489,6 +598,7 @@ export default function UsersPage() {
           selected={selected}
           onChange={setSelected}
           disabled={busy}
+          t={t}
         />
         {dialogError && (
           <p className={styles.error} role="alert">
@@ -503,29 +613,32 @@ export default function UsersPage() {
               setSelected(roles.find((r) => r.key === role)?.permissions ?? [])
             }
           >
-            استعادة صلاحيات الدور
+            {isRtl ? "استعادة صلاحيات الدور" : "Restore Role Defaults"}
           </button>
           <button
             className={`${styles.button} ${styles.primary}`}
             disabled={busy}
             onClick={() => void saveUser()}
           >
-            {busy ? <Loader2 className="animate-spin" size={18} /> : null}حفظ
-            الصلاحيات
+            {busy ? <Loader2 className="animate-spin" size={18} /> : null}
+            <span>{busy ? t("saving") : tCommon("save")}</span>
           </button>
         </div>
       </Modal>
+
+      {/* Edit Role Modal */}
       <Modal
         open={!!roleEdit}
         onClose={() => {
           if (!busy) setRoleEdit(null);
         }}
-        title={roleEdit?.key ? "تعديل الدور" : "دور جديد"}
-        description="يطبق تعديل الدور على جميع أعضائه، مع الاحتفاظ بتخصيصات كل مستخدم."
+        title={roleEdit?.key ? (isRtl ? "تعديل الدور" : "Edit Role") : (isRtl ? "دور جديد" : "New Role")}
+        description={isRtl ? "يطبق تعديل الدور على جميع أعضائه، مع الاحتفاظ بتخصيصات كل مستخدم." : "Modifications apply to all role members."}
+        isRtl={isRtl}
       >
         <div className={styles.fields}>
           <label className={styles.field}>
-            اسم الدور
+            {isRtl ? "اسم الدور" : "Role Name"}
             <input
               className={styles.input}
               maxLength={80}
@@ -534,7 +647,7 @@ export default function UsersPage() {
             />
           </label>
           <label className={styles.field}>
-            رمز الدور
+            {isRtl ? "رمز الدور" : "Role Key"}
             <input
               className={styles.input}
               dir="ltr"
@@ -551,6 +664,7 @@ export default function UsersPage() {
           selected={rolePermissions}
           onChange={setRolePermissions}
           disabled={busy}
+          t={t}
         />
         {dialogError && (
           <p className={styles.error} role="alert">
@@ -564,38 +678,44 @@ export default function UsersPage() {
           }
           onClick={() => void saveRole()}
         >
-          حفظ الدور
+          {busy ? t("saving") : tCommon("save")}
         </button>
       </Modal>
+
+      {/* Add New User Modal */}
       <Modal
         open={create}
         onClose={() => {
           if (!busy) setCreate(false);
         }}
-        title="إضافة عضو للفريق"
-        description="سننشئ كلمة مرور مؤقتة آمنة، ويختار عضو الفريق كلمته الشخصية عند أول دخول."
+        title={t("modalAddTitle")}
+        description={t("modalAddDesc")}
+        isRtl={isRtl}
       >
         <form onSubmit={createUser} className={styles.fields}>
-          {[
-            ["الاسم", name, setName, "text"],
-            ["البريد الإلكتروني", email, setEmail, "email"],
-          ].map(([label, value, setter, type]) => (
-            <label className={styles.field} key={String(label)}>
-              {String(label)}
-              <input
-                className={styles.input}
-                required
-                type={String(type)}
-                value={String(value)}
-                minLength={type === "password" ? 8 : 2}
-                onChange={(e) =>
-                  (setter as (value: string) => void)(e.target.value)
-                }
-              />
-            </label>
-          ))}
           <label className={styles.field}>
-            الدور
+            {t("fullNameLabel")}
+            <input
+              className={styles.input}
+              required
+              type="text"
+              value={name}
+              minLength={2}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label className={styles.field}>
+            {t("emailLabel")}
+            <input
+              className={styles.input}
+              required
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label className={styles.field}>
+            {t("roleLabel")}
             <select
               className={styles.select}
               value={role}
@@ -604,8 +724,8 @@ export default function UsersPage() {
               {(roles.length
                 ? roles
                 : [
-                    { key: "staff", name: "فريق التنفيذ" },
-                    { key: "cashier", name: "موظف الاستقبال" },
+                    { key: "staff", name: isRtl ? "فريق التنفيذ" : "Staff" },
+                    { key: "cashier", name: isRtl ? "موظف الاستقبال" : "Cashier" },
                   ]
               ).map((r) => (
                 <option key={r.key} value={r.key}>
@@ -615,16 +735,16 @@ export default function UsersPage() {
             </select>
           </label>
           <label className={styles.field}>
-            الفرع
+            {t("branchLabel")}
             <select
               className={styles.select}
               value={branch}
               onChange={(e) => setBranch(e.target.value)}
             >
-              <option value="">اختر الفرع</option>
+              <option value="">{t("noBranch")}</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name}
+                  {isRtl ? (b.nameAr || b.name || b.nameEn) : (b.nameEn || b.name || b.nameAr)}
                 </option>
               ))}
             </select>
@@ -638,7 +758,7 @@ export default function UsersPage() {
             className={`${styles.button} ${styles.primary}`}
             disabled={busy}
           >
-            {busy ? "جارٍ إنشاء الحساب…" : "إنشاء الحساب"}
+            {busy ? t("creating") : t("addUser")}
           </button>
         </form>
       </Modal>

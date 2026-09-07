@@ -9,6 +9,12 @@
   font-family: var(--font-thmanyah), sans-serif;
 }
 
+:global(html[lang="en"]) .shell,
+:global(body[data-locale="en"]) .shell,
+.shell[data-locale="en"] {
+  font-family: var(--font-outfit), sans-serif;
+}
+
 .skipLink {
   position: fixed;
   z-index: 100;
@@ -177,6 +183,68 @@
   border-block-start: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.sidebarControlsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sidebarLangSwitcher {
+  flex: 1;
+  justify-content: space-between;
+}
+
+.guideIconButton {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(223, 210, 235, 0.14);
+  border-radius: 13px;
+  background: rgba(223, 210, 235, 0.07);
+  color: #dfd2eb;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out,
+    box-shadow 140ms ease-out,
+    transform 150ms ease-out;
+}
+
+.guideIconButton:hover {
+  border-color: rgba(223, 210, 235, 0.35);
+  background: rgba(223, 210, 235, 0.16);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.guideIconButton:active {
+  transform: scale(0.95);
+}
+
+.guideIconButton:focus-visible {
+  outline: 3px solid var(--admin-coral);
+  outline-offset: 2px;
+}
+
+.guideQuestionMark {
+  font-family: var(--font-outfit), system-ui, -apple-system, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 750;
+  line-height: 1;
+  color: inherit;
+  display: block;
+}
+
 .guideButton {
   display: inline-flex;
   min-height: 42px;
@@ -326,6 +394,18 @@
   height: 7px;
   border-radius: 50%;
   background: var(--admin-teal);
+}
+
+.contextBarActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mobileHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .main {

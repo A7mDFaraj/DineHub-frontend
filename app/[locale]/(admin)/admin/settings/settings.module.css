@@ -10,6 +10,10 @@
   min-width: 0;
 }
 
+:global(html[lang="en"]) .page {
+  font-family: var(--font-outfit), sans-serif;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

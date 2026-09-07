@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, Building2, CircleAlert, Loader2, LockKeyhole, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, CircleAlert, Loader2, LockKeyhole } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { AccessProvider, useAccess } from "@/lib/access-context";
 import { useSession } from "@/lib/auth-client";
 import { PasswordChangeScreen } from "@/components/auth/password-change-screen";
@@ -10,13 +11,18 @@ import logo from "@/public/brand/dinehub-logo-3d.png";
 import styles from "./password-change.module.css";
 
 function AccountPasswordInner() {
+  const locale = useLocale();
+  const t = useTranslations("AccountPassword");
+  const isRtl = locale !== "en";
+  const ArrowIcon = isRtl ? ArrowLeft : ArrowRight;
+
   const { data: session, isPending } = useSession();
   const { access, loading, error, refresh } = useAccess();
 
   // 1. Loading State
   if (isPending || loading) {
     return (
-      <main dir="rtl" className={styles.page}>
+      <main dir={isRtl ? "rtl" : "ltr"} className={styles.page}>
         <div
           className={styles.shell}
           style={{
@@ -40,10 +46,10 @@ function AccountPasswordInner() {
             />
             <div style={{ display: "flex", alignItems: "center", gap: "10px", color: "var(--ink)", fontWeight: 650, fontSize: "1.1rem" }}>
               <Loader2 className={styles.spinner} size={22} style={{ color: "var(--teal)" }} />
-              <span>جارٍ التحقق من أمان الحساب والمنشأة…</span>
+              <span>{t("verifying")}</span>
             </div>
             <p style={{ color: "var(--muted)", margin: 0, fontSize: "0.9rem" }}>
-              نربط جلسة العمل بالمنشأة المعزولة لضمان أمان البيانات.
+              {t("verifyingDesc")}
             </p>
           </div>
         </div>
@@ -54,7 +60,7 @@ function AccountPasswordInner() {
   // 2. Unauthenticated State
   if (!session) {
     return (
-      <main dir="rtl" className={styles.page}>
+      <main dir={isRtl ? "rtl" : "ltr"} className={styles.page}>
         <div
           className={styles.shell}
           style={{
@@ -84,22 +90,22 @@ function AccountPasswordInner() {
 
             <div className={styles.businessBadge} style={{ margin: 0 }}>
               <Building2 size={15} />
-              <span>منصة DineHub للأعمال</span>
+              <span>{isRtl ? "منصة DineHub للأعمال" : "DineHub Business Platform"}</span>
               <span className={styles.businessBadgeDot} />
             </div>
 
             <h1 style={{ margin: 0, fontSize: "1.85rem", fontWeight: 700, color: "var(--ink)" }}>
-              تسجيل الدخول مطلوب
+              {t("loginRequired")}
             </h1>
 
             <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.95rem", lineHeight: 1.75 }}>
-              لتأمين حساب منشأتك أو تعيين كلمة المرور الجديدة، يرجى تسجيل الدخول أولاً باستخدام البريد وكلمة المرور المؤقتة التي استلمتها.
+              {t("loginRequiredDesc")}
             </p>
 
             <div style={{ width: "100%", maxWidth: "320px", marginTop: "12px" }}>
               <Link href="/admin/login" className={styles.submitButton} style={{ width: "100%" }}>
-                <span>الانتقال إلى تسجيل الدخول</span>
-                <ArrowLeft size={18} aria-hidden="true" />
+                <span>{t("goToLogin")}</span>
+                <ArrowIcon size={18} aria-hidden="true" />
               </Link>
             </div>
           </div>
@@ -111,7 +117,7 @@ function AccountPasswordInner() {
   // 3. Error / Access Fetch Failure State
   if (error || !access) {
     return (
-      <main dir="rtl" className={styles.page}>
+      <main dir={isRtl ? "rtl" : "ltr"} className={styles.page}>
         <div
           className={styles.shell}
           style={{
@@ -140,11 +146,11 @@ function AccountPasswordInner() {
             </div>
 
             <h1 style={{ margin: 0, fontSize: "1.85rem", fontWeight: 700, color: "var(--ink)" }}>
-              تعذر تحميل بيانات الحساب
+              {t("loadFailed")}
             </h1>
 
             <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.95rem", lineHeight: 1.75 }}>
-              حدث انقطاع مؤقت في الاتصال بخدمة التحقق من الصلاحيات. يرجى التحقق من اتصالك والمحاولة مجدداً.
+              {t("loadFailedDesc")}
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%", maxWidth: "320px", marginTop: "12px" }}>
@@ -153,10 +159,10 @@ function AccountPasswordInner() {
                 className={styles.submitButton}
                 onClick={() => void refresh()}
               >
-                <span>إعادة المحاولة الآن</span>
+                <span>{t("retryNow")}</span>
               </button>
               <Link href="/admin/login" className={styles.secondaryButton}>
-                <span>العودة لصفحة الدخول</span>
+                <span>{t("backToLogin")}</span>
               </Link>
             </div>
           </div>

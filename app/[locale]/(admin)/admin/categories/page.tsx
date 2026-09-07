@@ -1,7 +1,6 @@
 "use client";
 
 import { apiErrorMessage } from "@/lib/api-error";
-
 import { useCallback, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -18,6 +17,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
@@ -41,6 +41,11 @@ const STARTER_SUGGESTIONS = [
 ];
 
 export default function CategoriesPage() {
+  const locale = useLocale();
+  const isRtl = locale === "ar";
+  const t = useTranslations("AdminCategories");
+  const tCommon = useTranslations("AdminCommon");
+
   const {
     branches,
     selectedBranchId,
@@ -82,19 +87,19 @@ export default function CategoriesPage() {
       setCategories(sorted);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg("تعذر جلب تصنيفات هذا الفرع. يرجى المحاولة مرة أخرى.");
+      setErrorMsg(tCommon("error"));
     } finally {
       setIsLoadingCats(false);
     }
-  }, []);
+  }, [tCommon]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-    if (selectedBranchId) {
-      fetchCategories(selectedBranchId);
-    } else {
-      setCategories([]);
-    }
+      if (selectedBranchId) {
+        fetchCategories(selectedBranchId);
+      } else {
+        setCategories([]);
+      }
     }, 0);
     return () => clearTimeout(timer);
   }, [selectedBranchId, fetchCategories]);
@@ -122,11 +127,11 @@ export default function CategoriesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) {
-      setErrorMsg("يرجى اختيار فرع أولاً.");
+      setErrorMsg(tCommon("currentBranch"));
       return;
     }
     if (!formData.nameAr.trim() && !formData.nameEn.trim()) {
-      setErrorMsg("يرجى إدخال اسم التصنيف بالعربية أو الإنجليزية.");
+      setErrorMsg(t("nameArLabel"));
       return;
     }
 
@@ -138,22 +143,24 @@ export default function CategoriesPage() {
         formData.nameAr.trim() || formData.nameEn.trim();
 
       if (editingCategory) {
-        await apiClient.patch(`/admin/categories/${editingCategory.id}`, {
-          branchId: selectedBranchId,
-          name: primaryName,
-          nameAr: formData.nameAr.trim() || undefined,
-          nameEn: formData.nameEn.trim() || undefined,
-        });
-        setSuccessMsg("تم تعديل التصنيف بنجاح.");
+        await apiClient.patch(
+          `/admin/categories/${editingCategory.id}`,
+          {
+            name: primaryName,
+            nameAr: formData.nameAr.trim() || undefined,
+            nameEn: formData.nameEn.trim() || undefined,
+          }
+        );
+        setSuccessMsg(tCommon("success"));
       } else {
         await apiClient.post("/admin/categories", {
           branchId: selectedBranchId,
           name: primaryName,
           nameAr: formData.nameAr.trim() || undefined,
           nameEn: formData.nameEn.trim() || undefined,
-          sortOrder: categories.length + 1,
+          sortOrder: categories.length,
         });
-        setSuccessMsg("تمت إضافة التصنيف بنجاح.");
+        setSuccessMsg(tCommon("success"));
       }
 
       await fetchCategories(selectedBranchId);
@@ -162,68 +169,57 @@ export default function CategoriesPage() {
     } catch (err: unknown) {
       console.error(err);
       setErrorMsg(
-        apiErrorMessage(err) || "تعذر حفظ التصنيف. يرجى المحاولة لاحقاً."
+        apiErrorMessage(err) || tCommon("error")
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleMoveCategory = async (
-    index: number,
-    direction: "up" | "down"
-  ) => {
+  const handleMove = async (index: number, direction: "up" | "down") => {
+    if (!selectedBranchId) return;
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= categories.length) return;
 
-    const currentCat = categories[index];
-    const targetCat = categories[targetIndex];
+    const reordered = [...categories];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
 
-    const currentOrder = currentCat.sortOrder ?? index + 1;
-    const targetOrder = targetCat.sortOrder ?? targetIndex + 1;
-
-    // Optimistic UI update
-    const newCategories = [...categories];
-    newCategories[index] = { ...targetCat, sortOrder: currentOrder };
-    newCategories[targetIndex] = { ...currentCat, sortOrder: targetOrder };
-    setCategories(newCategories);
+    setCategories(reordered);
 
     try {
-      await Promise.all([
-        apiClient.patch(`/admin/categories/${currentCat.id}`, {
-          sortOrder: targetOrder,
-        }),
-        apiClient.patch(`/admin/categories/${targetCat.id}`, {
-          sortOrder: currentOrder,
-        }),
-      ]);
-      if (selectedBranchId) {
-        await fetchCategories(selectedBranchId);
-      }
+      await Promise.all(
+        reordered.map((cat, idx) =>
+          apiClient.patch(`/admin/categories/${cat.id}`, {
+            sortOrder: idx,
+          })
+        )
+      );
     } catch (err) {
-      console.error("Reordering error:", err);
-      if (selectedBranchId) {
-        await fetchCategories(selectedBranchId);
-      }
+      console.error("Failed to persist category order:", err);
+      void fetchCategories(selectedBranchId);
     }
+  };
+
+  const handleOpenDelete = (category: Category) => {
+    setCategoryToDelete(category);
+    setIsDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
     if (!categoryToDelete || !selectedBranchId) return;
-
     try {
       setIsDeleting(true);
-      setErrorMsg("");
       await apiClient.delete(`/admin/categories/${categoryToDelete.id}`);
-      setSuccessMsg(`تم حذف تصنيف "${categoryToDelete.nameAr || categoryToDelete.name || "المحدد"}" بنجاح.`);
+      setSuccessMsg(tCommon("success"));
       setIsDeleteDialogOpen(false);
       setCategoryToDelete(null);
       await fetchCategories(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
-      console.error("Delete category error:", err);
+      console.error(err);
       setErrorMsg(
-        apiErrorMessage(err) || "تعذر حذف التصنيف. قد يحتوي على منتجات مرتبطة."
+        apiErrorMessage(err) || tCommon("error")
       );
     } finally {
       setIsDeleting(false);
@@ -236,91 +232,25 @@ export default function CategoriesPage() {
         <div>
           <p className={styles.eyebrow}>
             <span aria-hidden="true" />
-            الإدارة • قائمة الطعام
+            DineHub • {t("pageTitle")}
           </p>
-          <h1>التصنيفات وترتيب القائمة</h1>
-          <p>
-            رتّب أقسام قائمتك وحدد تسلسل ظهورها للعميل عند مسح رمز الطاولة.
-          </p>
+          <h1>{t("pageTitle")}</h1>
+          <p className={styles.pageLead}>{t("pageDesc")}</p>
         </div>
 
-        <div className={styles.headerActions}>
-          <AdminBranchSelector />
-
+        <div className={styles.headerControls}>
+          <AdminBranchSelector className={styles.branchSelectWrap} />
           <button
             type="button"
-            className={styles.secondaryButton}
-            onClick={() => selectedBranchId && fetchCategories(selectedBranchId)}
-            disabled={isLoadingCats || !selectedBranchId}
-            aria-label="تحديث التصنيفات"
-          >
-            <RotateCcw
-              size={17}
-              className={isLoadingCats ? "animate-spin" : undefined}
-            />
-            <span>تحديث</span>
-          </button>
-
-          <button
-            type="button"
-            className={styles.primaryButton}
+            className={styles.createButton}
             onClick={() => handleOpenCreate()}
             disabled={!selectedBranchId}
           >
-            <Plus size={18} strokeWidth={2.2} />
-            <span>إضافة تصنيف</span>
+            <Plus size={18} />
+            <span>{t("addCategory")}</span>
           </button>
         </div>
       </header>
-
-      {/* KPI Stats */}
-      <section className={styles.kpiGrid} aria-label="ملخص التصنيفات">
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="coral">
-            <Tags size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>{categories.length}</span>
-            <span className={styles.kpiLabel}>
-              تصنيفات {selectedBranch?.nameAr || selectedBranch?.name || "الفرع"}
-            </span>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="teal">
-            <Layers size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>
-              {categories.length > 0 ? "مرتبة ومباشرة" : "قائمة فارغة"}
-            </span>
-            <span className={styles.kpiLabel}>حالة عرض القائمة للعملاء</span>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="lilac">
-            <Sparkles size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>
-              {categories[0]?.nameAr || categories[0]?.name || "—"}
-            </span>
-            <span className={styles.kpiLabel}>التصنيف الأول في العرض</span>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="plum">
-            <CheckCircle2 size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>ثنائي اللغة</span>
-            <span className={styles.kpiLabel}>دعم العربية والإنجليزية</span>
-          </div>
-        </div>
-      </section>
 
       {successMsg && (
         <div className={styles.successBanner} role="status">
@@ -329,126 +259,148 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {errorMsg && !isDialogOpen && !isDeleteDialogOpen && (
+      {errorMsg && (
         <div className={styles.errorBanner} role="alert">
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Categories Content Section */}
-      <section className={styles.categorySection}>
-        <div className={styles.sectionHead}>
-          <div>
-            <h2>ترتيب أقسام القائمة</h2>
-            <p>استخدم أسهم الترتيب لتغيير تسلسل ظهور الأقسام في هاتف العميل.</p>
+      {categories.length === 0 && !isLoadingCats && (
+        <section className={styles.starterSection} aria-label={t("starterTitle")}>
+          <div className={styles.starterHeader}>
+            <Sparkles size={18} className={styles.sparkleIcon} />
+            <h2>{t("starterTitle")}</h2>
           </div>
-          {categories.length > 1 && (
-            <span style={{ fontSize: "0.78rem", color: "#8cd1ca", fontWeight: 650 }}>
-              يتم حفظ الترتيب فورياً تلقائياً
+          <p className={styles.starterLead}>
+            {t("pageDesc")}
+          </p>
+          <div className={styles.starterChips}>
+            {STARTER_SUGGESTIONS.map((s) => (
+              <button
+                key={s.ar}
+                type="button"
+                className={styles.starterChip}
+                onClick={() => handleOpenCreate(s.ar, s.en)}
+              >
+                <Plus size={14} />
+                <span>{isRtl ? s.ar : s.en}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className={styles.listSection}>
+        <div className={styles.listSectionHeader}>
+          <div className={styles.listHeadingWrap}>
+            <Layers size={20} className={styles.listIcon} />
+            <h2>
+              {selectedBranch
+                ? `${t("pageTitle")} (${isRtl ? (selectedBranch.nameAr || selectedBranch.name) : (selectedBranch.nameEn || selectedBranch.name)})`
+                : t("pageTitle")}
+            </h2>
+            <span className={styles.badge}>
+              {t("itemsCount", { count: categories.length })}
             </span>
-          )}
+          </div>
+
+          <button
+            type="button"
+            className={styles.refreshBtn}
+            onClick={() => selectedBranchId && fetchCategories(selectedBranchId)}
+            disabled={isLoadingCats || !selectedBranchId}
+            aria-label={tCommon("retry")}
+            title={tCommon("retry")}
+          >
+            <RotateCcw
+              size={16}
+              className={isLoadingCats ? "animate-spin" : ""}
+            />
+          </button>
         </div>
 
-        {isLoadingCats && categories.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <Loader2 size={28} className="animate-spin" />
-            </div>
-            <h3>جارٍ تحميل التصنيفات…</h3>
+        {isLoadingCats ? (
+          <div className={styles.loadingState}>
+            <Loader2 size={32} className="animate-spin" />
+            <p>{tCommon("loading")}</p>
           </div>
         ) : !selectedBranchId ? (
           <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <Tags size={28} />
-            </div>
-            <h3>يرجى اختيار فرع أولاً</h3>
-            <p>حدد فرعاً من القائمة المنسدلة بالأعلى لعرض وإدارة تصنيفاته.</p>
+            <p>{tCommon("currentBranch")}</p>
           </div>
         ) : categories.length === 0 ? (
           <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <Tags size={28} />
-            </div>
-            <h3>لا توجد تصنيفات معرفة لهذا الفرع</h3>
-            <p>
-              أضف أول تصنيف لتنظيم أصناف الطعام، أو اختر أحد الاقتراحات السريعة أدناه:
-            </p>
-            <div className={styles.quickStarters}>
-              <span>اقتراحات سريعة:</span>
-              {STARTER_SUGGESTIONS.map((item) => (
-                <button
-                  key={item.ar}
-                  type="button"
-                  className={styles.starterChip}
-                  onClick={() => handleOpenCreate(item.ar, item.en)}
-                >
-                  <Plus size={13} />
-                  <span>{item.ar}</span>
-                </button>
-              ))}
-            </div>
+            <Tags size={40} strokeWidth={1.5} className={styles.emptyIcon} />
+            <h3>{t("emptyTitle")}</h3>
+            <p>{t("emptyDesc")}</p>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={() => handleOpenCreate()}
+            >
+              <Plus size={17} />
+              <span>{t("addCategory")}</span>
+            </button>
           </div>
         ) : (
           <div className={styles.categoryList}>
-            {categories.map((cat, idx) => {
-              const displayNameAr = cat.nameAr || cat.name || "تصنيف بدون اسم";
-              const displayNameEn = cat.nameEn || "";
-              const formattedIndex = String(idx + 1).padStart(2, "0");
+            {categories.map((cat, index) => {
+              const displayName = isRtl
+                ? (cat.nameAr || cat.name || cat.nameEn)
+                : (cat.nameEn || cat.name || cat.nameAr);
+              const secondaryName = isRtl ? cat.nameEn : cat.nameAr;
 
               return (
-                <div key={cat.id} className={styles.categoryCard}>
-                  <div className={styles.categoryInfo}>
-                    <span className={styles.orderBadge}>{formattedIndex}</span>
-                    <div className={styles.categoryTitles}>
-                      <h3>{displayNameAr}</h3>
-                      {displayNameEn && <span>{displayNameEn}</span>}
-                    </div>
-                  </div>
-
-                  <div className={styles.categoryActions}>
-                    <div className={styles.orderControl}>
-                      <button
-                        type="button"
-                        className={styles.orderBtn}
-                        onClick={() => handleMoveCategory(idx, "up")}
-                        disabled={idx === 0}
-                        title="تحريك لأعلى"
-                        aria-label={`تحريك ${displayNameAr} لأعلى`}
-                      >
-                        <ArrowUp size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.orderBtn}
-                        onClick={() => handleMoveCategory(idx, "down")}
-                        disabled={idx === categories.length - 1}
-                        title="تحريك لأسفل"
-                        aria-label={`تحريك ${displayNameAr} لأسفل`}
-                      >
-                        <ArrowDown size={13} />
-                      </button>
-                    </div>
-
+                <div key={cat.id} className={styles.categoryRow}>
+                  <div className={styles.orderControls}>
                     <button
                       type="button"
-                      className={styles.iconBtn}
+                      className={styles.orderBtn}
+                      onClick={() => handleMove(index, "up")}
+                      disabled={index === 0}
+                      aria-label={t("moveUp")}
+                      title={t("moveUp")}
+                    >
+                      <ArrowUp size={15} />
+                    </button>
+                    <span className={styles.orderIndex}>#{index + 1}</span>
+                    <button
+                      type="button"
+                      className={styles.orderBtn}
+                      onClick={() => handleMove(index, "down")}
+                      disabled={index === categories.length - 1}
+                      aria-label={t("moveDown")}
+                      title={t("moveDown")}
+                    >
+                      <ArrowDown size={15} />
+                    </button>
+                  </div>
+
+                  <div className={styles.catDetails}>
+                    <span className={styles.catName}>{displayName}</span>
+                    {secondaryName && (
+                      <span className={styles.catSub} dir={isRtl ? "ltr" : "rtl"}>
+                        {secondaryName}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className={styles.rowActions}>
+                    <button
+                      type="button"
+                      className={styles.actionBtn}
                       onClick={() => handleOpenEdit(cat)}
-                      title="تعديل التصنيف"
-                      aria-label={`تعديل تصنيف ${displayNameAr}`}
+                      title={t("editCategory")}
+                      aria-label={`${t("editCategory")} ${displayName}`}
                     >
                       <Edit3 size={15} />
                     </button>
-
                     <button
                       type="button"
-                      className={styles.iconBtn}
-                      data-variant="danger"
-                      onClick={() => {
-                        setCategoryToDelete(cat);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                      title="حذف التصنيف"
-                      aria-label={`حذف تصنيف ${displayNameAr}`}
+                      className={`${styles.actionBtn} ${styles.danger}`}
+                      onClick={() => handleOpenDelete(cat)}
+                      title={t("deleteConfirm")}
+                      aria-label={`${t("deleteConfirm")} ${displayName}`}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -464,16 +416,19 @@ export default function CategoriesPage() {
       <Dialog.Root open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content
+            className={styles.dialogContent}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
             <div className={styles.dialogHead}>
               <Dialog.Title>
-                {editingCategory ? "تعديل التصنيف" : "إضافة تصنيف جديد"}
+                {editingCategory ? t("editCategory") : t("addCategory")}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -492,12 +447,12 @@ export default function CategoriesPage() {
 
             <form onSubmit={handleSubmit} className={styles.formGrid}>
               <div className={styles.inputGroup}>
-                <label htmlFor="cat-name-ar">اسم التصنيف (بالعربية) *</label>
+                <label htmlFor="cat-name-ar">{t("nameArLabel")} *</label>
                 <input
                   id="cat-name-ar"
                   type="text"
                   required
-                  placeholder="مثال: المشروبات الساخنة"
+                  placeholder={isRtl ? "مثال: المشروبات الساخنة" : "e.g. Hot Drinks"}
                   value={formData.nameAr}
                   onChange={(e) =>
                     setFormData({ ...formData, nameAr: e.target.value })
@@ -506,7 +461,7 @@ export default function CategoriesPage() {
               </div>
 
               <div className={styles.inputGroup}>
-                <label htmlFor="cat-name-en">اسم التصنيف (بالإنجليزية - اختياري)</label>
+                <label htmlFor="cat-name-en">{t("nameEnLabel")}</label>
                 <input
                   id="cat-name-en"
                   type="text"
@@ -526,7 +481,7 @@ export default function CategoriesPage() {
                   onClick={() => setIsDialogOpen(false)}
                   disabled={isSubmitting}
                 >
-                  إلغاء
+                  {tCommon("cancel")}
                 </button>
                 <button
                   type="submit"
@@ -536,10 +491,10 @@ export default function CategoriesPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>جارٍ الحفظ…</span>
+                      <span>{tCommon("loading")}</span>
                     </>
                   ) : (
-                    <span>{editingCategory ? "حفظ التعديلات" : "إضافة التصنيف"}</span>
+                    <span>{tCommon("save")}</span>
                   )}
                 </button>
               </div>
@@ -555,14 +510,17 @@ export default function CategoriesPage() {
       >
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content
+            className={styles.dialogContent}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
             <div className={styles.dialogHead}>
-              <Dialog.Title>تأكيد حذف التصنيف</Dialog.Title>
+              <Dialog.Title>{t("deleteConfirm")}</Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -570,11 +528,7 @@ export default function CategoriesPage() {
             </div>
 
             <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
-              هل أنت متأكد من رغبتك في حذف تصنيف{" "}
-              <strong style={{ color: "#fffdf9" }}>
-                &quot;{categoryToDelete?.nameAr || categoryToDelete?.name}&quot;
-              </strong>
-              ؟ لن تتمكن من التراجع عن هذه الخطوة.
+              {t("deleteWarning")}
             </p>
 
             <div className={styles.dialogActions}>
@@ -584,7 +538,7 @@ export default function CategoriesPage() {
                 onClick={() => setIsDeleteDialogOpen(false)}
                 disabled={isDeleting}
               >
-                إلغاء
+                {tCommon("cancel")}
               </button>
               <button
                 type="button"
@@ -596,10 +550,10 @@ export default function CategoriesPage() {
                 {isDeleting ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>جارٍ الحذف…</span>
+                    <span>{tCommon("loading")}</span>
                   </>
                 ) : (
-                  <span>نعم، احذف التصنيف</span>
+                  <span>{tCommon("delete")}</span>
                 )}
               </button>
             </div>

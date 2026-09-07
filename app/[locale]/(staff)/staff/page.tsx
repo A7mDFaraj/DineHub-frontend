@@ -3,6 +3,7 @@
 import { useAccess } from "@/lib/access-context";
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 import { OrderCard, Order } from "@/components/staff/order-card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -82,7 +83,7 @@ function normalizeOrders(rawOrders: RawOrder[]): Order[] {
       ? order.items.map((item) => ({
           productId: item.productId ?? item.id ?? "unknown-product",
           nameAr: item.product?.nameAr ?? item.nameAr ?? item.name,
-          nameEn: item.product?.nameEn ?? item.nameEn ?? item.name ?? "عنصر",
+          nameEn: item.product?.nameEn ?? item.nameEn ?? item.name ?? "item",
           quantity: item.quantity ?? 1,
           note: item.note,
           selectedAttributes: item.selectedAttributes ?? [],
@@ -98,6 +99,10 @@ function requestMessage(error: unknown, fallback: string) {
 }
 
 export default function StaffDashboard() {
+  const locale = useLocale();
+  const t = useTranslations("Staff");
+  const isRtl = locale !== "en";
+
   const { can } = useAccess();
   const { data: session } = useSession();
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -131,12 +136,12 @@ export default function StaffDashboard() {
       setError(
         requestMessage(
           err,
-          "تعذر تحميل الفرع المعين لحسابك. يرجى إعادة تسجيل الدخول أو مراجعة المشرف.",
+          t("loadBranchesError"),
         ),
       );
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const fetchOrders = useCallback(
     async (branchId: string, isManual = false) => {
@@ -202,14 +207,14 @@ export default function StaffDashboard() {
         )
           return;
         console.error("Failed to fetch live orders:", err);
-        setError(requestMessage(err, "تعذر استرجاع قائمة الطلبات الحالية."));
+        setError(requestMessage(err, t("loadOrdersError")));
       } finally {
         fetchingBranches.current.delete(branchId);
         if (version === requestVersion.current) setLoading(false);
         if (isManual) setIsRefreshing(false);
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => {
@@ -267,8 +272,7 @@ export default function StaffDashboard() {
       if (branchRef.current === branchId) {
         setActionErrors((previous) => ({
           ...previous,
-          [orderId]:
-            "تعذر تأكيد التحديث. سنحدّث حالة الطلب؛ تحقق منها قبل المحاولة مجدداً.",
+          [orderId]: t("updateError"),
         }));
       }
     } finally {
@@ -308,14 +312,14 @@ export default function StaffDashboard() {
       {/* Action Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#181120] border border-white/[0.08] p-3 sm:p-4 rounded-2xl">
         <h1 className="text-lg sm:text-xl font-black text-white">
-          الطلبات الواردة
+          {t("incomingOrders")}
         </h1>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Branch Selector / Fixed Assigned Branch */}
           {isAdmin && branches.length > 1 ? (
             <div className="relative flex items-center bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-1.5">
-              <Building2 size={13} className="text-[#8cd1ca] ml-2 shrink-0" />
+              <Building2 size={13} className={`text-[#8cd1ca] ${isRtl ? "ml-2" : "mr-2"} shrink-0`} />
               <select
                 value={selectedBranchId}
                 onChange={(e) => {
@@ -326,7 +330,7 @@ export default function StaffDashboard() {
                   setLoading(true);
                   setSelectedBranchId(e.target.value);
                 }}
-                className="bg-transparent text-xs sm:text-sm text-white font-bold focus:outline-none cursor-pointer appearance-none pl-6 pr-1"
+                className={`bg-transparent text-xs sm:text-sm text-white font-bold focus:outline-none cursor-pointer appearance-none ${isRtl ? "pl-6 pr-1" : "pr-6 pl-1"}`}
               >
                 {branches.map((b) => (
                   <option
@@ -334,23 +338,24 @@ export default function StaffDashboard() {
                     value={b.id}
                     className="bg-[#1a1222] text-white"
                   >
-                    {b.nameAr || b.name || b.nameEn || "فرع"}
+                    {isRtl
+                      ? b.nameAr || b.name || b.nameEn || "فرع"
+                      : b.nameEn || b.name || b.nameAr || "Branch"}
                   </option>
                 ))}
               </select>
               <ChevronDown
                 size={14}
-                className="text-zinc-400 absolute left-2 pointer-events-none"
+                className={`text-zinc-400 absolute ${isRtl ? "left-2" : "right-2"} pointer-events-none`}
               />
             </div>
           ) : branches[0] ? (
             <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white font-bold">
               <Building2 size={13} className="text-[#8cd1ca]" />
               <span>
-                {branches[0].nameAr ||
-                  branches[0].name ||
-                  branches[0].nameEn ||
-                  "الفرع المعين"}
+                {isRtl
+                  ? branches[0].nameAr || branches[0].name || branches[0].nameEn || t("assignedBranch")
+                  : branches[0].nameEn || branches[0].name || branches[0].nameAr || t("assignedBranch")}
               </span>
             </div>
           ) : null}
@@ -363,13 +368,13 @@ export default function StaffDashboard() {
             }
             disabled={isRefreshing || !selectedBranchId}
             className="h-9 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            title="تحديث"
+            title={t("refresh")}
           >
             <RefreshCw
               size={13}
               className={isRefreshing ? "animate-spin text-[#8cd1ca]" : ""}
             />
-            <span>تحديث</span>
+            <span>{t("refresh")}</span>
           </button>
         </div>
       </div>
@@ -377,12 +382,12 @@ export default function StaffDashboard() {
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         {[
-          { id: "active", label: "النشطة", count: counts.active },
-          { id: "pending", label: "جديدة", count: counts.pending },
-          { id: "preparing", label: "قيد التجهيز", count: counts.preparing },
-          { id: "ready", label: "جاهزة للتسليم", count: counts.ready },
-          { id: "delivered", label: "سجل التسليم", count: counts.delivered },
-          { id: "all", label: "الكل", count: counts.all },
+          { id: "active", label: t("tabs.active"), count: counts.active },
+          { id: "pending", label: t("tabs.pending"), count: counts.pending },
+          { id: "preparing", label: t("tabs.preparing"), count: counts.preparing },
+          { id: "ready", label: t("tabs.ready"), count: counts.ready },
+          { id: "delivered", label: t("tabs.delivered"), count: counts.delivered },
+          { id: "all", label: t("tabs.all"), count: counts.all },
         ].map((tab) => {
           const isActive = statusFilter === tab.id;
           return (
@@ -424,14 +429,14 @@ export default function StaffDashboard() {
       {loading && orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 gap-3 text-zinc-400">
           <LoadingSpinner size={36} />
-          <p className="text-xs font-bold">جارٍ جلب الطلبات الواردة…</p>
+          <p className="text-xs font-bold">{t("loadingOrders")}</p>
         </div>
       ) : branches.length === 0 ? (
         <div className="bg-[#1c1424] border border-white/[0.08] p-12 text-center rounded-2xl">
           <p className="text-zinc-400 text-sm">
-            {session?.user.role === "cashier"
-              ? "لم يتم تعيين فرع لحسابك حتى الآن. يرجى التواصل مع المشرف لتحديد الفرع."
-              : "لا توجد فروع مسجلة. يرجى إنشاء فرع من لوحة الإدارة أولاً."}
+            {session?.user?.role === "cashier"
+              ? t("noBranchesAssigned")
+              : t("noBranchesCreated")}
           </p>
         </div>
       ) : (
@@ -461,12 +466,12 @@ export default function StaffDashboard() {
                 <Inbox size={22} />
               </div>
               <p className="text-base font-bold text-white">
-                لا توجد طلبات في هذا القسم حالياً
+                {t("emptyTitle")}
               </p>
               <p className="text-xs text-zinc-400 max-w-sm">
                 {statusFilter === "delivered"
-                  ? "الطلبات التي تم تسليمها للعملاء ستظهر في هذا السجل."
-                  : "عند قيام العملاء بمسح الرمز وإرسال الطلبات ستظهر هنا فوراً."}
+                  ? t("emptyDelivered")
+                  : t("emptyLive")}
               </p>
             </div>
           )}

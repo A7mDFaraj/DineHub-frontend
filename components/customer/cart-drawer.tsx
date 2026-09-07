@@ -9,6 +9,7 @@ import {
   X,
   Trash2,
   ArrowLeft,
+  ArrowRight,
   Loader2,
   MessageSquare,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import axios from "axios";
 import { apiClient } from "@/lib/api-client";
 import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 
 export function CartDrawer({
   branchId,
@@ -40,6 +42,11 @@ export function CartDrawer({
     totalItems,
   } = useCartStore();
 
+  const locale = useLocale();
+  const t = useTranslations("CustomerCart");
+  const isRtl = locale === "ar";
+  const SubmitArrow = isRtl ? ArrowLeft : ArrowRight;
+
   const params = useParams();
   const router = useRouter();
   const submittingRef = useRef(false);
@@ -58,12 +65,15 @@ export function CartDrawer({
       const hasItemNote = Boolean(item.itemNote);
 
       if (hasAttrs || hasItemNote) {
-        let line = `• ${item.quantity}× ${item.nameAr || item.nameEn}`;
+        const itemName = isRtl
+          ? item.nameAr || item.nameEn
+          : item.nameEn || item.nameAr;
+        let line = `• ${item.quantity}× ${itemName}`;
         if (hasAttrs) {
           line += ` [${item.selectedAttributes!.join(", ")}]`;
         }
         if (hasItemNote) {
-          line += ` (ملاحظة: ${item.itemNote})`;
+          line += ` (${t("notePrefix")}: ${item.itemNote})`;
         }
         customizedLines.push(line);
       }
@@ -72,9 +82,9 @@ export function CartDrawer({
     const generalNote = note.trim();
 
     if (customizedLines.length > 0 && generalNote) {
-      return `خيارات الطلبات:\n${customizedLines.join("\n")}\n\nملاحظة عامة: ${generalNote}`;
+      return `${t("optionsPrefix")}:\n${customizedLines.join("\n")}\n\n${t("generalNotePrefix")}: ${generalNote}`;
     } else if (customizedLines.length > 0) {
-      return `خيارات الطلبات:\n${customizedLines.join("\n")}`;
+      return `${t("optionsPrefix")}:\n${customizedLines.join("\n")}`;
     } else {
       return generalNote;
     }
@@ -83,7 +93,7 @@ export function CartDrawer({
   const handleSubmitOrder = async () => {
     if (submittingRef.current || items.length === 0) return;
     if (!tableNumber) {
-      alert("رقم الطاولة غير محدد");
+      alert(t("tableNotSpecified"));
       return;
     }
 
@@ -104,9 +114,7 @@ export function CartDrawer({
       }
 
       if (!resolvedTableId) {
-        throw new Error(
-          "تعذر التحقق من بيانات الطاولة. يرجى تحديث الصفحة والمحاولة مجدداً.",
-        );
+        throw new Error(t("tableNotSpecified"));
       }
 
       const formattedNote = buildFormattedOrderNote();
@@ -138,9 +146,10 @@ export function CartDrawer({
       ) {
         clearCart();
         toggleCart();
-        router.push(trackingPath);
+        const finalPath = isRtl ? trackingPath : `/en${trackingPath}`;
+        router.push(finalPath);
       } else {
-        throw new Error("تم إرسال الطلب ولكن لم يتم استلام رقم التأكيد.");
+        throw new Error(t("orderFailed"));
       }
     } catch (err: unknown) {
       console.error("Order error:", err);
@@ -150,9 +159,7 @@ export function CartDrawer({
           ? err.message
           : null;
       setSubmitError(
-        typeof message === "string"
-          ? message
-          : "تعذر إرسال الطلب. يرجى المحاولة مرة أخرى.",
+        typeof message === "string" ? message : t("orderFailed"),
       );
     } finally {
       submittingRef.current = false;
@@ -162,6 +169,7 @@ export function CartDrawer({
 
   const count = totalItems();
   const total = totalAmount();
+  const currencyLabel = isRtl ? "ر.س" : "SAR";
 
   return (
     <>
@@ -173,10 +181,11 @@ export function CartDrawer({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md"
-            dir="rtl"
+            dir={isRtl ? "rtl" : "ltr"}
             style={{
-              fontFamily:
-                "var(--font-thmanyah), var(--font-arabic), sans-serif",
+              fontFamily: isRtl
+                ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
+                : "var(--font-outfit), sans-serif",
             }}
           >
             <button
@@ -189,11 +198,11 @@ export function CartDrawer({
                   {count}
                 </div>
                 <span className="text-xs sm:text-sm font-bold">
-                  عرض ومراجعة الطلب
+                  {t("viewCart")}
                 </span>
               </div>
               <span className="font-mono text-sm sm:text-base font-black tabular-nums">
-                {total.toFixed(2)} ر.س
+                {total.toFixed(2)} {currencyLabel}
               </span>
             </button>
           </motion.div>
@@ -205,10 +214,11 @@ export function CartDrawer({
         {isCartOpen && (
           <div
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-            dir="rtl"
+            dir={isRtl ? "rtl" : "ltr"}
             style={{
-              fontFamily:
-                "var(--font-thmanyah), var(--font-arabic), sans-serif",
+              fontFamily: isRtl
+                ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
+                : "var(--font-outfit), sans-serif",
             }}
           >
             {/* Backdrop */}
@@ -242,10 +252,11 @@ export function CartDrawer({
                   </div>
                   <div>
                     <h2 className="text-base sm:text-lg font-black text-stone-900">
-                      سلة الطلبات
+                      {t("cartTitle")}
                     </h2>
                     <p className="text-[0.72rem] text-stone-500 font-medium">
-                      طاولة رقم #{tableNumber} • {count} عناصر
+                      {t("table")} #{tableNumber} • {count}{" "}
+                      {count === 1 ? t("itemSingular") : t("itemPlural")}
                     </p>
                   </div>
                 </div>
@@ -254,7 +265,7 @@ export function CartDrawer({
                   type="button"
                   onClick={toggleCart}
                   className="w-9 h-9 rounded-xl bg-white border border-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center transition-colors shadow-sm"
-                  aria-label="إغلاق السلة"
+                  aria-label="Close"
                 >
                   <X size={17} />
                 </button>
@@ -265,15 +276,17 @@ export function CartDrawer({
                 {items.length === 0 ? (
                   <div className="py-12 text-center text-stone-400 space-y-2">
                     <p className="text-sm font-bold text-stone-900">
-                      سلة الطلبات فارغة
+                      {t("emptyCartTitle")}
                     </p>
                     <p className="text-xs text-stone-500">
-                      أضف بعض الأطباق والمشروبات من القائمة لتأكيد طلبك.
+                      {t("emptyCartDesc")}
                     </p>
                   </div>
                 ) : (
                   items.map((item, idx) => {
-                    const itemName = item.nameAr || item.nameEn || "عنصر";
+                    const itemName = isRtl
+                      ? item.nameAr || item.nameEn || "عنصر"
+                      : item.nameEn || item.nameAr || "Item";
                     const itemTotal = Number(item.price) * item.quantity;
                     const hasAttrs =
                       item.selectedAttributes &&
@@ -292,7 +305,7 @@ export function CartDrawer({
                             className="font-mono text-xs font-black tabular-nums mt-0.5"
                             style={{ color: themeColor }}
                           >
-                            {itemTotal.toFixed(2)} ر.س
+                            {itemTotal.toFixed(2)} {currencyLabel}
                           </div>
 
                           {/* Attributes and Notes */}
@@ -311,7 +324,7 @@ export function CartDrawer({
 
                           {item.itemNote && (
                             <p className="text-[10px] text-stone-500 italic mt-0.5">
-                              ملاحظة: {item.itemNote}
+                              {t("notePrefix")}: {item.itemNote}
                             </p>
                           )}
                         </div>
@@ -331,7 +344,7 @@ export function CartDrawer({
                               }
                             }}
                             className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-red-50 hover:text-red-600 text-stone-700 flex items-center justify-center transition-colors"
-                            aria-label="إنقاص أو حذف"
+                            aria-label="Decrease quantity"
                           >
                             {item.quantity === 1 ? (
                               <Trash2 size={13} />
@@ -348,7 +361,7 @@ export function CartDrawer({
                               updateQuantity(item.productId, item.quantity + 1)
                             }
                             className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 flex items-center justify-center transition-colors"
-                            aria-label="زيادة الكمية"
+                            aria-label="Increase quantity"
                           >
                             <Plus size={13} />
                           </button>
@@ -363,13 +376,13 @@ export function CartDrawer({
                   <div className="space-y-1.5 pt-2">
                     <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
                       <MessageSquare size={13} style={{ color: themeColor }} />
-                      <span>ملاحظات عامة لطاقم الخدمة (اختياري)</span>
+                      <span>{t("generalNote")}</span>
                     </label>
                     <textarea
                       rows={2}
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
-                      placeholder="أي توجيهات إضافية تخص الطاولة أو تقديم الطلب…"
+                      placeholder={t("notePlaceholder")}
                       className="w-full rounded-xl bg-stone-50 border border-stone-200 p-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:border-stone-400 resize-none transition-all box-border font-medium"
                     />
                   </div>
@@ -386,9 +399,9 @@ export function CartDrawer({
               {items.length > 0 && (
                 <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 space-y-3">
                   <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-stone-600">
-                    <span>إجمالي الحساب:</span>
+                    <span>{t("subtotal")}:</span>
                     <span className="font-mono text-base sm:text-lg font-black text-stone-900 tabular-nums">
-                      {total.toFixed(2)} ر.س
+                      {total.toFixed(2)} {currencyLabel}
                     </span>
                   </div>
 
@@ -402,12 +415,12 @@ export function CartDrawer({
                     {isSubmitting ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        <span>جارٍ إرسال الطلب…</span>
+                        <span>{t("submitting")}</span>
                       </>
                     ) : (
                       <>
-                        <span>تأكيد وإرسال الطلب إلى الطاقم</span>
-                        <ArrowLeft size={16} />
+                        <span>{t("placeOrder")}</span>
+                        <SubmitArrow size={16} />
                       </>
                     )}
                   </button>

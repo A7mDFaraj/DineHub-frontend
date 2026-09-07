@@ -1,7 +1,6 @@
 "use client";
 
 import { apiErrorMessage } from "@/lib/api-error";
-
 import { useCallback, useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -14,13 +13,12 @@ import {
   RotateCcw,
   Search,
   SlidersHorizontal,
-  Sparkles,
   Tag,
   Trash2,
   UtensilsCrossed,
   X,
-  XCircle,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
@@ -58,6 +56,11 @@ interface Product {
 }
 
 export default function MenuManagementPage() {
+  const locale = useLocale();
+  const isRtl = locale === "ar";
+  const t = useTranslations("AdminMenu");
+  const tCommon = useTranslations("AdminCommon");
+
   const {
     branches,
     selectedBranchId,
@@ -144,21 +147,21 @@ export default function MenuManagementPage() {
       }
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg("تعذر جلب بيانات القائمة. يرجى المحاولة مرة أخرى.");
+      setErrorMsg(tCommon("error"));
     } finally {
       setIsLoadingMenu(false);
     }
-  }, []);
+  }, [tCommon]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-    if (selectedBranchId) {
-      fetchMenuData(selectedBranchId);
-    } else {
-      setProducts([]);
-      setCategories([]);
-      setAttributes([]);
-    }
+      if (selectedBranchId) {
+        fetchMenuData(selectedBranchId);
+      } else {
+        setProducts([]);
+        setCategories([]);
+        setAttributes([]);
+      }
     }, 0);
     return () => clearTimeout(timer);
   }, [selectedBranchId, fetchMenuData]);
@@ -187,56 +190,51 @@ export default function MenuManagementPage() {
       nameEn: prod.nameEn || "",
       descriptionAr: prod.descriptionAr || "",
       descriptionEn: prod.descriptionEn || "",
-      price: prod.price ? prod.price.toString() : "",
-      categoryId: prod.categoryId || (categories[0]?.id ?? ""),
+      price: String(prod.price),
+      categoryId: prod.categoryId,
       imageUrl: prod.imageUrl || "",
-      isAvailable: prod.isAvailable ?? true,
+      isAvailable: prod.isAvailable !== false,
     });
-    const currentAttrIds = (prod.attributes || []).map((a) => a.attribute.id);
-    setSelectedAttrIds(currentAttrIds);
+    setSelectedAttrIds(prod.attributes?.map((a) => a.attribute.id) || []);
     setErrorMsg("");
     setIsProductModalOpen(true);
   };
 
   const handleToggleAvailability = async (prod: Product, e: React.MouseEvent) => {
     e.stopPropagation();
-    const newStatus = !(prod.isAvailable ?? true);
-
-    // Optimistic UI
-    setProducts((prev) =>
-      prev.map((p) => (p.id === prod.id ? { ...p, isAvailable: newStatus } : p))
-    );
-
     try {
+      const nextStatus = !prod.isAvailable;
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === prod.id ? { ...p, isAvailable: nextStatus } : p
+        )
+      );
+
       await apiClient.patch(`/admin/products/${prod.id}`, {
-        isAvailable: newStatus,
+        isAvailable: nextStatus,
       });
-      setSuccessMsg(`تم ${newStatus ? "تفعيل" : "إيقاف"} توفر صنف "${prod.nameAr || prod.name}".`);
-      setTimeout(() => setSuccessMsg(""), 3000);
-    } catch (err: unknown) {
+    } catch (err) {
       console.error(err);
       if (selectedBranchId) fetchMenuData(selectedBranchId);
-      setErrorMsg("تعذر تحديث حالة التوفر.");
     }
   };
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) {
-      setErrorMsg("يرجى اختيار فرع أولاً.");
+      setErrorMsg(tCommon("currentBranch"));
       return;
     }
     if (!formData.nameAr.trim() && !formData.nameEn.trim()) {
-      setErrorMsg("يرجى إدخال اسم المنتج بالعربية أو الإنجليزية.");
+      setErrorMsg(t("nameAr"));
+      return;
+    }
+    if (!formData.price || isNaN(Number(formData.price))) {
+      setErrorMsg(t("price"));
       return;
     }
     if (!formData.categoryId) {
-      setErrorMsg("يرجى اختيار تصنيف للمنتج.");
-      return;
-    }
-    const numPrice = parseFloat(formData.price);
-    if (isNaN(numPrice) || numPrice < 0) {
-      setErrorMsg("يرجى إدخال سعر صالح.");
+      setErrorMsg(t("category"));
       return;
     }
 
@@ -244,28 +242,26 @@ export default function MenuManagementPage() {
       setIsSubmitting(true);
       setErrorMsg("");
 
-      const primaryName = formData.nameAr.trim() || formData.nameEn.trim();
-
       const payload = {
         branchId: selectedBranchId,
         categoryId: formData.categoryId,
-        name: primaryName,
+        name: formData.nameAr.trim() || formData.nameEn.trim(),
         nameAr: formData.nameAr.trim() || undefined,
         nameEn: formData.nameEn.trim() || undefined,
         descriptionAr: formData.descriptionAr.trim() || undefined,
         descriptionEn: formData.descriptionEn.trim() || undefined,
-        price: numPrice,
-        imageUrl: formData.imageUrl.trim() || undefined,
+        price: Number(formData.price),
+        imageUrl: formData.imageUrl || undefined,
         isAvailable: formData.isAvailable,
         attributeIds: selectedAttrIds,
       };
 
       if (editingProductId) {
         await apiClient.patch(`/admin/products/${editingProductId}`, payload);
-        setSuccessMsg("تم تعديل بيانات المنتج بنجاح.");
+        setSuccessMsg(tCommon("success"));
       } else {
         await apiClient.post("/admin/products", payload);
-        setSuccessMsg("تمت إضافة المنتج بنجاح.");
+        setSuccessMsg(tCommon("success"));
       }
 
       await fetchMenuData(selectedBranchId);
@@ -273,29 +269,11 @@ export default function MenuManagementPage() {
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(apiErrorMessage(err) || "تعذر حفظ المنتج.");
+      setErrorMsg(
+        apiErrorMessage(err) || tCommon("error")
+      );
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!productToDelete || !selectedBranchId) return;
-
-    try {
-      setIsDeleting(true);
-      setErrorMsg("");
-      await apiClient.delete(`/admin/products/${productToDelete.id}`);
-      setSuccessMsg(`تم حذف منتج "${productToDelete.nameAr || productToDelete.name}" بنجاح.`);
-      setIsDeleteModalOpen(false);
-      setProductToDelete(null);
-      await fetchMenuData(selectedBranchId);
-      setTimeout(() => setSuccessMsg(""), 4000);
-    } catch (err: unknown) {
-      console.error(err);
-      setErrorMsg(apiErrorMessage(err) || "تعذر حذف المنتج.");
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -303,24 +281,28 @@ export default function MenuManagementPage() {
     e.preventDefault();
     if (!selectedBranchId) return;
     if (!newAttrData.labelAr.trim() && !newAttrData.labelEn.trim()) {
-      setAttrError("يرجى إدخال اسم الوسم.");
+      setAttrError(t("nameAr"));
       return;
     }
 
     try {
       setIsSavingAttr(true);
       setAttrError("");
-      const { data } = await apiClient.post("/admin/attributes", {
+
+      const res = await apiClient.post("/admin/attributes", {
         branchId: selectedBranchId,
         labelAr: newAttrData.labelAr.trim() || undefined,
         labelEn: newAttrData.labelEn.trim() || undefined,
       });
-      const newAttr = data?.data || data;
+
+      const newAttr = res.data?.data || res.data;
       setAttributes((prev) => [...prev, newAttr]);
       setNewAttrData({ labelAr: "", labelEn: "" });
     } catch (err: unknown) {
       console.error(err);
-      setAttrError(apiErrorMessage(err) || "تعذر إنشاء الوسم.");
+      setAttrError(
+        apiErrorMessage(err) || tCommon("error")
+      );
     } finally {
       setIsSavingAttr(false);
     }
@@ -331,43 +313,58 @@ export default function MenuManagementPage() {
       await apiClient.delete(`/admin/attributes/${attrId}`);
       setAttributes((prev) => prev.filter((a) => a.id !== attrId));
       setSelectedAttrIds((prev) => prev.filter((id) => id !== attrId));
-    } catch (err: unknown) {
+    } catch (err) {
       console.error(err);
-      setAttrError("تعذر حذف الوسم.");
     }
   };
 
   const toggleAttributeSelection = (attrId: string) => {
     setSelectedAttrIds((prev) =>
-      prev.includes(attrId) ? prev.filter((id) => id !== attrId) : [...prev, attrId]
+      prev.includes(attrId)
+        ? prev.filter((id) => id !== attrId)
+        : [...prev, attrId]
     );
   };
 
-  // Filtered Products
-  const filteredProducts = products.filter((prod) => {
-    const query = searchQuery.toLowerCase().trim();
-    const nameMatch =
-      !query ||
-      (prod.nameAr && prod.nameAr.toLowerCase().includes(query)) ||
-      (prod.name && prod.name.toLowerCase().includes(query)) ||
-      (prod.nameEn && prod.nameEn.toLowerCase().includes(query)) ||
-      (prod.descriptionAr && prod.descriptionAr.toLowerCase().includes(query)) ||
-      (prod.descriptionEn && prod.descriptionEn.toLowerCase().includes(query));
+  const handleConfirmDelete = async () => {
+    if (!productToDelete || !selectedBranchId) return;
+    try {
+      setIsDeleting(true);
+      await apiClient.delete(`/admin/products/${productToDelete.id}`);
+      setSuccessMsg(tCommon("success"));
+      setIsDeleteModalOpen(false);
+      setProductToDelete(null);
+      await fetchMenuData(selectedBranchId);
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err: unknown) {
+      console.error(err);
+      setErrorMsg(
+        apiErrorMessage(err) || tCommon("error")
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-    const catMatch =
+  // Filter products
+  const filteredProducts = products.filter((prod) => {
+    const matchSearch =
+      searchQuery === "" ||
+      (prod.nameAr && prod.nameAr.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (prod.nameEn && prod.nameEn.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (prod.name && prod.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (prod.descriptionAr && prod.descriptionAr.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchCategory =
       selectedCatFilter === "all" || prod.categoryId === selectedCatFilter;
 
-    const isAvail = prod.isAvailable !== false;
-    const availMatch =
+    const matchAvail =
       availabilityFilter === "all" ||
-      (availabilityFilter === "available" && isAvail) ||
-      (availabilityFilter === "unavailable" && !isAvail);
+      (availabilityFilter === "available" && prod.isAvailable !== false) ||
+      (availabilityFilter === "unavailable" && prod.isAvailable === false);
 
-    return nameMatch && catMatch && availMatch;
+    return matchSearch && matchCategory && matchAvail;
   });
-
-  const availableCount = products.filter((p) => p.isAvailable !== false).length;
-  const unavailableCount = products.length - availableCount;
 
   return (
     <div className={styles.page}>
@@ -375,85 +372,25 @@ export default function MenuManagementPage() {
         <div>
           <p className={styles.eyebrow}>
             <span aria-hidden="true" />
-            الإدارة • قائمة الطعام
+            DineHub • {t("pageTitle")}
           </p>
-          <h1>إدارة المنتجات والأصناف</h1>
-          <p>
-            أضف وعدّل أصناف الطعام، وحدد الأسعار والوسوم وحالة التوفر في المطبخ فورياً.
-          </p>
+          <h1>{t("pageTitle")}</h1>
+          <p className={styles.pageLead}>{t("pageDesc")}</p>
         </div>
 
-        <div className={styles.headerActions}>
-          <AdminBranchSelector />
-
+        <div className={styles.headerControls}>
+          <AdminBranchSelector className={styles.branchSelectWrap} />
           <button
             type="button"
-            className={styles.secondaryButton}
-            onClick={() => selectedBranchId && fetchMenuData(selectedBranchId)}
-            disabled={isLoadingMenu || !selectedBranchId}
-            aria-label="تحديث القائمة"
-          >
-            <RotateCcw
-              size={17}
-              className={isLoadingMenu ? "animate-spin" : undefined}
-            />
-            <span>تحديث</span>
-          </button>
-
-          <button
-            type="button"
-            className={styles.primaryButton}
+            className={styles.createButton}
             onClick={handleOpenCreate}
             disabled={!selectedBranchId}
           >
-            <Plus size={18} strokeWidth={2.2} />
-            <span>إضافة منتج</span>
+            <Plus size={18} />
+            <span>{t("addProduct")}</span>
           </button>
         </div>
       </header>
-
-      {/* KPI Stats */}
-      <section className={styles.kpiGrid} aria-label="ملخص المنتجات">
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="coral">
-            <UtensilsCrossed size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>{products.length}</span>
-            <span className={styles.kpiLabel}>إجمالي منتجات الفرع</span>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="teal">
-            <CheckCircle2 size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>{availableCount}</span>
-            <span className={styles.kpiLabel}>متاح للطلب الآن</span>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="lilac">
-            <XCircle size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>{unavailableCount}</span>
-            <span className={styles.kpiLabel}>غير متوفر مؤقتاً</span>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiIcon} data-tone="plum">
-            <Tag size={22} />
-          </div>
-          <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>{categories.length}</span>
-            <span className={styles.kpiLabel}>أقسام مصنفة</span>
-          </div>
-        </div>
-      </section>
 
       {successMsg && (
         <div className={styles.successBanner} role="status">
@@ -462,39 +399,50 @@ export default function MenuManagementPage() {
         </div>
       )}
 
-      {errorMsg && !isProductModalOpen && !isDeleteModalOpen && (
+      {errorMsg && (
         <div className={styles.errorBanner} role="alert">
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Control / Filter Bar */}
-      <div className={styles.filterBar}>
-        <div className={styles.filterTopRow}>
-          <div className={styles.searchBox}>
-            <Search size={16} className={styles.searchIcon} />
+      {/* Control Bar: Search & Category Pills */}
+      <div className={styles.controlBar}>
+        <div className={styles.searchRow}>
+          <div className={styles.searchShell}>
+            <Search size={18} className={styles.searchIcon} />
             <input
               type="search"
-              className={styles.searchInput}
-              placeholder="ابحث عن صنف بالاسم أو الوصف…"
+              placeholder={t("searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className={styles.searchInput}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className={styles.clearSearch}
+                aria-label={tCommon("cancel")}
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
 
-          <div className={styles.filterControls}>
+          <div className={styles.filterGroup}>
             <select
-              className={styles.availabilitySelect}
               value={availabilityFilter}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "all" || value === "available" || value === "unavailable") setAvailabilityFilter(value);
-              }}
-              aria-label="تصفية حسب التوفر"
+              onChange={(e) =>
+                setAvailabilityFilter(
+                  e.target.value as "all" | "available" | "unavailable"
+                )
+              }
+              className={styles.selectInput}
+              aria-label={tCommon("filter")}
             >
-              <option value="all">كافة الحالات</option>
-              <option value="available">المتوفر فقط</option>
-              <option value="unavailable">غير المتوفر</option>
+              <option value="all">{tCommon("all")}</option>
+              <option value="available">{t("available")}</option>
+              <option value="unavailable">{t("unavailable")}</option>
             </select>
 
             <button
@@ -504,7 +452,7 @@ export default function MenuManagementPage() {
               style={{ minHeight: "42px", padding: "0 14px", fontSize: "0.8rem" }}
             >
               <SlidersHorizontal size={15} />
-              <span>إدارة الوسوم ({attributes.length})</span>
+              <span>{t("attributesTitle")} ({attributes.length})</span>
             </button>
           </div>
         </div>
@@ -517,13 +465,15 @@ export default function MenuManagementPage() {
             data-active={selectedCatFilter === "all"}
             onClick={() => setSelectedCatFilter("all")}
           >
-            <span>كافة الأصناف</span>
+            <span>{t("filterAll")}</span>
             <span className={styles.pillCount}>{products.length}</span>
           </button>
 
           {categories.map((cat) => {
             const count = products.filter((p) => p.categoryId === cat.id).length;
-            const displayName = cat.nameAr || cat.name || cat.nameEn || "قسم";
+            const displayName = isRtl
+              ? (cat.nameAr || cat.name || cat.nameEn || "قسم")
+              : (cat.nameEn || cat.name || cat.nameAr || "Category");
             return (
               <button
                 key={cat.id}
@@ -546,30 +496,22 @@ export default function MenuManagementPage() {
           <div className={styles.emptyIcon}>
             <Loader2 size={28} className="animate-spin" />
           </div>
-          <h3>جارٍ تحميل قائمة الطعام…</h3>
+          <h3>{tCommon("loading")}</h3>
         </div>
       ) : !selectedBranchId ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>
             <UtensilsCrossed size={28} />
           </div>
-          <h3>يرجى اختيار فرع لعرض قائمته</h3>
+          <h3>{tCommon("currentBranch")}</h3>
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>
             <UtensilsCrossed size={28} />
           </div>
-          <h3>
-            {products.length === 0
-              ? "لا توجد منتجات مسجلة في هذا الفرع بعد"
-              : "لا توجد نتائج مطابقة لبحثك"}
-          </h3>
-          <p>
-            {products.length === 0
-              ? "ابدأ بإضافة أول صنف لقائمتك لتظهر للعملاء عند مسح رمز الطاولة."
-              : "جرب تغيير مصطلح البحث أو إزالة التصفية لعرض المزيد من الأصناف."}
-          </p>
+          <h3>{t("emptyTitle")}</h3>
+          <p>{t("emptyDesc")}</p>
           {products.length === 0 && (
             <button
               type="button"
@@ -578,17 +520,24 @@ export default function MenuManagementPage() {
               style={{ marginTop: "10px" }}
             >
               <Plus size={18} />
-              <span>إضافة أول صنف الآن</span>
+              <span>{t("addProduct")}</span>
             </button>
           )}
         </div>
       ) : (
         <div className={styles.productGrid}>
           {filteredProducts.map((prod) => {
-            const displayNameAr = prod.nameAr || prod.name || "صنف بدون اسم";
-            const displayNameEn = prod.nameEn || "";
+            const displayName = isRtl
+              ? (prod.nameAr || prod.name || prod.nameEn || "صنف")
+              : (prod.nameEn || prod.name || prod.nameAr || "Item");
+            const secondaryName = isRtl ? prod.nameEn : prod.nameAr;
+            const displayDesc = isRtl
+              ? (prod.descriptionAr || prod.descriptionEn)
+              : (prod.descriptionEn || prod.descriptionAr);
             const cat = categories.find((c) => c.id === prod.categoryId);
-            const catName = cat?.nameAr || cat?.name || cat?.nameEn || "";
+            const catName = isRtl
+              ? (cat?.nameAr || cat?.name || cat?.nameEn || "")
+              : (cat?.nameEn || cat?.name || cat?.nameAr || "");
             const isAvail = prod.isAvailable !== false;
 
             return (
@@ -597,14 +546,14 @@ export default function MenuManagementPage() {
                   {prod.imageUrl ? (
                     <img
                       src={prod.imageUrl}
-                      alt={displayNameAr}
+                      alt={displayName}
                       className={styles.productImg}
                       loading="lazy"
                     />
                   ) : (
                     <div className={styles.noImage}>
                       <ImageIcon size={32} />
-                      <span>بدون صورة</span>
+                      <span>—</span>
                     </div>
                   )}
 
@@ -616,32 +565,32 @@ export default function MenuManagementPage() {
                     className={styles.availabilityBadge}
                     data-available={String(isAvail)}
                   >
-                    {isAvail ? "متوفر للطلب" : "غير متوفر"}
+                    {isAvail ? t("available") : t("unavailable")}
                   </span>
                 </div>
 
                 <div className={styles.productBody}>
                   <div className={styles.productHeader}>
                     <div className={styles.productTitles}>
-                      <h3>{displayNameAr}</h3>
-                      {displayNameEn && <p>{displayNameEn}</p>}
+                      <h3>{displayName}</h3>
+                      {secondaryName && <p>{secondaryName}</p>}
                     </div>
                     <span className={styles.priceTag}>
-                      {Number(prod.price).toFixed(2)} ر.س
+                      <bdi dir="ltr">{Number(prod.price).toFixed(2)}</bdi> {tCommon("currency")}
                     </span>
                   </div>
 
-                  {(prod.descriptionAr || prod.descriptionEn) && (
-                    <p className={styles.productDesc}>
-                      {prod.descriptionAr || prod.descriptionEn}
-                    </p>
+                  {displayDesc && (
+                    <p className={styles.productDesc}>{displayDesc}</p>
                   )}
 
                   {prod.attributes && prod.attributes.length > 0 && (
                     <div className={styles.attributesList}>
                       {prod.attributes.map((a) => (
                         <span key={a.attribute.id} className={styles.attrChip}>
-                          {a.attribute.labelAr || a.attribute.labelEn}
+                          {isRtl
+                            ? (a.attribute.labelAr || a.attribute.labelEn)
+                            : (a.attribute.labelEn || a.attribute.labelAr)}
                         </span>
                       ))}
                     </div>
@@ -653,7 +602,7 @@ export default function MenuManagementPage() {
                     type="button"
                     className={styles.toggleSwitch}
                     onClick={(e) => handleToggleAvailability(prod, e)}
-                    title={isAvail ? "إيقاف التوفر" : "تفعيل التوفر"}
+                    title={isAvail ? t("unavailable") : t("available")}
                   >
                     <span
                       className={styles.switchTrack}
@@ -661,7 +610,7 @@ export default function MenuManagementPage() {
                     >
                       <span className={styles.switchThumb} />
                     </span>
-                    <span>{isAvail ? "متوفر" : "معطل"}</span>
+                    <span>{isAvail ? t("available") : t("unavailable")}</span>
                   </button>
 
                   <div className={styles.cardActions}>
@@ -669,8 +618,8 @@ export default function MenuManagementPage() {
                       type="button"
                       className={styles.iconBtn}
                       onClick={() => handleOpenEdit(prod)}
-                      title="تعديل المنتج"
-                      aria-label={`تعديل ${displayNameAr}`}
+                      title={t("editProduct")}
+                      aria-label={`${t("editProduct")} ${displayName}`}
                     >
                       <Edit3 size={15} />
                     </button>
@@ -682,8 +631,8 @@ export default function MenuManagementPage() {
                         setProductToDelete(prod);
                         setIsDeleteModalOpen(true);
                       }}
-                      title="حذف المنتج"
-                      aria-label={`حذف ${displayNameAr}`}
+                      title={t("deleteConfirm")}
+                      aria-label={`${t("deleteConfirm")} ${displayName}`}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -702,16 +651,19 @@ export default function MenuManagementPage() {
       >
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content
+            className={styles.dialogContent}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
             <div className={styles.dialogHead}>
               <Dialog.Title>
-                {editingProductId ? "تعديل بيانات المنتج" : "إضافة منتج جديد"}
+                {editingProductId ? t("editProduct") : t("addProduct")}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -730,25 +682,25 @@ export default function MenuManagementPage() {
 
             <form onSubmit={handleSubmitProduct} className={styles.formGrid}>
               <div className={styles.inputGroup}>
-                <label>صورة المنتج</label>
+                <label>{t("uploadImage")}</label>
                 <ImageUploader
                   value={formData.imageUrl}
                   onChange={(url) =>
                     setFormData({ ...formData, imageUrl: url })
                   }
-                  label="رفع صورة الصنف"
-                  description="JPG, PNG, WebP بحد أقصى 5 ميجابايت"
+                  label={t("uploadImage")}
+                  description="JPG, PNG, WebP (max 5MB)"
                 />
               </div>
 
               <div className={styles.twoCol}>
                 <div className={styles.inputGroup}>
-                  <label htmlFor="prod-name-ar">اسم المنتج (بالعربية) *</label>
+                  <label htmlFor="prod-name-ar">{t("nameAr")} *</label>
                   <input
                     id="prod-name-ar"
                     type="text"
                     required
-                    placeholder="مثال: فلات وايت كلاسيك"
+                    placeholder={isRtl ? "مثال: فلات وايت كلاسيك" : "e.g. Classic Flat White"}
                     value={formData.nameAr}
                     onChange={(e) =>
                       setFormData({ ...formData, nameAr: e.target.value })
@@ -757,7 +709,7 @@ export default function MenuManagementPage() {
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label htmlFor="prod-name-en">اسم المنتج (بالإنجليزية)</label>
+                  <label htmlFor="prod-name-en">{t("nameEn")}</label>
                   <input
                     id="prod-name-en"
                     type="text"
@@ -773,7 +725,7 @@ export default function MenuManagementPage() {
 
               <div className={styles.twoCol}>
                 <div className={styles.inputGroup}>
-                  <label htmlFor="prod-price">السعر (ر.س) *</label>
+                  <label htmlFor="prod-price">{t("price")} ({tCommon("currency")}) *</label>
                   <input
                     id="prod-price"
                     type="number"
@@ -789,7 +741,7 @@ export default function MenuManagementPage() {
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label htmlFor="prod-cat">التصنيف *</label>
+                  <label htmlFor="prod-cat">{t("category")} *</label>
                   <select
                     id="prod-cat"
                     required
@@ -799,11 +751,13 @@ export default function MenuManagementPage() {
                     }
                   >
                     {categories.length === 0 && (
-                      <option value="">لا توجد تصنيفات معرفة</option>
+                      <option value="">{tCommon("all")}</option>
                     )}
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.nameAr || c.name || c.nameEn}
+                        {isRtl
+                          ? (c.nameAr || c.name || c.nameEn)
+                          : (c.nameEn || c.name || c.nameAr)}
                       </option>
                     ))}
                   </select>
@@ -811,10 +765,14 @@ export default function MenuManagementPage() {
               </div>
 
               <div className={styles.inputGroup}>
-                <label htmlFor="prod-desc-ar">وصف المنتج (بالعربية)</label>
+                <label htmlFor="prod-desc-ar">{t("descAr")}</label>
                 <textarea
                   id="prod-desc-ar"
-                  placeholder="مزيج متوازن من الإسبريسو الفاخر مع حليب مبخر بقوام مخملي…"
+                  placeholder={
+                    isRtl
+                      ? "مزيج متوازن من الإسبريسو الفاخر مع حليب مبخر بقوام مخملي…"
+                      : "Balanced artisan espresso with velvety steamed milk…"
+                  }
                   value={formData.descriptionAr}
                   onChange={(e) =>
                     setFormData({
@@ -825,9 +783,25 @@ export default function MenuManagementPage() {
                 />
               </div>
 
+              <div className={styles.inputGroup}>
+                <label htmlFor="prod-desc-en">{t("descEn")}</label>
+                <textarea
+                  id="prod-desc-en"
+                  dir="ltr"
+                  placeholder="Rich espresso balanced with velvety steamed milk…"
+                  value={formData.descriptionEn}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      descriptionEn: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
               {attributes.length > 0 && (
                 <div className={styles.inputGroup}>
-                  <label>الوسوم والخصائص</label>
+                  <label>{t("attributesTitle")}</label>
                   <div className={styles.attrSelectionGrid}>
                     {attributes.map((attr) => {
                       const isSelected = selectedAttrIds.includes(attr.id);
@@ -840,7 +814,11 @@ export default function MenuManagementPage() {
                           onClick={() => toggleAttributeSelection(attr.id)}
                         >
                           {isSelected && <Check size={13} />}
-                          <span>{attr.labelAr || attr.labelEn}</span>
+                          <span>
+                            {isRtl
+                              ? (attr.labelAr || attr.labelEn)
+                              : (attr.labelEn || attr.labelAr)}
+                          </span>
                         </button>
                       );
                     })}
@@ -855,7 +833,7 @@ export default function MenuManagementPage() {
                   onClick={() => setIsProductModalOpen(false)}
                   disabled={isSubmitting}
                 >
-                  إلغاء
+                  {tCommon("cancel")}
                 </button>
                 <button
                   type="submit"
@@ -865,12 +843,10 @@ export default function MenuManagementPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>جارٍ الحفظ…</span>
+                      <span>{tCommon("loading")}</span>
                     </>
                   ) : (
-                    <span>
-                      {editingProductId ? "حفظ التعديلات" : "إضافة المنتج"}
-                    </span>
+                    <span>{tCommon("save")}</span>
                   )}
                 </button>
               </div>
@@ -883,14 +859,17 @@ export default function MenuManagementPage() {
       <Dialog.Root open={isAttrModalOpen} onOpenChange={setIsAttrModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content
+            className={styles.dialogContent}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
             <div className={styles.dialogHead}>
-              <Dialog.Title>إدارة وسوم وخصائص المنتجات</Dialog.Title>
+              <Dialog.Title>{t("attributesTitle")}</Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -910,10 +889,10 @@ export default function MenuManagementPage() {
             <form onSubmit={handleCreateAttribute} className={styles.formGrid}>
               <div className={styles.twoCol}>
                 <div className={styles.inputGroup}>
-                  <label>الوسم (بالعربية)</label>
+                  <label>{t("nameAr")}</label>
                   <input
                     type="text"
-                    placeholder="مثال: الأكثر طلباً، نباتي، حار"
+                    placeholder={isRtl ? "مثال: الأكثر طلباً، نباتي، حار" : "e.g. Best Seller, Vegan, Spicy"}
                     value={newAttrData.labelAr}
                     onChange={(e) =>
                       setNewAttrData({
@@ -924,7 +903,7 @@ export default function MenuManagementPage() {
                   />
                 </div>
                 <div className={styles.inputGroup}>
-                  <label>الوسم (بالإنجليزية)</label>
+                  <label>{t("nameEn")}</label>
                   <input
                     type="text"
                     dir="ltr"
@@ -951,18 +930,18 @@ export default function MenuManagementPage() {
                 ) : (
                   <Plus size={16} />
                 )}
-                <span>إضافة الوسم</span>
+                <span>{tCommon("add")}</span>
               </button>
             </form>
 
             <div style={{ marginTop: "24px", borderTop: "1px solid rgba(223, 210, 235, 0.1)", paddingTop: "16px" }}>
               <h4 style={{ margin: "0 0 12px", fontSize: "0.95rem", color: "#fffdf9" }}>
-                الوسوم المعرفة حالياً ({attributes.length})
+                {t("attributesTitle")} ({attributes.length})
               </h4>
 
               {attributes.length === 0 ? (
                 <p style={{ color: "#b9aebd", fontSize: "0.85rem" }}>
-                  لا توجد وسوم مضافة بعد لهذا الفرع.
+                  —
                 </p>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -981,7 +960,11 @@ export default function MenuManagementPage() {
                         fontSize: "0.82rem",
                       }}
                     >
-                      <span>{attr.labelAr || attr.labelEn}</span>
+                      <span>
+                        {isRtl
+                          ? (attr.labelAr || attr.labelEn)
+                          : (attr.labelEn || attr.labelAr)}
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleDeleteAttribute(attr.id)}
@@ -994,7 +977,7 @@ export default function MenuManagementPage() {
                           display: "grid",
                           placeItems: "center",
                         }}
-                        title="حذف الوسم"
+                        title={tCommon("delete")}
                       >
                         <X size={14} />
                       </button>
@@ -1014,14 +997,17 @@ export default function MenuManagementPage() {
       >
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content
+            className={styles.dialogContent}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
             <div className={styles.dialogHead}>
-              <Dialog.Title>تأكيد حذف المنتج</Dialog.Title>
+              <Dialog.Title>{t("deleteConfirm")}</Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -1029,11 +1015,7 @@ export default function MenuManagementPage() {
             </div>
 
             <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
-              هل أنت متأكد من رغبتك في حذف صنف{" "}
-              <strong style={{ color: "#fffdf9" }}>
-                &quot;{productToDelete?.nameAr || productToDelete?.name}&quot;
-              </strong>
-              ؟ سيتم حذفه نهائياً من قائمة هذا الفرع.
+              {t("deleteWarning")}
             </p>
 
             <div className={styles.dialogActions}>
@@ -1043,7 +1025,7 @@ export default function MenuManagementPage() {
                 onClick={() => setIsDeleteModalOpen(false)}
                 disabled={isDeleting}
               >
-                إلغاء
+                {tCommon("cancel")}
               </button>
               <button
                 type="button"
@@ -1055,10 +1037,10 @@ export default function MenuManagementPage() {
                 {isDeleting ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>جارٍ الحذف…</span>
+                    <span>{tCommon("loading")}</span>
                   </>
                 ) : (
-                  <span>نعم، احذف المنتج</span>
+                  <span>{tCommon("delete")}</span>
                 )}
               </button>
             </div>

@@ -31,23 +31,35 @@ const outfit = Outfit({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "DineHub | الطلب يبدأ بمسح، والتشغيل يبقى تحت سيطرتك",
-    template: "%s | DineHub",
-  },
-  description:
-    "منصة طلبات رقمية عبر QR تمنح عملاءك تجربة سريعة، وتمنح فريقك إدارة الفروع والقوائم والطلبات والتحليلات من مكان واحد.",
-  icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: [
-      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
-    ],
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const isEn = locale === "en";
+
+  return {
+    title: {
+      default: isEn
+        ? "DineHub | Effortless Digital Ordering & Multi-Branch Operations"
+        : "DineHub | الطلب يبدأ بمسح، والتشغيل يبقى تحت سيطرتك",
+      template: "%s | DineHub",
+    },
+    description: isEn
+      ? "Instant QR ordering experiences for any venue, with unified menu, orders, branches, and analytics."
+      : "منصة طلبات رقمية عبر QR تمنح عملاءك تجربة سريعة، وتمنح فريقك إدارة الفروع والقوائم والطلبات والتحليلات من مكان واحد.",
+    icons: {
+      icon: [
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      ],
+      apple: [
+        { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+      ],
+    },
+  };
+}
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));

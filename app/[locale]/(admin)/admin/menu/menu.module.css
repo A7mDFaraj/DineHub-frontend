@@ -9,6 +9,10 @@
   box-sizing: border-box;
 }
 
+:global(html[lang="en"]) .page {
+  font-family: var(--font-outfit), sans-serif;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

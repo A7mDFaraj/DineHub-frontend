@@ -5,9 +5,11 @@ import {
   Clock,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   MessageSquare,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLocale, useTranslations } from "next-intl";
 
 import { OrderElapsed } from "@/components/orders/order-elapsed";
 
@@ -47,63 +49,65 @@ interface OrderCardProps {
 const statusConfig: Record<
   OrderStatus,
   {
-    statusTitle: string;
+    statusKey: "statusPending" | "statusPreparing" | "statusReady" | "statusDelivered";
     statusColor: string;
     nextStatus: OrderStatus | null;
-    actionLabel: string;
+    actionKey?: "actionPrepare" | "actionReady" | "actionDeliver";
     actionButtonClass: string;
   }
 > = {
   pending: {
-    statusTitle: "جديد",
+    statusKey: "statusPending",
     statusColor: "text-red-400",
     nextStatus: "preparing",
-    actionLabel: "قبول الطلب وبدء التجهيز",
+    actionKey: "actionPrepare",
     actionButtonClass:
       "bg-[#f2644b] hover:bg-[#ff735c] text-white shadow-[0_4px_16px_rgba(242,100,75,0.35)] active:scale-[0.96]",
   },
   preparing: {
-    statusTitle: "قيد التجهيز",
+    statusKey: "statusPreparing",
     statusColor: "text-amber-400",
     nextStatus: "ready",
-    actionLabel: "جاهز للتسليم",
+    actionKey: "actionReady",
     actionButtonClass:
       "bg-[#47aaa1] hover:bg-[#58bdb4] text-white shadow-[0_4px_16px_rgba(71,170,161,0.35)] active:scale-[0.96]",
   },
   ready: {
-    statusTitle: "جاهز للتسليم",
+    statusKey: "statusReady",
     statusColor: "text-emerald-400",
     nextStatus: "delivered",
-    actionLabel: "تأكيد التسليم",
+    actionKey: "actionDeliver",
     actionButtonClass:
       "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_4px_16px_rgba(16,185,129,0.35)] active:scale-[0.96]",
   },
   delivered: {
-    statusTitle: "مكتمل",
+    statusKey: "statusDelivered",
     statusColor: "text-zinc-400",
     nextStatus: null,
-    actionLabel: "",
     actionButtonClass: "",
   },
 };
 
-function formatElapsedTime(createdAt: string): {
+function formatElapsedTime(
+  createdAt: string,
+  t: (key: string, values?: Record<string, string | number>) => string
+): {
   label: string;
   isDelayed: boolean;
 } {
   const diffMs = Date.now() - new Date(createdAt).getTime();
   const diffMins = Math.floor(diffMs / 60000);
 
-  if (diffMins < 1) return { label: "الآن", isDelayed: false };
-  if (diffMins === 1) return { label: "منذ دقيقة", isDelayed: false };
-  if (diffMins === 2) return { label: "منذ دقيقتين", isDelayed: false };
+  if (diffMins < 1) return { label: t("timeNow"), isDelayed: false };
+  if (diffMins === 1) return { label: t("timeMin"), isDelayed: false };
+  if (diffMins === 2) return { label: t("time2Mins"), isDelayed: false };
   if (diffMins <= 10)
-    return { label: `منذ ${diffMins} دقائق`, isDelayed: false };
+    return { label: t("timeFewMins", { count: diffMins }), isDelayed: false };
   if (diffMins < 60)
-    return { label: `منذ ${diffMins} دقيقة`, isDelayed: diffMins > 15 };
+    return { label: t("timeManyMins", { count: diffMins }), isDelayed: diffMins > 15 };
 
   const diffHours = Math.floor(diffMins / 60);
-  return { label: `منذ ${diffHours} ساعة`, isDelayed: true };
+  return { label: t("timeHours", { count: diffHours }), isDelayed: true };
 }
 
 export function OrderCard({
@@ -113,9 +117,14 @@ export function OrderCard({
   canUpdate = true,
   error,
 }: OrderCardProps) {
+  const locale = useLocale();
+  const t = useTranslations("Staff.orderCard");
+  const isRtl = locale !== "en";
+
   const config = statusConfig[order.status];
-  const elapsed = formatElapsedTime(order.createdAt);
+  const elapsed = formatElapsedTime(order.createdAt, t);
   const shortId = order.orderNumber?.toString().padStart(4, "0") ?? "—";
+  const ChevronIcon = isRtl ? ChevronLeft : ChevronRight;
 
   return (
     <motion.div
@@ -126,7 +135,9 @@ export function OrderCard({
       transition={{ duration: 0.2 }}
       className="flex flex-col h-full rounded-2xl bg-[#1c1424] border border-white/[0.09] hover:border-white/[0.18] transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden"
       style={{
-        fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif",
+        fontFamily: isRtl
+          ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
+          : "var(--font-outfit), sans-serif",
       }}
     >
       {/* Card Header: Table Number + Time */}
@@ -137,7 +148,7 @@ export function OrderCard({
           </div>
           <div>
             <div className="text-sm font-black text-white flex items-center gap-1.5">
-              <span>طاولة {order.tableId}</span>
+              <span>{t("table", { number: order.tableId })}</span>
               <bdi className="text-base font-mono font-black text-white">
                 #{shortId}
               </bdi>
@@ -150,14 +161,14 @@ export function OrderCard({
                 completed={order.status === "delivered"}
               />
               {elapsed.isDelayed && order.status !== "delivered" && (
-                <span className="text-red-400 font-bold mr-1">⚠️ تأخير</span>
+                <span className="text-red-400 font-bold mx-1">{t("delayed")}</span>
               )}
             </div>
           </div>
         </div>
 
         <span className={`text-xs font-black ${config.statusColor}`}>
-          {config.statusTitle}
+          {t(config.statusKey)}
         </span>
       </div>
 
@@ -168,7 +179,7 @@ export function OrderCard({
           <div className="bg-[#f2644b]/10 border border-[#f2644b]/20 rounded-xl p-2.5 text-xs space-y-1">
             <div className="font-bold text-[#ff9d8c] flex items-center gap-1.5 text-[0.72rem]">
               <MessageSquare size={13} className="shrink-0" />
-              <span>ملاحظات الطلب:</span>
+              <span>{t("notes")}</span>
             </div>
             <div className="text-zinc-200 text-xs leading-relaxed whitespace-pre-line">
               {order.note}
@@ -181,7 +192,9 @@ export function OrderCard({
           {order.items.map((item, idx) => {
             const hasAttrs =
               item.selectedAttributes && item.selectedAttributes.length > 0;
-            const itemName = item.nameAr || item.nameEn || "عنصر";
+            const itemName = isRtl
+              ? item.nameAr || item.nameEn || "عنصر"
+              : item.nameEn || item.nameAr || "Item";
 
             return (
               <li key={idx} className="pt-1.5 first:pt-0 space-y-0.5">
@@ -195,7 +208,7 @@ export function OrderCard({
                 </div>
 
                 {hasAttrs && (
-                  <div className="flex flex-wrap gap-1 mr-6">
+                  <div className={`flex flex-wrap gap-1 ${isRtl ? "mr-6" : "ml-6"}`}>
                     {item.selectedAttributes!.map((attr, aIdx) => (
                       <span
                         key={aIdx}
@@ -208,7 +221,7 @@ export function OrderCard({
                 )}
 
                 {item.note && (
-                  <div className="text-[11px] text-zinc-400 italic mr-6">
+                  <div className={`text-[11px] text-zinc-400 italic ${isRtl ? "mr-6" : "ml-6"}`}>
                     {item.note}
                   </div>
                 )}
@@ -225,9 +238,10 @@ export function OrderCard({
       )}
       {order.status === "ready" && (
         <p className="px-4 pb-3 text-xs text-emerald-300">
-          طابق الرمز #{shortId} مع شاشة العميل قبل التسليم.
+          {t("statusReadyHint", { code: shortId })}
         </p>
       )}
+
       {/* Card Action Footer */}
       <div className="p-3 bg-white/[0.02] border-t border-white/[0.06] mt-auto">
         {config.nextStatus && canUpdate ? (
@@ -239,12 +253,12 @@ export function OrderCard({
             className={`w-full min-h-[48px] rounded-xl font-black text-xs sm:text-sm px-4 flex items-center justify-between transition-all disabled:opacity-60 disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${config.actionButtonClass}`}
           >
             <span>
-              {isUpdating ? "جارٍ تأكيد التحديث…" : config.actionLabel}
+              {isUpdating ? t("updating") : config.actionKey ? t(config.actionKey) : ""}
             </span>
             {isUpdating ? (
               <Loader2 size={18} className="animate-spin" />
             ) : (
-              <ChevronLeft size={18} />
+              <ChevronIcon size={18} />
             )}
           </button>
         ) : (
@@ -252,8 +266,8 @@ export function OrderCard({
             <CheckCircle2 size={14} className="text-emerald-400" />
             <span>
               {order.status === "delivered"
-                ? "تم تسليم الطلب"
-                : "بانتظار الفريق المسؤول"}
+                ? t("deliveredBadge")
+                : t("waitingBadge")}
             </span>
           </div>
         )}

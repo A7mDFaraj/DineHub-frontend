@@ -1,0 +1,284 @@
+/* Language Switcher - DineHub Design System (Glassy AR | EN Switcher, No Red) */
+
+/* Sidebar Full-Width Row Control */
+.sidebarBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  padding-inline-start: 12px;
+  padding-inline-end: 5px;
+  border-radius: 13px;
+  background: rgba(223, 210, 235, 0.07);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(223, 210, 235, 0.14);
+  color: #dfd2eb;
+  box-sizing: border-box;
+  user-select: none;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    box-shadow 140ms ease-out;
+}
+
+.sidebarBtn:hover {
+  background: rgba(223, 210, 235, 0.12);
+  border-color: rgba(223, 210, 235, 0.28);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.sidebarBtnLead {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  color: #dfd2eb;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 140ms ease-out;
+}
+
+.sidebarBtnLead:hover {
+  color: #ffffff;
+}
+
+.sidebarBtnLabel {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+/* Compact Container (Login Screen, Navigation Header) */
+.compactContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  min-height: 38px;
+  padding-inline-start: 10px;
+  padding-inline-end: 4px;
+  border-radius: 12px;
+  box-sizing: border-box;
+  user-select: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    box-shadow 140ms ease-out,
+    transform 150ms ease-out;
+}
+
+.compactLead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 2px;
+}
+
+/* Light Variant - High Visibility Frosted Glass Capsule for Login Screen */
+.lightContainer {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 4px 18px rgba(34, 24, 42, 0.07),
+    0 1px 3px rgba(34, 24, 42, 0.04),
+    inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  color: #22182a;
+}
+
+.lightContainer:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(34, 24, 42, 0.22);
+  box-shadow:
+    0 6px 24px rgba(34, 24, 42, 0.1),
+    0 2px 6px rgba(34, 24, 42, 0.05),
+    inset 0 1px 1px #ffffff;
+  transform: translateY(-1px);
+}
+
+.lightContainer .langIcon {
+  color: #4b2f51;
+}
+
+.lightContainer .switcherTrack {
+  background: rgba(34, 24, 42, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 2.5px;
+}
+
+.lightContainer .switcherOption {
+  min-width: 27px;
+  height: 23px;
+  padding: 0 6px;
+}
+
+.lightContainer .switcherActive {
+  background: rgba(255, 255, 255, 0.92);
+  color: #22182a;
+  box-shadow:
+    0 1px 4px rgba(34, 24, 42, 0.12),
+    inset 0 1px 1px #ffffff;
+  font-weight: 750;
+  cursor: default;
+}
+
+.lightContainer .switcherInactive {
+  color: #685f6d;
+}
+
+.lightContainer .switcherInactive:hover {
+  color: #22182a;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.lightContainer .switcherDivider {
+  background: rgba(34, 24, 42, 0.12);
+}
+
+/* Dark Variant - For Navigation Header / Dark Surfaces */
+.darkContainer {
+  background: rgba(223, 210, 235, 0.08);
+  border: 1px solid rgba(223, 210, 235, 0.16);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  color: #dfd2eb;
+}
+
+.darkContainer:hover {
+  background: rgba(223, 210, 235, 0.14);
+  border-color: rgba(223, 210, 235, 0.32);
+  transform: translateY(-1px);
+}
+
+.darkContainer .langIcon {
+  color: #dfd2eb;
+}
+
+.darkContainer .switcherTrack {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 2.5px;
+}
+
+.darkContainer .switcherOption {
+  min-width: 27px;
+  height: 23px;
+  padding: 0 6px;
+}
+
+.darkContainer .switcherActive {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: default;
+}
+
+.darkContainer .switcherInactive {
+  color: rgba(223, 210, 235, 0.52);
+}
+
+.darkContainer .switcherInactive:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.darkContainer .switcherDivider {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Shared Switcher Track (Dark default, used in sidebar) */
+.switcherTrack {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+.switcherOption {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family: var(--font-outfit), system-ui, -apple-system, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1;
+  user-select: none;
+  transition:
+    background-color 140ms ease-out,
+    color 140ms ease-out,
+    box-shadow 140ms ease-out,
+    transform 140ms ease-out;
+}
+
+.switcherActive {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  cursor: default;
+}
+
+.switcherInactive {
+  color: rgba(223, 210, 235, 0.52);
+}
+
+.switcherInactive:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.switcherOption:active {
+  transform: scale(0.95);
+}
+
+.switcherOption:focus-visible {
+  outline: 2px solid rgba(223, 210, 235, 0.6);
+  outline-offset: 1px;
+}
+
+.switcherDivider {
+  width: 1px;
+  height: 11px;
+  background: rgba(255, 255, 255, 0.14);
+  margin: 0 1px;
+  flex-shrink: 0;
+}
+
+/* Shared Icon Style */
+.langIcon {
+  flex-shrink: 0;
+  color: #cbbdd6;
+  transition: transform 140ms ease-out;
+}
+
+.sidebarBtnLead:hover .langIcon,
+.compactLead:hover .langIcon {
+  transform: scale(1.08);
+}

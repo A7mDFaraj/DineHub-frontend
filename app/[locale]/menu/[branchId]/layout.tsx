@@ -1,18 +1,24 @@
-import type { Metadata } from "next"
+import type { Metadata } from "next";
+import { getLocale } from "next-intl/server";
 
-export const metadata: Metadata = { referrer: "no-referrer", robots: { index: false, follow: false } }
+export const metadata: Metadata = { referrer: "no-referrer", robots: { index: false, follow: false } };
 
 interface BranchLayoutProps {
   children: React.ReactNode;
 }
 
-export default function BranchLayout({ children }: BranchLayoutProps) {
+export default async function BranchLayout({ children }: BranchLayoutProps) {
+  const locale = await getLocale();
+  const isRtl = locale === "ar";
+
   return (
     <div 
       className="min-h-screen bg-[#faf8f5] text-[#1c1917] font-sans antialiased relative selection:bg-[#f2644b]/20"
-      dir="rtl"
+      dir={isRtl ? "rtl" : "ltr"}
       style={{
-        fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif",
+        fontFamily: isRtl
+          ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
+          : "var(--font-outfit), sans-serif",
       }}
     >
       {/* Soft warm appetizing ambient light */}

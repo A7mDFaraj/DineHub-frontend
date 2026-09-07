@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 import { useAccess } from "@/lib/access-context";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import styles from "./business.module.css";
+
 interface Insights {
   summary: {
     orders: number;
@@ -22,13 +24,19 @@ interface Insights {
   popular: { id: string; name: string; quantity: number; value: number }[];
   daily: { day: string; orders: number }[];
 }
-const number = (value: number | null) =>
-  value === null
-    ? "—"
-    : new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 1 }).format(
-        value,
-      );
+
 export function BusinessInsights() {
+  const locale = useLocale();
+  const t = useTranslations("AdminDashboard");
+  const tCommon = useTranslations("AdminCommon");
+
+  const formatNumber = (value: number | null) =>
+    value === null
+      ? "—"
+      : new Intl.NumberFormat(locale === "ar" ? "ar-SA" : "en-US", {
+          maximumFractionDigits: 1,
+        }).format(value);
+
   const { can, access } = useAccess();
   const canReadAnalytics = can("analytics.read");
   const canReadAllBranches = can("branches.all");
@@ -42,6 +50,7 @@ export function BusinessInsights() {
   const cache = useRef(new Map<string, { data: Insights; time: number }>());
   const lastRetry = useRef(0);
   const displayedKey = useRef("");
+
   useEffect(() => {
     if (!canReadAnalytics || !selectedBranchId) return;
     const controller = new AbortController();
@@ -71,7 +80,7 @@ export function BusinessInsights() {
           setData(res.data);
         }
       } catch {
-        if (active) setError("تعذر تحميل مؤشرات الأداء. حاول مجدداً.");
+        if (active) setError(t("errorLoad"));
       } finally {
         if (active) setLoading(false);
       }
@@ -81,44 +90,46 @@ export function BusinessInsights() {
       active = false;
       controller.abort();
     };
-  }, [days, selectedBranchId, retry, canReadAnalytics, canReadAllBranches, assignedBranch]);
+  }, [days, selectedBranchId, retry, canReadAnalytics, canReadAllBranches, assignedBranch, t]);
+
   if (!canReadAnalytics) return null;
   const s = data?.summary;
+
   return (
     <section className={styles.section} aria-labelledby="insights-title">
       <div className={styles.heading}>
         <div>
-          <h2 id="insights-title">أرقام تساعدك تتخذ القرار.</h2>
-          <p className={styles.muted}>
-            أداء الطلبات وتجربة العملاء في الفرع المحدد
-          </p>
+          <h2 id="insights-title">{t("insightsTitle")}</h2>
+          <p className={styles.muted}>{t("insightsSubtitle")}</p>
         </div>
         <div className={styles.controls}>
           <select
             className={styles.select}
-            aria-label="فرع الإحصاءات"
+            aria-label={t("branchSelectAria")}
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value)}
           >
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.name ?? b.nameAr ?? "الفرع"}
+                {locale === "en"
+                  ? (b.nameEn || b.name || b.nameAr || t("defaultBranch"))
+                  : (b.nameAr || b.name || b.nameEn || t("defaultBranch"))}
               </option>
             ))}
           </select>
           <select
-            aria-label="الفترة الزمنية"
+            aria-label={t("periodSelectAria")}
             className={styles.select}
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
           >
-            <option value={7}>آخر 7 أيام</option>
-            <option value={30}>آخر 30 يوماً</option>
-            <option value={90}>آخر 90 يوماً</option>
+            <option value={7}>{t("period7")}</option>
+            <option value={30}>{t("period30")}</option>
+            <option value={90}>{t("period90")}</option>
           </select>
           <button
             className={styles.button}
-            aria-label="تحديث الإحصاءات"
+            aria-label={t("refreshAria")}
             disabled={loading}
             onClick={() => setRetry((v) => v + 1)}
           >
@@ -133,35 +144,35 @@ export function BusinessInsights() {
       )}
       {loading && !s ? (
         <div className={styles.panel} role="status">
-          جارٍ قراءة أداء نشاطك…
+          {t("readingPerformance")}
         </div>
       ) : s ? (
         <>
           <div className={styles.grid}>
             {[
               [
-                "إجمالي الطلبات",
-                number(s.orders),
-                `${number(s.active)} طلبات نشطة`,
+                t("kpiTotalOrders"),
+                formatNumber(s.orders),
+                t("kpiActiveOrdersNote", { count: formatNumber(s.active) }),
               ],
               [
-                "متوسط وقت الإنجاز",
+                t("kpiAvgFulfillment"),
                 s.averageMinutes === null
                   ? "—"
-                  : `${number(s.averageMinutes)} د`,
-                `${number(s.timedOrders)} طلبات بتوقيت مسجل`,
+                  : `${formatNumber(s.averageMinutes)} ${t("kpiMinuteSuffix")}`,
+                t("kpiTimedOrdersNote", { count: formatNumber(s.timedOrders) }),
               ],
               [
-                "قيمة الطلبات المكتملة",
-                `${number(s.completedValue)} ر.س`,
-                `${number(s.completed)} طلبات مكتملة · ليست صافي الربح`,
+                t("kpiCompletedValue"),
+                `${formatNumber(s.completedValue)} ${tCommon("currency")}`,
+                t("kpiCompletedNote", { count: formatNumber(s.completed) }),
               ],
               [
-                "رضا العملاء",
+                t("kpiGuestSatisfaction"),
                 s.averageRating === null
                   ? "—"
-                  : `${number(s.averageRating)} / 5`,
-                `${number(s.ratings)} تقييمات`,
+                  : `${formatNumber(s.averageRating)} / 5`,
+                t("kpiRatingCount", { count: formatNumber(s.ratings) }),
               ],
             ].map(([label, value, note]) => (
               <article className={styles.metric} key={label}>
@@ -173,27 +184,27 @@ export function BusinessInsights() {
           </div>
           <div className={styles.columns}>
             <article className={styles.panel}>
-              <h3>أين يذهب وقت الطلب؟</h3>
-              <p className={styles.muted}>متوسط كل مرحلة من التوقيت المسجل</p>
+              <h3>{t("breakdownTitle")}</h3>
+              <p className={styles.muted}>{t("breakdownSubtitle")}</p>
               {[
-                ["انتظار القبول", s.acceptMinutes],
-                ["التنفيذ والتجهيز", s.prepareMinutes],
-                ["انتظار التسليم", s.handoffMinutes],
+                [t("stageAccept"), s.acceptMinutes],
+                [t("stagePrepare"), s.prepareMinutes],
+                [t("stageHandoff"), s.handoffMinutes],
               ].map(([label, value]) => (
                 <div className={styles.row} key={String(label)}>
                   <span>{label}</span>
                   <strong>
-                    {value === null ? "—" : `${number(Number(value))} د`}
+                    {value === null
+                      ? "—"
+                      : `${formatNumber(Number(value))} ${t("kpiMinuteSuffix")}`}
                   </strong>
                 </div>
               ))}
-              <p className={styles.muted}>
-                الأوقات التاريخية غير المسجلة لا تدخل في المتوسط.
-              </p>
+              <p className={styles.muted}>{t("breakdownNote")}</p>
             </article>
             <article className={styles.panel}>
-              <h3>الأكثر طلباً</h3>
-              <p className={styles.muted}>حسب الكمية في الطلبات المكتملة</p>
+              <h3>{t("popularTitle")}</h3>
+              <p className={styles.muted}>{t("popularSubtitle")}</p>
               {data.popular.length ? (
                 <ol className={styles.list}>
                   {data.popular.map((p, index) => (
@@ -202,7 +213,7 @@ export function BusinessInsights() {
                         <span>
                           {index + 1}. {p.name}
                         </span>
-                        <strong>{number(p.quantity)}</strong>
+                        <strong>{formatNumber(p.quantity)}</strong>
                       </div>
                       <div className={styles.bar}>
                         <span
@@ -215,15 +226,13 @@ export function BusinessInsights() {
                   ))}
                 </ol>
               ) : (
-                <p className={styles.muted}>
-                  ستظهر الأصناف بعد اكتمال أول طلب.
-                </p>
+                <p className={styles.muted}>{t("popularEmpty")}</p>
               )}
             </article>
           </div>
           <article className={styles.panel}>
-            <h3>حركة الطلبات</h3>
-            <p className={styles.muted}>الطلبات اليومية · توقيت الرياض</p>
+            <h3>{t("trendTitle")}</h3>
+            <p className={styles.muted}>{t("trendSubtitle")}</p>
             {data.daily.length ? (
               <>
                 <div className={styles.chart} aria-hidden="true">
@@ -238,17 +247,19 @@ export function BusinessInsights() {
                   ))}
                 </div>
                 <details className={styles.muted}>
-                  <summary>عرض الأرقام اليومية</summary>
+                  <summary>{t("trendDetails")}</summary>
                   {data.daily.map((day) => (
                     <div className={styles.row} key={day.day}>
                       <time>{day.day}</time>
-                      <span>{number(day.orders)} طلب</span>
+                      <span>
+                        {t("trendOrdersCount", { count: formatNumber(day.orders) })}
+                      </span>
                     </div>
                   ))}
                 </details>
               </>
             ) : (
-              <p className={styles.muted}>لا توجد طلبات في هذه الفترة.</p>
+              <p className={styles.muted}>{t("trendEmpty")}</p>
             )}
           </article>
         </>

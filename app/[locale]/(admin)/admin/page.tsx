@@ -1,6 +1,7 @@
 import { BusinessInsights } from "@/components/admin/business-insights";
 import {
   ArrowLeft,
+  ArrowRight,
   Building2,
   CheckCircle2,
   ClipboardList,
@@ -9,70 +10,83 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { AdminGuideTrigger } from "@/components/admin/admin-onboarding-guide";
 import styles from "./dashboard.module.css";
 
-export const metadata: Metadata = {
-  title: "نظرة الإدارة",
-  description: "ابدأ إعداد فروع DineHub وقائمتك ورموز الطلب.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "AdminDashboard" });
 
-const setupSteps = [
-  {
-    number: "01",
-    title: "أضف أول فرع",
-    description: "عرّف موقع الخدمة الذي ستتصل به القائمة والطاولات.",
-    href: "/admin/branches",
-    icon: Building2,
-    tone: "teal",
-  },
-  {
-    number: "02",
-    title: "ابنِ القائمة",
-    description: "رتّب التصنيفات والمنتجات بالطريقة التي يراها العميل.",
-    href: "/admin/categories",
-    icon: UtensilsCrossed,
-    tone: "lilac",
-  },
-  {
-    number: "03",
-    title: "انشر نقطة الطلب",
-    description: "أنشئ رمز QR للطاولة أو الاستلام وابدأ استقبال الطلبات.",
-    href: "/admin/qr-code",
-    icon: QrCode,
-    tone: "coral",
-  },
-] as const;
+  return {
+    title: t("pageTitle"),
+    description: t("pageDesc"),
+  };
+}
 
-export default function AdminDashboard() {
+export default async function AdminDashboard() {
+  const locale = await getLocale();
+  const isRtl = locale === "ar";
+  const t = await getTranslations("AdminDashboard");
+  const ActionArrow = isRtl ? ArrowLeft : ArrowRight;
+
+  const setupSteps = [
+    {
+      number: t("step1Num"),
+      title: t("step1Title"),
+      description: t("step1Desc"),
+      href: "/admin/branches",
+      icon: Building2,
+      tone: "teal",
+    },
+    {
+      number: t("step2Num"),
+      title: t("step2Title"),
+      description: t("step2Desc"),
+      href: "/admin/categories",
+      icon: UtensilsCrossed,
+      tone: "lilac",
+    },
+    {
+      number: t("step3Num"),
+      title: t("step3Title"),
+      description: t("step3Desc"),
+      href: "/admin/qr-code",
+      icon: QrCode,
+      tone: "coral",
+    },
+  ] as const;
+
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <p className={styles.eyebrow}>
             <span aria-hidden="true" />
-            مسار الإعداد
+            {t("heroEyebrow")}
           </p>
-          <h1>حوّل المكان إلى خط خدمة متصل.</h1>
-          <p className={styles.heroLead}>
-            ابدأ بالفرع، مرّر القائمة إلى العميل، ثم اجعل كل طلب واضحًا للفريق.
-          </p>
+          <h1>{t("heroTitle")}</h1>
+          <p className={styles.heroLead}>{t("heroLead")}</p>
           <div className={styles.heroActions}>
             <Link className={styles.primaryAction} href="/admin/branches">
-              <span>ابدأ بأول فرع</span>
-              <ArrowLeft aria-hidden="true" size={19} />
+              <span>{t("heroAction")}</span>
+              <ActionArrow aria-hidden="true" size={19} />
             </Link>
             <AdminGuideTrigger className={styles.guideAction}>
               <Sparkles aria-hidden="true" size={18} />
-              <span>دليل البدء السريع</span>
+              <span>{t("guideAction")}</span>
             </AdminGuideTrigger>
           </div>
         </div>
 
         <div
           className={styles.signalMap}
-          aria-label="مسار الطلب من العميل إلى لوحة التحكم"
+          aria-label={t("mapAria")}
         >
           <div className={styles.signalLine} aria-hidden="true" />
           <div className={styles.signalDot} aria-hidden="true" />
@@ -80,19 +94,19 @@ export default function AdminDashboard() {
             <span>
               <QrCode aria-hidden="true" size={22} />
             </span>
-            <small>العميل</small>
+            <small>{t("mapCustomer")}</small>
           </div>
           <div className={styles.mapNode} data-position="order">
             <span>
               <ClipboardList aria-hidden="true" size={22} />
             </span>
-            <small>الطلب</small>
+            <small>{t("mapOrder")}</small>
           </div>
           <div className={styles.mapNode} data-position="team">
             <span>
               <CheckCircle2 aria-hidden="true" size={22} />
             </span>
-            <small>الفريق</small>
+            <small>{t("mapTeam")}</small>
           </div>
         </div>
       </section>
@@ -100,10 +114,10 @@ export default function AdminDashboard() {
       <section className={styles.setupSection} aria-labelledby="setup-title">
         <div className={styles.sectionHeading}>
           <div>
-            <p>ابدأ بخطوات حقيقية</p>
-            <h2 id="setup-title">ثلاث محطات إلى أول طلب</h2>
+            <p>{t("setupHeadingPre")}</p>
+            <h2 id="setup-title">{t("setupHeadingTitle")}</h2>
           </div>
-          <span>كل محطة تفتح التي بعدها</span>
+          <span>{t("setupHeadingSub")}</span>
         </div>
 
         <div className={styles.setupTrack}>
@@ -123,7 +137,7 @@ export default function AdminDashboard() {
               <h3>{step.title}</h3>
               <p>{step.description}</p>
               <span className={styles.cardAction}>
-                افتح المحطة <ArrowLeft aria-hidden="true" size={17} />
+                {t("openMilestone")} <ActionArrow aria-hidden="true" size={17} />
               </span>
             </Link>
           ))}
@@ -134,16 +148,13 @@ export default function AdminDashboard() {
         <div>
           <p>
             <i aria-hidden="true" />
-            اليوم
+            {t("todayLabel")}
           </p>
-          <h2 id="today-title">هنا ستظهر نبضات الخدمة.</h2>
-          <span>
-            عندما يبدأ العملاء بالطلب، ستجد الحالة والتوقيت والفرع دون أرقام
-            تجريبية.
-          </span>
+          <h2 id="today-title">{t("todayHeading")}</h2>
+          <span>{t("todayDesc")}</span>
         </div>
         <Link href="/admin/menu">
-          راجع القائمة <ArrowLeft aria-hidden="true" size={18} />
+          {t("reviewMenuAction")} <ActionArrow aria-hidden="true" size={18} />
         </Link>
       </section>
       <BusinessInsights />

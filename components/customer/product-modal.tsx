@@ -1,45 +1,46 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { X, Plus, Minus, Check, MessageSquare, SlidersHorizontal } from "lucide-react"
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Plus, Minus, Check, MessageSquare, SlidersHorizontal } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 
 export interface ProductAttributeItem {
   attribute: {
-    id: string
-    labelAr?: string
-    labelEn?: string
-  }
+    id: string;
+    labelAr?: string;
+    labelEn?: string;
+  };
 }
 
 export interface ModalProduct {
-  id: string
-  nameAr: string
-  nameEn?: string
-  name?: string
-  descriptionAr?: string
-  descriptionEn?: string
-  price: number
-  imageUrl?: string
-  isAvailable?: boolean
-  attributes?: ProductAttributeItem[]
+  id: string;
+  nameAr: string;
+  nameEn?: string;
+  name?: string;
+  descriptionAr?: string;
+  descriptionEn?: string;
+  price: number;
+  imageUrl?: string;
+  isAvailable?: boolean;
+  attributes?: ProductAttributeItem[];
 }
 
 interface ProductModalProps {
-  product: ModalProduct | null
-  isOpen: boolean
-  themeColor?: string
-  onClose: () => void
+  product: ModalProduct | null;
+  isOpen: boolean;
+  themeColor?: string;
+  onClose: () => void;
   onAddToCart: (customizedItem: {
-    productId: string
-    nameAr: string
-    nameEn: string
-    price: number
-    quantity: number
-    imageUrl?: string
-    selectedAttributes: string[]
-    itemNote?: string
-  }) => void
+    productId: string;
+    nameAr: string;
+    nameEn: string;
+    price: number;
+    quantity: number;
+    imageUrl?: string;
+    selectedAttributes: string[];
+    itemNote?: string;
+  }) => void;
 }
 
 export function ProductModal({
@@ -49,33 +50,41 @@ export function ProductModal({
   onClose,
   onAddToCart,
 }: ProductModalProps) {
-  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([])
-  const [itemNote, setItemNote] = useState("")
-  const [quantity, setQuantity] = useState(1)
+  const locale = useLocale();
+  const t = useTranslations("CustomerProductModal");
+  const isRtl = locale === "ar";
 
-  const [previous, setPrevious] = useState({ isOpen, product })
+  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
+  const [itemNote, setItemNote] = useState("");
+  const [quantity, setQuantity] = useState(1);
+
+  const [previous, setPrevious] = useState({ isOpen, product });
   if (previous.isOpen !== isOpen || previous.product !== product) {
-    setPrevious({ isOpen, product })
+    setPrevious({ isOpen, product });
     if (isOpen && product) {
-      setSelectedAttributes([])
-      setItemNote("")
-      setQuantity(1)
+      setSelectedAttributes([]);
+      setItemNote("");
+      setQuantity(1);
     }
   }
 
-  if (!product) return null
+  if (!product) return null;
 
-  const prodNameAr = product.nameAr || product.name || "عنصر القائمة"
-  const prodNameEn = product.nameEn || product.name || prodNameAr
-  const prodDesc = product.descriptionAr || product.descriptionEn || ""
-  const unitPrice = Number(product.price) || 0
-  const totalPrice = unitPrice * quantity
+  const prodNameAr = product.nameAr || product.name || "عنصر القائمة";
+  const prodNameEn = product.nameEn || product.name || "Menu item";
+  const prodTitle = isRtl ? prodNameAr : prodNameEn;
+  const prodDesc = isRtl
+    ? product.descriptionAr || product.descriptionEn || ""
+    : product.descriptionEn || product.descriptionAr || "";
+  const unitPrice = Number(product.price) || 0;
+  const totalPrice = unitPrice * quantity;
+  const currencyLabel = isRtl ? "ر.س" : "SAR";
 
   const toggleAttribute = (label: string) => {
     setSelectedAttributes((prev) =>
       prev.includes(label) ? prev.filter((a) => a !== label) : [...prev, label]
-    )
-  }
+    );
+  };
 
   const handleAdd = () => {
     onAddToCart({
@@ -87,17 +96,21 @@ export function ProductModal({
       imageUrl: product.imageUrl,
       selectedAttributes,
       itemNote: itemNote.trim() || undefined,
-    })
-    onClose()
-  }
+    });
+    onClose();
+  };
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" 
-          dir="rtl"
-          style={{ fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif" }}
+          dir={isRtl ? "rtl" : "ltr"}
+          style={{
+            fontFamily: isRtl
+              ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
+              : "var(--font-outfit), sans-serif",
+          }}
         >
           {/* Backdrop */}
           <motion.div
@@ -116,11 +129,11 @@ export function ProductModal({
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
             className="relative z-10 w-full sm:max-w-lg bg-white border border-stone-200 rounded-t-[32px] sm:rounded-[28px] max-h-[88vh] flex flex-col overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.2)] text-stone-900"
           >
-            {/* Close Button Top Left (in RTL) */}
+            {/* Close Button */}
             <button
               onClick={onClose}
-              className="absolute top-4 left-4 z-20 w-9 h-9 rounded-full bg-stone-100 border border-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center transition-colors shadow-sm"
-              aria-label="إغلاق"
+              className={`absolute top-4 ${isRtl ? "left-4" : "right-4"} z-20 w-9 h-9 rounded-full bg-stone-100 border border-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center transition-colors shadow-sm`}
+              aria-label="Close"
             >
               <X size={17} />
             </button>
@@ -132,7 +145,7 @@ export function ProductModal({
                 <div className="w-full h-44 sm:h-52 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200/80 outline outline-1 -outline-offset-1 outline-black/5 relative -mt-1 shadow-sm">
                   <img
                     src={product.imageUrl}
-                    alt={prodNameAr}
+                    alt={prodTitle}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -142,13 +155,13 @@ export function ProductModal({
               <div>
                 <div className="flex items-start justify-between gap-3 mb-1">
                   <h2 className="text-xl sm:text-2xl font-black text-stone-900 leading-tight">
-                    {prodNameAr}
+                    {prodTitle}
                   </h2>
                   <span
                     className="text-lg sm:text-xl font-black font-mono tabular-nums shrink-0"
                     style={{ color: themeColor }}
                   >
-                    {unitPrice.toFixed(2)} ر.س
+                    {unitPrice.toFixed(2)} {currencyLabel}
                   </span>
                 </div>
                 {prodDesc && (
@@ -163,12 +176,14 @@ export function ProductModal({
                 <div className="space-y-2.5 pt-2 border-t border-stone-100">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
                     <SlidersHorizontal size={14} style={{ color: themeColor }} />
-                    <span>الخيارات والإضافات المتاحة</span>
+                    <span>{isRtl ? "الخيارات والإضافات المتاحة" : "Available Options & Add-ons"}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {product.attributes.map((attr) => {
-                      const label = attr.attribute.labelAr || attr.attribute.labelEn || ""
-                      const isSelected = selectedAttributes.includes(label)
+                      const label = isRtl
+                        ? attr.attribute.labelAr || attr.attribute.labelEn || ""
+                        : attr.attribute.labelEn || attr.attribute.labelAr || "";
+                      const isSelected = selectedAttributes.includes(label);
                       return (
                         <button
                           key={attr.attribute.id}
@@ -191,7 +206,7 @@ export function ProductModal({
                             {isSelected && <Check size={11} strokeWidth={3} />}
                           </div>
                         </button>
-                      )
+                      );
                     })}
                   </div>
                 </div>
@@ -201,13 +216,13 @@ export function ProductModal({
               <div className="space-y-1.5 pt-2 border-t border-stone-100">
                 <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
                   <MessageSquare size={13} style={{ color: themeColor }} />
-                  <span>ملاحظات إضافية على هذا الطبق (اختياري)</span>
+                  <span>{t("specialNote")}</span>
                 </label>
                 <textarea
                   rows={2}
                   value={itemNote}
                   onChange={(e) => setItemNote(e.target.value)}
-                  placeholder="مثال: بدون بصل، زيادة صوص، الحليب خالي من الدسم…"
+                  placeholder={t("notePlaceholder")}
                   className="w-full rounded-xl bg-stone-50 border border-stone-200 p-3 text-xs text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:border-stone-400 resize-none transition-all box-border font-medium"
                 />
               </div>
@@ -222,7 +237,7 @@ export function ProductModal({
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   disabled={quantity <= 1}
                   className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 disabled:opacity-30 text-stone-800 flex items-center justify-center transition-colors"
-                  aria-label="إنقاص الكمية"
+                  aria-label="Decrease quantity"
                 >
                   <Minus size={15} />
                 </button>
@@ -233,7 +248,7 @@ export function ProductModal({
                   type="button"
                   onClick={() => setQuantity((q) => q + 1)}
                   className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 flex items-center justify-center transition-colors"
-                  aria-label="زيادة الكمية"
+                  aria-label="Increase quantity"
                 >
                   <Plus size={15} />
                 </button>
@@ -246,9 +261,9 @@ export function ProductModal({
                 style={{ backgroundColor: themeColor }}
                 className="flex-1 min-h-[48px] rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-between px-5 shadow-sm transition-all active:scale-[0.96]"
               >
-                <span>إضافة إلى الطلب</span>
+                <span>{t("addToCart")}</span>
                 <span className="font-mono tabular-nums font-black text-sm sm:text-base">
-                  {totalPrice.toFixed(2)} ر.س
+                  {totalPrice.toFixed(2)} {currencyLabel}
                 </span>
               </button>
             </div>
@@ -256,5 +271,5 @@ export function ProductModal({
         </div>
       )}
     </AnimatePresence>
-  )
+  );
 }

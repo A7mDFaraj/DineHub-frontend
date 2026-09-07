@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
+  ArrowRight,
   ChefHat,
   CircleAlert,
   Eye,
@@ -14,23 +15,19 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
 import { apiClient } from "@/lib/api-client";
 import { permissionForPage } from "@/lib/access-context";
 import { authClient } from "@/lib/auth-client";
+import { Link } from "@/i18n/navigation";
+import { AdminLanguageSwitcher } from "@/components/admin/admin-language-switcher";
 import { reportClientIncident } from "@/lib/observability";
 import logo from "@/public/brand/dinehub-logo-3d.png";
 import styles from "./auth.module.css";
 
-const signInSchema = z.object({
-  email: z.email("اكتب بريدًا إلكترونيًا صحيحًا."),
-  password: z.string().min(8, "كلمة المرور لا تقل عن 8 أحرف."),
-});
-
-type SignInValues = z.infer<typeof signInSchema>;
 type AuthError = { code?: string; message?: string };
 
 const SESSION_CONFIRMATION_ATTEMPTS = 3;
@@ -58,9 +55,13 @@ async function confirmSession() {
   return null;
 }
 
-async function openAuthenticatedArea() {
+async function openAuthenticatedArea(locale: string) {
   const { data } = await apiClient.get<{ permissions: string[]; mustChangePassword?: boolean }>("/access/me");
-  if (data.mustChangePassword) { window.location.replace("/account/password"); return; }
+  const prefix = locale === "en" ? "/en" : "";
+  if (data.mustChangePassword) {
+    window.location.replace(prefix + "/account/password");
+    return;
+  }
   const destination = [
     "/admin",
     "/staff",
@@ -72,27 +73,27 @@ async function openAuthenticatedArea() {
     "/admin/logs",
     "/admin/settings",
   ].find((path) => data.permissions.includes(permissionForPage(path)));
-  window.location.replace(destination ?? "/staff");
+  window.location.replace(prefix + (destination ?? "/staff"));
 }
 
-function getAuthError(error: AuthError | null) {
+function getAuthError(error: AuthError | null, t: (key: string) => string) {
   const message = error?.message?.toLowerCase() ?? "";
   const code = error?.code?.toLowerCase() ?? "";
 
   if (message.includes("invalid") || code.includes("invalid")) {
-    return "البريد أو كلمة المرور غير صحيحة. راجعهما وحاول مرة أخرى.";
+    return t("errorInvalid");
   }
   if (
     message.includes("already") ||
     message.includes("exist") ||
     code.includes("user_already_exists")
   ) {
-    return "يوجد حساب بهذا البريد بالفعل. انتقل إلى تسجيل الدخول.";
+    return t("errorExists");
   }
   if (message.includes("password") || code.includes("password")) {
-    return "تعذّر قبول كلمة المرور. استخدم 8 أحرف على الأقل وحاول مجددًا.";
+    return t("errorPassword");
   }
-  return "تعذّر الاتصال بخدمة الدخول الآن. تحقق من اتصالك ثم حاول مرة أخرى.";
+  return t("errorNetwork");
 }
 
 function PasswordField({
@@ -108,6 +109,7 @@ function PasswordField({
   error?: string;
   registration: UseFormRegisterReturn;
 }) {
+  const t = useTranslations("AdminLogin");
   const [visible, setVisible] = useState(false);
   const errorId = `${id}-error`;
 
@@ -129,7 +131,7 @@ function PasswordField({
           type="button"
           className={styles.passwordToggle}
           onClick={() => setVisible((current) => !current)}
-          aria-label={visible ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+          aria-label={visible ? t("hidePassword") : t("showPassword")}
           aria-pressed={visible}
         >
           {visible ? (
@@ -149,7 +151,18 @@ function PasswordField({
 }
 
 function SignInForm() {
+  const locale = useLocale();
+  const isRtl = locale === "ar";
+  const t = useTranslations("AdminLogin");
   const [requestError, setRequestError] = useState<string | null>(null);
+
+  const signInSchema = z.object({
+    email: z.string().email(t("valEmail")),
+    password: z.string().min(8, t("valPassword")),
+  });
+
+  type SignInValues = z.infer<typeof signInSchema>;
+
   const {
     register,
     handleSubmit,
@@ -173,7 +186,7 @@ function SignInForm() {
           message: error.message ?? "Sign-in was rejected",
           metadata: { errorCode: error.code ?? "unknown" },
         });
-        setRequestError(getAuthError(error));
+        setRequestError(getAuthError(error, t));
         return;
       }
 
@@ -185,13 +198,11 @@ function SignInForm() {
           message: "Sign-in succeeded but the session could not be confirmed",
           metadata: { flow: "sign-in" },
         });
-        setRequestError(
-          "تم قبول بيانات الدخول، لكن تعذّر تثبيت الجلسة. حاول مرة أخرى.",
-        );
+        setRequestError(t("errorSession"));
         return;
       }
 
-      await openAuthenticatedArea();
+      await openAuthenticatedArea(locale);
     } catch (error) {
       const reason =
         error instanceof Error
@@ -204,9 +215,11 @@ function SignInForm() {
         stack: reason.stack,
         metadata: { errorName: reason.name },
       });
-      setRequestError(getAuthError(null));
+      setRequestError(getAuthError(null, t));
     }
   };
+
+  const SubmitArrow = isRtl ? ArrowLeft : ArrowRight;
 
   return (
     <form className={styles.form} onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -218,7 +231,7 @@ function SignInForm() {
       ) : null}
 
       <div className={styles.field}>
-        <label htmlFor="sign-in-email">البريد الإلكتروني</label>
+        <label htmlFor="sign-in-email">{t("emailLabel")}</label>
         <div className={styles.inputShell} data-invalid={Boolean(errors.email)}>
           <Mail aria-hidden="true" size={19} strokeWidth={1.7} />
           <input
@@ -230,7 +243,7 @@ function SignInForm() {
             aria-invalid={Boolean(errors.email)}
             aria-describedby={errors.email ? "sign-in-email-error" : undefined}
             dir="ltr"
-            placeholder="name@business.com"
+            placeholder={t("emailPlaceholder")}
           />
         </div>
         {errors.email ? (
@@ -242,7 +255,7 @@ function SignInForm() {
 
       <PasswordField
         id="sign-in-password"
-        label="كلمة المرور"
+        label={t("passwordLabel")}
         autoComplete="current-password"
         error={errors.password?.message}
         registration={register("password")}
@@ -256,12 +269,12 @@ function SignInForm() {
         {isSubmitting ? (
           <>
             <Loader2 className={styles.spinner} aria-hidden="true" size={20} />
-            <span>جارٍ الدخول إلى لوحة التحكم…</span>
+            <span>{t("submitting")}</span>
           </>
         ) : (
           <>
-            <span>ادخل إلى الإدارة</span>
-            <ArrowLeft aria-hidden="true" size={20} />
+            <span>{t("submit")}</span>
+            <SubmitArrow aria-hidden="true" size={20} />
           </>
         )}
       </button>
@@ -270,12 +283,12 @@ function SignInForm() {
 }
 
 export function AdminAuthScreen() {
-  const isSignIn = true;
+  const t = useTranslations("AdminLogin");
 
   return (
     <main className={styles.page}>
       <a className={styles.skipLink} href="#auth-form">
-        انتقل إلى نموذج الدخول
+        {t("skipLink")}
       </a>
       <div className={styles.shell}>
         <section
@@ -283,8 +296,12 @@ export function AdminAuthScreen() {
           id="auth-form"
           aria-labelledby="auth-title"
         >
+          <div className={styles.authTopBar}>
+            <AdminLanguageSwitcher variant="light" />
+          </div>
+
           <div className={styles.mobileBrand}>
-            <Link href="/" aria-label="DineHub، العودة إلى الصفحة الرئيسية">
+            <Link href="/" aria-label={t("mobileBrandAria")}>
               <Image src={logo} alt="" width={58} priority />
               <span dir="ltr">DineHub</span>
             </Link>
@@ -293,35 +310,27 @@ export function AdminAuthScreen() {
           <div className={styles.authHeader}>
             <p className={styles.eyebrow}>
               <span aria-hidden="true" />
-              لوحة التحكم
+              {t("eyebrow")}
             </p>
-            <h1 id="auth-title">
-              {isSignIn
-                ? "أهلاً بعودتك إلى خط الخدمة."
-                : "ابدأ مسار طلباتك من مكان واحد."}
-            </h1>
-            <p>
-              {isSignIn
-                ? "أدخل بياناتك لتصل إلى الفروع والقائمة والطلبات."
-                : "حساب واحد يربط ما يراه العميل بما يحتاجه فريقك."}
-            </p>
+            <h1 id="auth-title">{t("title")}</h1>
+            <p>{t("subtitle")}</p>
           </div>
 
           <SignInForm />
           <p className={styles.secureNote}>
             <ShieldCheck aria-hidden="true" size={17} />
-            جلسة دخول آمنة ومشفّرة
+            {t("secureSession")}
           </p>
         </section>
 
         <aside
           className={styles.storyPanel}
-          aria-label="كيف يربط DineHub رحلة الطلب"
+          aria-label={t("storyAria")}
         >
           <Link
             className={styles.brand}
             href="/"
-            aria-label="DineHub، الصفحة الرئيسية"
+            aria-label="DineHub"
           >
             <Image
               className={styles.logo}
@@ -336,13 +345,10 @@ export function AdminAuthScreen() {
           <div className={styles.storyCopy}>
             <p className={styles.liveLabel}>
               <span aria-hidden="true" />
-              الإشارة متصلة
+              {t("storyLive")}
             </p>
-            <h2>من مسح واحد، يبدأ يوم أوضح.</h2>
-            <p>
-              نفس المسار الذي يبدأ عند العميل يصل إلى فريقك مرتبًا، ويبقى ظاهرًا
-              لك حتى التسليم.
-            </p>
+            <h2>{t("storyTitle")}</h2>
+            <p>{t("storyDesc")}</p>
           </div>
 
           <div className={styles.signalScene} aria-hidden="true">
@@ -352,26 +358,26 @@ export function AdminAuthScreen() {
               <span>
                 <ScanLine size={22} />
               </span>
-              <small>يمسح</small>
+              <small>{t("stepScan")}</small>
             </div>
             <div className={styles.signalNode} data-step="order">
               <span>
                 <ReceiptText size={22} />
               </span>
-              <small>يصل</small>
+              <small>{t("stepReceive")}</small>
             </div>
             <div className={styles.signalNode} data-step="ready">
               <span>
                 <ChefHat size={22} />
               </span>
-              <small>يُجهّز</small>
+              <small>{t("stepPrep")}</small>
             </div>
           </div>
 
           <div className={styles.storyFoot}>
-            <span>العميل</span>
-            <span>الفريق</span>
-            <span>الفروع</span>
+            <span>{t("footCustomer")}</span>
+            <span>{t("footTeam")}</span>
+            <span>{t("footBranches")}</span>
           </div>
         </aside>
       </div>

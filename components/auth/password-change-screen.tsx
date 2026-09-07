@@ -3,6 +3,7 @@
 import { useId, useRef, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
+  ArrowRight,
   Building2,
   Check,
   CheckCircle2,
@@ -19,8 +20,8 @@ import {
   Users,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import axios from "axios";
 import { apiClient } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
@@ -40,6 +41,11 @@ export function PasswordChangeScreen({
   businessName: businessNameProp,
 }: PasswordChangeScreenProps) {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useTranslations("AccountPassword");
+  const isRtl = locale !== "en";
+  const ArrowIcon = isRtl ? ArrowLeft : ArrowRight;
+
   const { data: session } = useSession();
   const { access } = useAccess();
 
@@ -68,24 +74,23 @@ export function PasswordChangeScreen({
 
   const isMinLength = newPassword.length >= 12;
   const isMatching = Boolean(newPassword && newPassword === confirmation);
-  const isDifferentFromCurrent = !currentPassword || newPassword !== currentPassword;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (lock.current) return;
 
     if (newPassword.length < 12) {
-      setError("كلمة المرور الجديدة يجب ألا تقل عن 12 حرفًا.");
+      setError(isRtl ? "كلمة المرور الجديدة يجب ألا تقل عن 12 حرفًا." : "New password must be at least 12 characters long.");
       return;
     }
 
     if (newPassword !== confirmation) {
-      setError("كلمتا المرور غير متطابقتين. يرجى التحقق وإعادة المحاولة.");
+      setError(isRtl ? "كلمتا المرور غير متطابقتين. يرجى التحقق وإعادة المحاولة." : "Passwords do not match. Please verify and try again.");
       return;
     }
 
     if (newPassword === currentPassword) {
-      setError("اختر كلمة مرور جديدة مختلفة عن الحالية.");
+      setError(isRtl ? "اختر كلمة مرور جديدة مختلفة عن الحالية." : "Please choose a new password different from current password.");
       return;
     }
 
@@ -108,7 +113,7 @@ export function PasswordChangeScreen({
       const serverMessage =
         axios.isAxiosError(err) && typeof err.response?.data?.message === "string"
           ? err.response.data.message
-          : "تعذر تحديث كلمة المرور. تحقق من صحة كلمة المرور الحالية وحاول مجدداً.";
+          : (isRtl ? "تعذر تحديث كلمة المرور. تحقق من صحة كلمة المرور الحالية وحاول مجدداً." : "Failed to update password. Please check your current credentials.");
       setError(serverMessage);
     } finally {
       lock.current = false;
@@ -127,7 +132,7 @@ export function PasswordChangeScreen({
   };
 
   return (
-    <main dir="rtl" className={styles.page}>
+    <main dir={isRtl ? "rtl" : "ltr"} className={styles.page}>
       <div className={styles.shell}>
         {/* Action / Form Section */}
         <section
@@ -136,7 +141,7 @@ export function PasswordChangeScreen({
         >
           {/* Mobile Logo */}
           <div className={styles.mobileBrand}>
-            <Link href="/" aria-label="DineHub، العودة إلى الرئيسية">
+            <Link href="/" aria-label={isRtl ? "DineHub، العودة إلى الرئيسية" : "DineHub, Return to Home"}>
               <Image src={logo} alt="DineHub Logo" width={50} height={50} priority />
               <span dir="ltr">DineHub</span>
             </Link>
@@ -146,13 +151,13 @@ export function PasswordChangeScreen({
           {resolvedBusinessName ? (
             <div className={styles.businessBadge}>
               <Building2 size={15} aria-hidden="true" />
-              <span>منشأة: {resolvedBusinessName}</span>
+              <span>{isRtl ? `منشأة: ${resolvedBusinessName}` : `Business: ${resolvedBusinessName}`}</span>
               <span className={styles.businessBadgeDot} aria-hidden="true" />
             </div>
           ) : (
             <div className={styles.businessBadge}>
               <ShieldCheck size={15} aria-hidden="true" />
-              <span>مساحة عمل معزولة ومحمية</span>
+              <span>{isRtl ? "مساحة عمل معزولة ومحمية" : "Protected Isolated Tenant"}</span>
               <span className={styles.businessBadgeDot} aria-hidden="true" />
             </div>
           )}
@@ -162,15 +167,13 @@ export function PasswordChangeScreen({
               <div className={styles.successIconWell}>
                 <CheckCircle2 size={40} strokeWidth={2} aria-hidden="true" />
               </div>
-              <h1 id="password-screen-title">تم تأمين حسابك بنجاح</h1>
-              <p>
-                تم حفظ كلمة المرور وإنهاء الجلسات السابقة لحماية نشاطك التجاري. يمكنك الآن تسجيل الدخول بكلمتك الجديدة ومتابعة تشغيل منشأتك.
-              </p>
+              <h1 id="password-screen-title">{t("securedSuccessTitle")}</h1>
+              <p>{t("securedSuccessDesc")}</p>
 
               <div className={styles.actionsRow} style={{ width: "100%", maxWidth: "340px", marginTop: "14px" }}>
                 <Link href="/admin/login" className={styles.submitButton}>
-                  <span>تسجيل الدخول الآن</span>
-                  <ArrowLeft size={18} aria-hidden="true" />
+                  <span>{t("loginNow")}</span>
+                  <ArrowIcon size={18} aria-hidden="true" />
                 </Link>
               </div>
             </div>
@@ -179,15 +182,13 @@ export function PasswordChangeScreen({
               <header className={styles.header}>
                 <p className={styles.eyebrow}>
                   <span aria-hidden="true" />
-                  {forced ? "إعداد الحساب الأولي" : "أمان الحساب"}
+                  {forced ? t("initialSetup") : t("accountSecurity")}
                 </p>
                 <h1 id="password-screen-title">
-                  {forced ? "عيّن كلمة المرور الخاصة بمنشأتك" : "تغيير كلمة المرور"}
+                  {forced ? t("setBusinessPassword") : t("changePassword")}
                 </h1>
                 <p>
-                  {forced
-                    ? "كلمة المرور التي استلمتها مؤقتة للتهيئة الأولى. اختر كلمة خاصة بك للبدء في إدارة فروعك وقوائمك."
-                    : "لحماية منشأتك، ستنتهي كافة الجلسات السابقة بعد التحديث لتسجيل الدخول بكلمة المرور الجديدة."}
+                  {forced ? t("forcedNotice") : t("regularNotice")}
                 </p>
               </header>
 
@@ -195,10 +196,8 @@ export function PasswordChangeScreen({
                 <div className={styles.expiredBox} role="alert">
                   <ShieldAlert size={26} className="text-red-500" aria-hidden="true" />
                   <div>
-                    <h2>انتهت صلاحية كلمة المرور المؤقتة</h2>
-                    <p>
-                      انتهت المهلة المحددة لكلمة المرور المؤقتة. إذا كنت مالك المنشأة يرجى التواصل مع دعم DineHub، أو التواصل مع مسؤول منشأتك لإصدار كلمة جديدة.
-                    </p>
+                    <h2>{t("expiredTitle")}</h2>
+                    <p>{t("expiredDesc")}</p>
                     <div style={{ marginTop: "16px" }}>
                       <button
                         type="button"
@@ -207,7 +206,7 @@ export function PasswordChangeScreen({
                         className={styles.secondaryButton}
                       >
                         <LogOut size={16} aria-hidden="true" />
-                        <span>تسجيل الخروج والعودة</span>
+                        <span>{t("logoutAndReturn")}</span>
                       </button>
                     </div>
                   </div>
@@ -224,7 +223,7 @@ export function PasswordChangeScreen({
                   {/* Current / Temporary Password */}
                   <div className={styles.field}>
                     <label htmlFor={currentId}>
-                      <span>{forced ? "كلمة المرور المؤقتة الحالية" : "كلمة المرور الحالية"}</span>
+                      <span>{forced ? t("currentPasswordForced") : t("currentPasswordRegular")}</span>
                     </label>
                     <div className={styles.inputShell}>
                       <KeyRound size={19} strokeWidth={1.7} aria-hidden="true" />
@@ -244,7 +243,7 @@ export function PasswordChangeScreen({
                         type="button"
                         className={styles.passwordToggle}
                         onClick={() => setShowCurrent((v) => !v)}
-                        aria-label={showCurrent ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                        aria-label={showCurrent ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
                       >
                         {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -254,7 +253,7 @@ export function PasswordChangeScreen({
                   {/* New Password */}
                   <div className={styles.field}>
                     <label htmlFor={newId}>
-                      <span>كلمة المرور الجديدة</span>
+                      <span>{t("newPassword")}</span>
                     </label>
                     <div
                       className={styles.inputShell}
@@ -278,7 +277,7 @@ export function PasswordChangeScreen({
                         type="button"
                         className={styles.passwordToggle}
                         onClick={() => setShowNew((v) => !v)}
-                        aria-label={showNew ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                        aria-label={showNew ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
                       >
                         {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -288,12 +287,12 @@ export function PasswordChangeScreen({
                     <div className={styles.requirementsBox} aria-live="polite">
                       <span className={styles.reqItem} data-met={isMinLength}>
                         {isMinLength ? <Check size={13} strokeWidth={2.5} /> : <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />}
-                        12 حرفًا على الأقل
+                        {t("reqMinLength")}
                       </span>
                       {confirmation && (
                         <span className={styles.reqItem} data-met={isMatching}>
                           {isMatching ? <Check size={13} strokeWidth={2.5} /> : <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />}
-                          {isMatching ? "كلمتا المرور متطابقتان" : "غير متطابقتين بعد"}
+                          {isMatching ? t("reqMatching") : t("reqNotMatching")}
                         </span>
                       )}
                     </div>
@@ -302,7 +301,7 @@ export function PasswordChangeScreen({
                   {/* Confirm Password */}
                   <div className={styles.field}>
                     <label htmlFor={confirmId}>
-                      <span>تأكيد كلمة المرور الجديدة</span>
+                      <span>{t("confirmPassword")}</span>
                     </label>
                     <div
                       className={styles.inputShell}
@@ -326,7 +325,7 @@ export function PasswordChangeScreen({
                         type="button"
                         className={styles.passwordToggle}
                         onClick={() => setShowConfirm((v) => !v)}
-                        aria-label={showConfirm ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                        aria-label={showConfirm ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
                       >
                         {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -343,12 +342,12 @@ export function PasswordChangeScreen({
                       {busy ? (
                         <>
                           <Loader2 className={styles.spinner} size={19} aria-hidden="true" />
-                          <span>جارٍ حفظ التحديث…</span>
+                          <span>{t("saving")}</span>
                         </>
                       ) : (
                         <>
-                          <span>حفظ كلمة المرور ومتابعة العمل</span>
-                          <ArrowLeft size={18} aria-hidden="true" />
+                          <span>{t("savePassword")}</span>
+                          <ArrowIcon size={18} aria-hidden="true" />
                         </>
                       )}
                     </button>
@@ -360,7 +359,7 @@ export function PasswordChangeScreen({
                       className={styles.secondaryButton}
                     >
                       <LogOut size={16} aria-hidden="true" />
-                      <span>تسجيل الخروج والعودة لاحقًا</span>
+                      <span>{t("logoutAndReturn")}</span>
                     </button>
                   </div>
                 </form>
@@ -368,7 +367,7 @@ export function PasswordChangeScreen({
 
               <footer className={styles.footerNote}>
                 <ShieldCheck size={16} aria-hidden="true" />
-                <span>جلسة مشفرة ومعزولة لحماية بيانات منشأتك</span>
+                <span>{isRtl ? "جلسة مشفرة ومعزولة لحماية بيانات منشأتك" : "Encrypted isolated session protecting your business"}</span>
               </footer>
             </>
           )}
@@ -377,12 +376,12 @@ export function PasswordChangeScreen({
         {/* Story / Brand Isolation Showcase */}
         <aside
           className={styles.storyPanel}
-          aria-label="مزايا أمان وعزل الأعمال في DineHub"
+          aria-label={isRtl ? "مزايا أمان وعزل الأعمال في DineHub" : "DineHub Security & Business Isolation"}
         >
           <Link
             className={styles.brand}
             href="/"
-            aria-label="DineHub، الصفحة الرئيسية"
+            aria-label={isRtl ? "DineHub، الصفحة الرئيسية" : "DineHub Homepage"}
           >
             <Image
               className={styles.logo}
@@ -398,11 +397,17 @@ export function PasswordChangeScreen({
           <div className={styles.storyCopy}>
             <p className={styles.liveLabel}>
               <span aria-hidden="true" />
-              أمان وتشغيل موثوق
+              {isRtl ? "أمان وتشغيل موثوق" : "Enterprise-Grade Reliability"}
             </p>
-            <h2>بيئة معزولة بالكامل. أمان يبدأ من أول خطوة.</h2>
+            <h2>
+              {isRtl
+                ? "بيئة معزولة بالكامل. أمان يبدأ من أول خطوة."
+                : "Fully Isolated Workspaces. Security by Design."}
+            </h2>
             <p>
-              نظام مصمم للمنشآت الرائدة؛ نوفر عزلاً تاماً للبيانات، إدارة دقيقة للصلاحيات، وربطاً فورياً بين مسح العميل وعمليات الفريق.
+              {isRtl
+                ? "نظام مصمم للمنشآت الرائدة؛ نوفر عزلاً تاماً للبيانات، إدارة دقيقة للصلاحيات، وربطاً فورياً بين مسح العميل وعمليات الفريق."
+                : "Engineered for leading food & beverage brands; isolated multitenancy, granular access control, and instantaneous sync from guest QR scan to live kitchen."}
             </p>
           </div>
 
@@ -412,8 +417,12 @@ export function PasswordChangeScreen({
                 <Building2 size={20} />
               </div>
               <div className={styles.featureText}>
-                <h3>عزل رقمي مستقل لكل منشأة</h3>
-                <p>قواعد بيانات وعمليات منفصلة تضمن أقصى درجات الخصوصية وحماية الأعمال.</p>
+                <h3>{isRtl ? "عزل رقمي مستقل لكل منشأة" : "Tenant Isolation"}</h3>
+                <p>
+                  {isRtl
+                    ? "قواعد بيانات وعمليات منفصلة تضمن أقصى درجات الخصوصية وحماية الأعمال."
+                    : "Independent operational scope ensuring complete business privacy and compliance."}
+                </p>
               </div>
             </div>
 
@@ -422,8 +431,12 @@ export function PasswordChangeScreen({
                 <Users size={20} />
               </div>
               <div className={styles.featureText}>
-                <h3>صلاحيات دقيقة للملاك والفرق</h3>
-                <p>تحكم كامل في وصول طاقم الفروع والمدراء لحماية الإيرادات والقوائم.</p>
+                <h3>{isRtl ? "صلاحيات دقيقة للملاك والفرق" : "Granular Team Access"}</h3>
+                <p>
+                  {isRtl
+                    ? "تحكم كامل في وصول طاقم الفروع والمدراء لحماية الإيرادات والقوائم."
+                    : "Role-based controls tailored for branch cashiers, kitchen crew, and owners."}
+                </p>
               </div>
             </div>
 
@@ -432,16 +445,20 @@ export function PasswordChangeScreen({
                 <Sparkles size={20} />
               </div>
               <div className={styles.featureText}>
-                <h3>إشارة طلب فائقة السرعة</h3>
-                <p>مسار مباشر من كاميرا العميل إلى شاشات التحضير دون انقطاع.</p>
+                <h3>{isRtl ? "إشارة طلب فائقة السرعة" : "Realtime Order Signals"}</h3>
+                <p>
+                  {isRtl
+                    ? "مسار مباشر من كاميرا العميل إلى شاشات التحضير دون انقطاع."
+                    : "Direct zero-friction pipeline from guest smartphone camera to kitchen display."}
+                </p>
               </div>
             </div>
           </div>
 
           <div className={styles.storyFoot}>
             <span>DineHub Enterprise Security</span>
-            <span>تشفير معتمد 256-bit</span>
-            <span>عزل متعدد المنشآت</span>
+            <span>{isRtl ? "تشفير معتمد 256-bit" : "256-bit Encryption"}</span>
+            <span>{isRtl ? "عزل متعدد المنشآت" : "Multitenant Isolation"}</span>
           </div>
         </aside>
       </div>

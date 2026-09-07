@@ -1,6 +1,7 @@
 "use client";
 
 import { Building2, ChevronDown, Loader2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 
 interface AdminBranchSelectorProps {
@@ -11,9 +12,14 @@ interface AdminBranchSelectorProps {
 
 export function AdminBranchSelector({
   className,
-  label = "الفرع الحالي",
+  label,
   showLabel = true,
 }: AdminBranchSelectorProps) {
+  const locale = useLocale();
+  const t = useTranslations("AdminCommon");
+  const defaultLabel = t("currentBranch");
+  const effectiveLabel = label ?? defaultLabel;
+
   const {
     branches,
     selectedBranchId,
@@ -43,7 +49,7 @@ export function AdminBranchSelector({
         className={className}
       >
         <Loader2 size={15} className="animate-spin" style={{ color: "#47aaa1" }} />
-        <span>جلب الفروع…</span>
+        <span>{t("fetchingBranches")}</span>
       </div>
     );
   }
@@ -61,7 +67,7 @@ export function AdminBranchSelector({
           border: "1px solid rgba(242, 100, 75, 0.2)",
           color: "#ff9d8c",
           fontSize: "0.82rem",
-          fontWeight: 600,
+          fontWeight: 650,
           width: "100%",
           maxWidth: "100%",
           boxSizing: "border-box",
@@ -69,7 +75,7 @@ export function AdminBranchSelector({
         className={className}
       >
         <Building2 size={15} aria-hidden="true" />
-        <span>{branchError || "لا توجد فروع معرفة"}</span>
+        <span>{branchError || t("noBranchesFound")}</span>
         {branchError && (
           <button
             type="button"
@@ -87,7 +93,7 @@ export function AdminBranchSelector({
               padding: "5px 8px",
             }}
           >
-            إعادة المحاولة
+            {t("retry")}
           </button>
         )}
       </div>
@@ -116,7 +122,7 @@ export function AdminBranchSelector({
             flexShrink: 0,
           }}
         >
-          {label}:
+          {effectiveLabel}:
         </span>
       )}
       <div
@@ -132,7 +138,8 @@ export function AdminBranchSelector({
           WebkitBackdropFilter: "blur(12px)",
           border: "1px solid rgba(223, 210, 235, 0.16)",
           borderRadius: "14px",
-          padding: "0 34px 0 12px",
+          paddingInlineStart: "12px",
+          paddingInlineEnd: "34px",
           boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
           transition: "all 150ms ease",
           boxSizing: "border-box",
@@ -156,7 +163,7 @@ export function AdminBranchSelector({
           className="admin-branch-select"
           value={selectedBranchId}
           onChange={(e) => setSelectedBranchId(e.target.value)}
-          aria-label={label}
+          aria-label={effectiveLabel}
           style={{
             width: "100%",
             appearance: "none",
@@ -176,7 +183,9 @@ export function AdminBranchSelector({
         >
           {branches.map((b) => {
             const displayName =
-              b.nameAr || b.name || b.nameEn || "فرع غير مسمى";
+              locale === "en"
+                ? (b.nameEn || b.name || b.nameAr || "Branch")
+                : (b.nameAr || b.name || b.nameEn || "فرع غير مسمى");
             return (
               <option
                 key={b.id}

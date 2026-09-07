@@ -24,6 +24,7 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
@@ -36,6 +37,11 @@ interface Table {
 }
 
 export default function QrCodeManagementPage() {
+  const t = useTranslations("AdminQrCode");
+  const tCommon = useTranslations("AdminCommon");
+  const locale = useLocale();
+  const isRtl = locale !== "en";
+
   const {
     branches,
     selectedBranchId,
@@ -82,11 +88,11 @@ export default function QrCodeManagementPage() {
       setTables(sorted);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg("تعذر جلب طاولات هذا الفرع. يرجى المحاولة لاحقاً.");
+      setErrorMsg(t("errorFetch"));
     } finally {
       setIsLoadingTables(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -159,12 +165,12 @@ export default function QrCodeManagementPage() {
   const handleAddSingleTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBranchId) {
-      setErrorMsg("يرجى اختيار فرع أولاً.");
+      setErrorMsg(t("selectBranchFirst"));
       return;
     }
     const num = parseInt(newTableNumber, 10);
     if (isNaN(num) || num < 1) {
-      setErrorMsg("يرجى إدخال رقم طاولة صحيح.");
+      setErrorMsg(t("tableNumberHelp"));
       return;
     }
 
@@ -175,14 +181,14 @@ export default function QrCodeManagementPage() {
         number: num,
         branchId: selectedBranchId,
       });
-      setSuccessMsg(`تمت إضافة طاولة #${num} بنجاح.`);
+      setSuccessMsg(isRtl ? `تمت إضافة طاولة #${num} بنجاح.` : `Table #${num} added successfully.`);
       setNewTableNumber("");
       setIsAddModalOpen(false);
       await fetchTables(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(apiErrorMessage(err) || "تعذر إضافة الطاولة. قد تكون مسجلة مسبقاً.");
+      setErrorMsg(apiErrorMessage(err) || (isRtl ? "تعذر إضافة الطاولة. قد تكون مسجلة مسبقاً." : "Failed to add table. It may already exist."));
     } finally {
       setIsSubmitting(false);
     }
@@ -195,7 +201,7 @@ export default function QrCodeManagementPage() {
     const count = parseInt(batchCount, 10);
 
     if (isNaN(start) || start < 1 || isNaN(count) || count < 1 || count > 50) {
-      setErrorMsg("يرجى إدخال أرقام صحيحة (العدد من 1 إلى 50).");
+      setErrorMsg(isRtl ? "يرجى إدخال أرقام صحيحة (العدد من 1 إلى 50)." : "Please enter valid numbers (count between 1 and 50).");
       return;
     }
 
@@ -219,7 +225,7 @@ export default function QrCodeManagementPage() {
       }
 
       if (promises.length === 0) {
-        setSuccessMsg("كل أرقام الطاولات المحددة موجودة بالفعل.");
+        setSuccessMsg(isRtl ? "كل أرقام الطاولات المحددة موجودة بالفعل." : "All specified table numbers already exist.");
         setIsBatchModalOpen(false);
         return;
       }
@@ -233,11 +239,11 @@ export default function QrCodeManagementPage() {
       if (failedCount > 0) {
         setErrorMsg(
           createdCount > 0
-            ? `تم إنشاء ${createdCount} طاولات، وتعذر إنشاء ${failedCount} طاولات. يرجى المحاولة مرة أخرى.`
-            : "تعذر إنشاء الطاولات. يرجى المحاولة مرة أخرى."
+            ? (isRtl ? `تم إنشاء ${createdCount} طاولات، وتعذر إنشاء ${failedCount} طاولات.` : `Created ${createdCount} tables; failed to create ${failedCount}.`)
+            : (isRtl ? "تعذر إنشاء الطاولات. يرجى المحاولة مرة أخرى." : "Failed to create tables. Please retry.")
         );
       } else {
-        setSuccessMsg(`تم إنشاء ${createdCount} طاولات بنجاح.`);
+        setSuccessMsg(isRtl ? `تم إنشاء ${createdCount} طاولات بنجاح.` : `${createdCount} tables created successfully.`);
         setIsBatchModalOpen(false);
       }
       await fetchTables(selectedBranchId);
@@ -246,7 +252,7 @@ export default function QrCodeManagementPage() {
       }
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg("حدث خطأ أثناء التوليد التلقائي للطاولات.");
+      setErrorMsg(isRtl ? "حدث خطأ أثناء التوليد التلقائي للطاولات." : "Error occurred while generating tables.");
     } finally {
       setIsSubmitting(false);
     }
@@ -259,14 +265,14 @@ export default function QrCodeManagementPage() {
       setIsDeleting(true);
       setErrorMsg("");
       await apiClient.delete(`/admin/tables/${tableToDelete.id}`);
-      setSuccessMsg(`تم حذف طاولة #${tableToDelete.number} بنجاح.`);
+      setSuccessMsg(isRtl ? `تم حذف طاولة #${tableToDelete.number} بنجاح.` : `Table #${tableToDelete.number} deleted successfully.`);
       setIsDeleteModalOpen(false);
       setTableToDelete(null);
       await fetchTables(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(apiErrorMessage(err) || "تعذر حذف الطاولة.");
+      setErrorMsg(apiErrorMessage(err) || (isRtl ? "تعذر حذف الطاولة." : "Failed to delete table."));
     } finally {
       setIsDeleting(false);
     }
@@ -277,7 +283,7 @@ export default function QrCodeManagementPage() {
     const printWindow = window.open("", "_blank", "noopener,noreferrer");
 
     if (!standMarkup || !printWindow) {
-      setErrorMsg("تعذر فتح نافذة الطباعة. يرجى السماح بالنوافذ المنبثقة ثم المحاولة مرة أخرى.");
+      setErrorMsg(t("errorPrint"));
       return;
     }
 
@@ -288,9 +294,9 @@ export default function QrCodeManagementPage() {
     };
 
     printWindow.document.write(`<!doctype html>
-      <html dir="rtl">
+      <html dir="${isRtl ? "rtl" : "ltr"}">
         <head>
-          <title>ستاند طاولة</title>
+          <title>${t("tentCardTitle")}</title>
           <style>
             * { box-sizing: border-box; }
             body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Arial, sans-serif; background: #fff; }
@@ -307,17 +313,21 @@ export default function QrCodeManagementPage() {
     searchQuery === "" ? true : t.number.toString().includes(searchQuery.trim())
   );
 
+  const branchDisplayName = isRtl
+    ? (selectedBranch?.nameAr || selectedBranch?.name || selectedBranch?.nameEn || t("kpiDefaultBranch"))
+    : (selectedBranch?.nameEn || selectedBranch?.name || selectedBranch?.nameAr || t("kpiDefaultBranch"));
+
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
           <p className={styles.eyebrow}>
             <span aria-hidden="true" />
-            الإدارة • رموز الطلب
+            {t("eyebrow")}
           </p>
-          <h1>رموز QR ونقاط طلب الطاولات</h1>
+          <h1>{t("pageTitle")}</h1>
           <p>
-            أنشئ رموز استجابة سريعة (QR) مخصصة لكل طاولة، أو شارك الرابط المباشر لقائمتك الرقمية.
+            {t("pageDesc")}
           </p>
         </div>
 
@@ -329,13 +339,13 @@ export default function QrCodeManagementPage() {
             className={styles.secondaryButton}
             onClick={() => selectedBranchId && fetchTables(selectedBranchId)}
             disabled={isLoadingTables || !selectedBranchId}
-            aria-label="تحديث الطاولات"
+            title={tCommon("retry")}
           >
             <RotateCcw
               size={17}
               className={isLoadingTables ? "animate-spin" : undefined}
             />
-            <span>تحديث</span>
+            <span>{isLoadingTables ? tCommon("loading") : tCommon("retry")}</span>
           </button>
 
           <button
@@ -348,20 +358,20 @@ export default function QrCodeManagementPage() {
             disabled={!selectedBranchId}
           >
             <Plus size={18} strokeWidth={2.2} />
-            <span>إضافة طاولة</span>
+            <span>{t("addTable")}</span>
           </button>
         </div>
       </header>
 
       {/* KPI Stats */}
-      <section className={styles.kpiGrid} aria-label="ملخص رموز QR">
+      <section className={styles.kpiGrid} aria-label={t("kpiSummaryAria")}>
         <div className={styles.kpiCard}>
           <div className={styles.kpiIcon} data-tone="coral">
             <QrCodeIcon size={22} />
           </div>
           <div className={styles.kpiInfo}>
             <span className={styles.kpiValue}>{tables.length}</span>
-            <span className={styles.kpiLabel}>طاولات معرفة بالفرع</span>
+            <span className={styles.kpiLabel}>{t("kpiTables")}</span>
           </div>
         </div>
 
@@ -371,9 +381,9 @@ export default function QrCodeManagementPage() {
           </div>
           <div className={styles.kpiInfo}>
             <span className={styles.kpiValue}>
-              {selectedBranch?.nameAr || selectedBranch?.name || "الفرع المحدد"}
+              {branchDisplayName}
             </span>
-            <span className={styles.kpiLabel}>نقطة الخدمة الحالية</span>
+            <span className={styles.kpiLabel}>{t("kpiCurrentBranch")}</span>
           </div>
         </div>
 
@@ -382,8 +392,8 @@ export default function QrCodeManagementPage() {
             <Sparkles size={22} />
           </div>
           <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>فوري وتلقائي</span>
-            <span className={styles.kpiLabel}>توجيه مباشر لقائمة الطعام</span>
+            <span className={styles.kpiValue}>{t("kpiInstant")}</span>
+            <span className={styles.kpiLabel}>{t("kpiInstantDesc")}</span>
           </div>
         </div>
 
@@ -392,8 +402,8 @@ export default function QrCodeManagementPage() {
             <Printer size={22} />
           </div>
           <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>طباعة قياسية</span>
-            <span className={styles.kpiLabel}>ستاندات الطاولات والتصدير</span>
+            <span className={styles.kpiValue}>{t("kpiPrint")}</span>
+            <span className={styles.kpiLabel}>{t("kpiPrintDesc")}</span>
           </div>
         </div>
       </section>
@@ -417,11 +427,11 @@ export default function QrCodeManagementPage() {
           <div className={styles.showcaseCopy}>
             <span className={styles.showcaseTag}>
               <Store size={14} />
-              <span>الرابط العام لقائمة الفرع</span>
+              <span>{t("showcaseTag")}</span>
             </span>
-            <h2>القائمة الرقمية العامة بدون تحديد طاولة</h2>
+            <h2>{t("showcaseTitle")}</h2>
             <p>
-              استخدم هذا الرابط العام أو رمزه في حسابات التواصل الاجتماعي، خرائط جوجل، أو خدمة الاستلام المباشر.
+              {t("showcaseDesc")}
             </p>
 
             <div className={styles.urlBox}>
@@ -433,7 +443,7 @@ export default function QrCodeManagementPage() {
                   onClick={() => handleCopy(getBranchMenuUrl(), "general")}
                 >
                   {copiedGeneral ? <Check size={14} color="#8cd1ca" /> : <Copy size={14} />}
-                  <span>{copiedGeneral ? "تم النسخ" : "نسخ الرابط"}</span>
+                  <span>{copiedGeneral ? t("copied") : t("copyUrl")}</span>
                 </button>
                 <a
                   href={getBranchMenuUrl()}
@@ -442,7 +452,7 @@ export default function QrCodeManagementPage() {
                   className={styles.secondaryButton}
                 >
                   <ExternalLink size={14} />
-                  <span>معاينة</span>
+                  <span>{t("preview")}</span>
                 </a>
               </div>
             </div>
@@ -466,10 +476,10 @@ export default function QrCodeManagementPage() {
                   `dinehub-menu-${selectedBranch?.name || "branch"}`
                 )
               }
-              title="تحميل رمز QR بدقة عالية"
+              title={t("downloadQrTitle")}
             >
               <Download size={16} />
-              <span>تحميل الرمز</span>
+              <span>{t("downloadQr")}</span>
             </button>
           </div>
         </section>
@@ -482,7 +492,7 @@ export default function QrCodeManagementPage() {
           <input
             type="search"
             className={styles.searchInput}
-            placeholder="ابحث برقم الطاولة (مثال: 1, 5, 12)…"
+            placeholder={t("searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -496,7 +506,7 @@ export default function QrCodeManagementPage() {
             disabled={!selectedBranchId}
           >
             <Layers size={16} />
-            <span>توليد مجموعة طاولات</span>
+            <span>{t("batchGenerate")}</span>
           </button>
         </div>
       </div>
@@ -507,14 +517,14 @@ export default function QrCodeManagementPage() {
           <div className={styles.emptyIcon}>
             <Loader2 size={28} className="animate-spin" />
           </div>
-          <h3>جارٍ تحميل رموز الطاولات…</h3>
+          <h3>{t("loadingTables")}</h3>
         </div>
       ) : !selectedBranchId ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>
             <QrCodeIcon size={28} />
           </div>
-          <h3>يرجى اختيار فرع أولاً</h3>
+          <h3>{t("selectBranchFirst")}</h3>
         </div>
       ) : filteredTables.length === 0 ? (
         <div className={styles.emptyState}>
@@ -523,13 +533,13 @@ export default function QrCodeManagementPage() {
           </div>
           <h3>
             {tables.length === 0
-              ? "لا توجد طاولات معرفة في هذا الفرع بعد"
-              : "لا توجد طاولة مطابقة للبحث"}
+              ? t("emptyTablesTitle")
+              : t("emptyTablesSearchTitle")}
           </h3>
           <p>
             {tables.length === 0
-              ? "أضف أرقام طاولات مطعمك لتوليد رموز QR جاهزة للطباعة والطلب."
-              : "جرب البحث برقم طاولة آخر."}
+              ? t("emptyTablesDesc")
+              : t("emptyTablesSearchDesc")}
           </p>
           {tables.length === 0 && (
             <button
@@ -539,7 +549,7 @@ export default function QrCodeManagementPage() {
               style={{ marginTop: "10px" }}
             >
               <Plus size={18} />
-              <span>إضافة أول طاولة الآن</span>
+              <span>{t("addFirstTable")}</span>
             </button>
           )}
         </div>
@@ -555,7 +565,7 @@ export default function QrCodeManagementPage() {
                 <div className={styles.tableHead}>
                   <span className={styles.tableNumberBadge}>
                     <QrCodeIcon size={16} color="#8cd1ca" />
-                    <span>طاولة #{table.number}</span>
+                    <span>{t("tableLabel")} #{table.number}</span>
                   </span>
                 </div>
 
@@ -573,8 +583,8 @@ export default function QrCodeManagementPage() {
                     type="button"
                     className={styles.cardActionBtn}
                     onClick={() => handleCopy(tableUrl, table.id)}
-                    title="نسخ الرابط"
-                    aria-label={`نسخ رابط طاولة ${table.number}`}
+                    title={t("copyTableUrl")}
+                    aria-label={`${t("copyTableUrl")} #${table.number}`}
                   >
                     {isCopied ? <Check size={16} color="#8cd1ca" /> : <Copy size={16} />}
                   </button>
@@ -584,8 +594,8 @@ export default function QrCodeManagementPage() {
                     target="_blank"
                     rel="noreferrer"
                     className={styles.cardActionBtn}
-                    title="معاينة شاشة العميل"
-                    aria-label={`معاينة طاولة ${table.number}`}
+                    title={t("preview")}
+                    aria-label={`${t("preview")} #${table.number}`}
                   >
                     <ExternalLink size={16} />
                   </a>
@@ -597,8 +607,8 @@ export default function QrCodeManagementPage() {
                       setActivePrintTable(table);
                       setIsPrintModalOpen(true);
                     }}
-                    title="طباعة ستاند الطاولة"
-                    aria-label={`طباعة ستاند طاولة ${table.number}`}
+                    title={t("printStand")}
+                    aria-label={`${t("printStand")} #${table.number}`}
                   >
                     <Printer size={16} />
                   </button>
@@ -611,8 +621,8 @@ export default function QrCodeManagementPage() {
                       setTableToDelete(table);
                       setIsDeleteModalOpen(true);
                     }}
-                    title="حذف الطاولة"
-                    aria-label={`حذف طاولة ${table.number}`}
+                    title={tCommon("delete")}
+                    aria-label={`${t("deleteTableAria")} #${table.number}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -627,14 +637,14 @@ export default function QrCodeManagementPage() {
       <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content className={styles.dialogContent} dir={isRtl ? "rtl" : "ltr"}>
             <div className={styles.dialogHead}>
-              <Dialog.Title>إضافة طاولة جديدة</Dialog.Title>
+              <Dialog.Title>{t("modalAddTitle")}</Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -653,13 +663,13 @@ export default function QrCodeManagementPage() {
 
             <form onSubmit={handleAddSingleTable} className={styles.formGrid}>
               <div className={styles.inputGroup}>
-                <label htmlFor="table-num">رقم الطاولة *</label>
+                <label htmlFor="table-num">{t("tableNumberLabel")} *</label>
                 <input
                   id="table-num"
                   type="number"
                   min="1"
                   required
-                  placeholder="مثال: 12"
+                  placeholder={t("tableNumberPlaceholder")}
                   value={newTableNumber}
                   onChange={(e) => setNewTableNumber(e.target.value)}
                 />
@@ -672,7 +682,7 @@ export default function QrCodeManagementPage() {
                   onClick={() => setIsAddModalOpen(false)}
                   disabled={isSubmitting}
                 >
-                  إلغاء
+                  {tCommon("cancel")}
                 </button>
                 <button
                   type="submit"
@@ -682,10 +692,10 @@ export default function QrCodeManagementPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>جارٍ الحفظ…</span>
+                      <span>{t("adding")}</span>
                     </>
                   ) : (
-                    <span>إنشاء الطاولة</span>
+                    <span>{t("addTable")}</span>
                   )}
                 </button>
               </div>
@@ -698,14 +708,14 @@ export default function QrCodeManagementPage() {
       <Dialog.Root open={isBatchModalOpen} onOpenChange={setIsBatchModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content className={styles.dialogContent} dir={isRtl ? "rtl" : "ltr"}>
             <div className={styles.dialogHead}>
-              <Dialog.Title>توليد مجموعة طاولات تلقائياً</Dialog.Title>
+              <Dialog.Title>{t("modalBatchTitle")}</Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -724,7 +734,7 @@ export default function QrCodeManagementPage() {
 
             <form onSubmit={handleBatchCreate} className={styles.formGrid}>
               <div className={styles.inputGroup}>
-                <label htmlFor="batch-start">البدء من رقم الطاولة:</label>
+                <label htmlFor="batch-start">{t("batchStartLabel")}</label>
                 <input
                   id="batch-start"
                   type="number"
@@ -736,7 +746,7 @@ export default function QrCodeManagementPage() {
               </div>
 
               <div className={styles.inputGroup}>
-                <label htmlFor="batch-count">عدد الطاولات المراد إنشاؤها (1 إلى 50):</label>
+                <label htmlFor="batch-count">{t("batchCountLabel")} (1-50):</label>
                 <input
                   id="batch-count"
                   type="number"
@@ -749,7 +759,11 @@ export default function QrCodeManagementPage() {
               </div>
 
               <p style={{ color: "#b9aebd", fontSize: "0.82rem", margin: 0 }}>
-                سيتم تجاوز أي طاولة موجودة مسبقاً وتوليد الأرقام المتبقية تلقائياً.
+                {t("batchPreview", {
+                  start: batchStart,
+                  end: Math.max(1, (parseInt(batchStart, 10) || 1) + (parseInt(batchCount, 10) || 1) - 1),
+                  count: batchCount,
+                })}
               </p>
 
               <div className={styles.dialogActions}>
@@ -759,7 +773,7 @@ export default function QrCodeManagementPage() {
                   onClick={() => setIsBatchModalOpen(false)}
                   disabled={isSubmitting}
                 >
-                  إلغاء
+                  {tCommon("cancel")}
                 </button>
                 <button
                   type="submit"
@@ -769,10 +783,10 @@ export default function QrCodeManagementPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      <span>جارٍ التوليد…</span>
+                      <span>{t("generating")}</span>
                     </>
                   ) : (
-                    <span>توليد الطاولات الآن</span>
+                    <span>{t("batchGenerate")}</span>
                   )}
                 </button>
               </div>
@@ -785,14 +799,14 @@ export default function QrCodeManagementPage() {
       <Dialog.Root open={isPrintModalOpen} onOpenChange={setIsPrintModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content className={styles.dialogContent} dir={isRtl ? "rtl" : "ltr"}>
             <div className={styles.dialogHead}>
-              <Dialog.Title>معاينة وطباعة ستاند الطاولة</Dialog.Title>
+              <Dialog.Title>{t("modalPrintTitle")}</Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -804,11 +818,9 @@ export default function QrCodeManagementPage() {
                 <span style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f2644b" }}>
                   DineHub
                 </span>
-                <span className={styles.tentCardTitle}>
-                  {selectedBranch?.nameAr || selectedBranch?.name || "مطعمنا الفاخر"}
-                </span>
+                <span className={styles.tentCardTitle}>{branchDisplayName}</span>
                 <p className={styles.tentCardLead}>
-                  امسح الرمز بكاميرا هاتفك لتصفح القائمة والطلب مباشرة
+                  {t("scanInstructions")}
                 </p>
 
                 <div style={{ background: "#ffffff", padding: "16px", borderRadius: "16px", margin: "8px 0" }}>
@@ -830,7 +842,7 @@ export default function QrCodeManagementPage() {
                     fontSize: "1.05rem",
                   }}
                 >
-                  طاولة #{activePrintTable.number}
+                  {t("tableLabel")} #{activePrintTable.number}
                 </div>
               </div>
             )}
@@ -848,7 +860,7 @@ export default function QrCodeManagementPage() {
                 }
               >
                 <Download size={16} />
-                <span>تحميل كصورة PNG</span>
+                <span>{t("downloadPng")}</span>
               </button>
               <button
                 type="button"
@@ -856,7 +868,7 @@ export default function QrCodeManagementPage() {
                 onClick={handlePrint}
               >
                 <Printer size={16} />
-                <span>طباعة الستاند</span>
+                <span>{t("printStand")}</span>
               </button>
             </div>
           </Dialog.Content>
@@ -870,14 +882,14 @@ export default function QrCodeManagementPage() {
       >
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
-          <Dialog.Content className={styles.dialogContent} dir="rtl">
+          <Dialog.Content className={styles.dialogContent} dir={isRtl ? "rtl" : "ltr"}>
             <div className={styles.dialogHead}>
-              <Dialog.Title>تأكيد حذف الطاولة</Dialog.Title>
+              <Dialog.Title>{t("modalDeleteTitle")}</Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   type="button"
                   className={styles.closeButton}
-                  aria-label="إغلاق"
+                  aria-label={tCommon("cancel")}
                 >
                   <X size={19} />
                 </button>
@@ -885,11 +897,8 @@ export default function QrCodeManagementPage() {
             </div>
 
             <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
-              هل أنت متأكد من رغبتك في حذف طاولة{" "}
-              <strong style={{ color: "#fffdf9" }}>
-                &quot;#{tableToDelete?.number}&quot;
-              </strong>
-              ؟ لن يتمكن العملاء من مسح رمز هذه الطاولة للطلب بعد الحذف.
+              {t("modalDeleteDesc", { number: tableToDelete?.number ?? 0 })}{" "}
+              {t("modalDeleteWarning")}
             </p>
 
             <div className={styles.dialogActions}>
@@ -899,7 +908,7 @@ export default function QrCodeManagementPage() {
                 onClick={() => setIsDeleteModalOpen(false)}
                 disabled={isDeleting}
               >
-                إلغاء
+                {tCommon("cancel")}
               </button>
               <button
                 type="button"
@@ -911,10 +920,10 @@ export default function QrCodeManagementPage() {
                 {isDeleting ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>جارٍ الحذف…</span>
+                    <span>{t("deleting")}</span>
                   </>
                 ) : (
-                  <span>نعم، احذف الطاولة</span>
+                  <span>{tCommon("delete")}</span>
                 )}
               </button>
             </div>

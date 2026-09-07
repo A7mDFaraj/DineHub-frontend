@@ -8,15 +8,13 @@ import {
   CheckCircle2,
   Image as ImageIcon,
   Loader2,
-  MapPin,
   Palette,
-  Phone,
   RotateCcw,
   Save,
-  Smartphone,
   Sparkles,
   Store,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
@@ -24,17 +22,22 @@ import { ImageUploader } from "@/components/ui/image-uploader";
 import styles from "./settings.module.css";
 
 const PRESET_COLORS = [
-  { name: "مرجاني DineHub", hex: "#f2644b" },
-  { name: "تيل مهدئ", hex: "#47aaa1" },
-  { name: "ذهبي فاخر", hex: "#d4af37" },
-  { name: "أرجواني ملكي", hex: "#8b5cf6" },
-  { name: "زمردي طبيعي", hex: "#10b981" },
-  { name: "أزرق ياقوتي", hex: "#3b82f6" },
-  { name: "وردي مخملي", hex: "#e11d48" },
-  { name: "عنبري دافئ", hex: "#f59e0b" },
+  { key: "coral", hex: "#f2644b" },
+  { key: "teal", hex: "#47aaa1" },
+  { key: "gold", hex: "#d4af37" },
+  { key: "purple", hex: "#8b5cf6" },
+  { key: "emerald", hex: "#10b981" },
+  { key: "sapphire", hex: "#3b82f6" },
+  { key: "velvet", hex: "#e11d48" },
+  { key: "amber", hex: "#f59e0b" },
 ];
 
 export default function BranchSettingsPage() {
+  const locale = useLocale();
+  const t = useTranslations("AdminSettings");
+  const tCommon = useTranslations("AdminCommon");
+  const isRtl = locale !== "en";
+
   const {
     branches,
     selectedBranchId,
@@ -76,11 +79,11 @@ export default function BranchSettingsPage() {
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!selectedBranchId) {
-      setErrorMsg("يرجى اختيار فرع أولاً.");
+      setErrorMsg(t("selectBranchFirst"));
       return;
     }
     if (!formData.name.trim() && !formData.nameEn.trim()) {
-      setErrorMsg("يرجى إدخال اسم الفرع.");
+      setErrorMsg(t("errorNoName"));
       return;
     }
 
@@ -101,22 +104,29 @@ export default function BranchSettingsPage() {
         themeColor: formData.themeColor.trim() || "#f2644b",
       });
 
-      setSuccessMsg("تم حفظ إعدادات الهوية والفرع بنجاح! تم تحديث شاشة العميل.");
+      setSuccessMsg(t("successSaved"));
       await refreshBranches();
       setTimeout(() => setSuccessMsg(""), 4500);
     } catch (err: unknown) {
       console.error("Save settings error:", err);
       setErrorMsg(
-        apiErrorMessage(err) || "تعذر حفظ الإعدادات. يرجى المحاولة مرة أخرى."
+        apiErrorMessage(err) || (isRtl ? "تعذر حفظ الإعدادات. يرجى المحاولة مرة أخرى." : "Failed to save settings. Please try again.")
       );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const selectedColorName =
-    PRESET_COLORS.find((c) => c.hex.toLowerCase() === formData.themeColor.toLowerCase())
-      ?.name || "مخصص";
+  const matchedColor = PRESET_COLORS.find(
+    (c) => c.hex.toLowerCase() === formData.themeColor.toLowerCase()
+  );
+  const selectedColorName = matchedColor
+    ? t(`colors.${matchedColor.key}`)
+    : t("customColor");
+
+  const displayName = isRtl
+    ? (formData.name || formData.nameEn || selectedBranch?.name || "")
+    : (formData.nameEn || formData.name || selectedBranch?.name || "");
 
   return (
     <div className={styles.page}>
@@ -124,12 +134,10 @@ export default function BranchSettingsPage() {
         <div>
           <p className={styles.eyebrow}>
             <span aria-hidden="true" />
-            الإدارة • الإعدادات
+            {tCommon("admin")} • {t("pageTitle")}
           </p>
-          <h1>هوية المتجر وإعدادات الفرع</h1>
-          <p>
-            خصص اسم مطعمك، شعارك التجاري، وألوان الواجهة التي سيراها عملاؤك عند مسح الرمز.
-          </p>
+          <h1>{t("pageTitle")}</h1>
+          <p>{t("pageDesc")}</p>
         </div>
 
         <div className={styles.headerActions}>
@@ -140,13 +148,13 @@ export default function BranchSettingsPage() {
             className={styles.secondaryButton}
             onClick={() => refreshBranches()}
             disabled={isLoadingBranches}
-            aria-label="تحديث البيانات"
+            aria-label={tCommon("refresh")}
           >
             <RotateCcw
               size={17}
               className={isLoadingBranches ? "animate-spin" : undefined}
             />
-            <span>تحديث</span>
+            <span>{tCommon("refresh")}</span>
           </button>
 
           <button
@@ -158,12 +166,12 @@ export default function BranchSettingsPage() {
             {isSaving ? (
               <>
                 <Loader2 size={17} className="animate-spin" />
-                <span>جارٍ الحفظ…</span>
+                <span>{t("saving")}</span>
               </>
             ) : (
               <>
                 <Save size={17} strokeWidth={2.2} />
-                <span>حفظ التغييرات</span>
+                <span>{t("saveChanges")}</span>
               </>
             )}
           </button>
@@ -171,16 +179,18 @@ export default function BranchSettingsPage() {
       </header>
 
       {/* KPI Stats */}
-      <section className={styles.kpiGrid} aria-label="ملخص الإعدادات">
+      <section className={styles.kpiGrid} aria-label={t("pageTitle")}>
         <div className={styles.kpiCard}>
           <div className={styles.kpiIcon} data-tone="coral">
             <Store size={22} />
           </div>
           <div className={styles.kpiInfo}>
             <span className={styles.kpiValue}>
-              {formData.name || selectedBranch?.name || "—"}
+              {displayName || "—"}
             </span>
-            <span className={styles.kpiLabel}>اسم الفرع الحالي</span>
+            <span className={styles.kpiLabel}>
+              {isRtl ? "اسم الفرع الحالي" : "Current Branch Name"}
+            </span>
           </div>
         </div>
 
@@ -190,9 +200,13 @@ export default function BranchSettingsPage() {
           </div>
           <div className={styles.kpiInfo}>
             <span className={styles.kpiValue}>
-              {formData.logoUrl ? "شعار مخصص" : "الافتراضي"}
+              {formData.logoUrl
+                ? (isRtl ? "شعار مخصص" : "Custom Logo")
+                : (isRtl ? "الافتراضي" : "Default")}
             </span>
-            <span className={styles.kpiLabel}>حالة شعار المطعم</span>
+            <span className={styles.kpiLabel}>
+              {isRtl ? "حالة شعار المطعم" : "Brand Logo Status"}
+            </span>
           </div>
         </div>
 
@@ -202,7 +216,9 @@ export default function BranchSettingsPage() {
           </div>
           <div className={styles.kpiInfo}>
             <span className={styles.kpiValue}>{selectedColorName}</span>
-            <span className={styles.kpiLabel}>لون الهوية المعتمد</span>
+            <span className={styles.kpiLabel}>
+              {isRtl ? "لون الهوية المعتمد" : "Active Theme Color"}
+            </span>
           </div>
         </div>
 
@@ -211,8 +227,12 @@ export default function BranchSettingsPage() {
             <Sparkles size={22} />
           </div>
           <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>تحديث فوري</span>
-            <span className={styles.kpiLabel}>المزامنة مع قائمة العميل</span>
+            <span className={styles.kpiValue}>
+              {isRtl ? "تحديث فوري" : "Instant Sync"}
+            </span>
+            <span className={styles.kpiLabel}>
+              {isRtl ? "المزامنة مع قائمة العميل" : "Guest Menu Sync"}
+            </span>
           </div>
         </div>
       </section>
@@ -235,8 +255,12 @@ export default function BranchSettingsPage() {
           <div className={styles.emptyIcon}>
             <Building2 size={28} />
           </div>
-          <h3>يرجى اختيار فرع أولاً</h3>
-          <p>حدد فرعاً لتعديل هويته وشعاره وبياناته.</p>
+          <h3>{t("selectBranchFirst")}</h3>
+          <p>
+            {isRtl
+              ? "حدد فرعاً لتعديل هويته وشعاره وبياناته."
+              : "Select a branch to customize its brand identity, logo, and details."}
+          </p>
         </div>
       ) : (
         <div className={styles.settingsGrid}>
@@ -249,19 +273,23 @@ export default function BranchSettingsPage() {
                   <Store size={20} />
                 </div>
                 <div>
-                  <h2>بيانات الفرع والموقع</h2>
-                  <p>المعلومات الأساسية التي تظهر في ترويسة القائمة والفاتورة.</p>
+                  <h2>{t("generalInfo")}</h2>
+                  <p>
+                    {isRtl
+                      ? "المعلومات الأساسية التي تظهر في ترويسة القائمة والفاتورة."
+                      : "Basic branch information displayed in digital menus and guest receipts."}
+                  </p>
                 </div>
               </div>
 
               <form onSubmit={handleSave} className={styles.formGrid}>
                 <div className={styles.inputGroup}>
-                  <label htmlFor="store-name-ar">اسم المطعم / الفرع (بالعربية) *</label>
+                  <label htmlFor="store-name-ar">{t("nameArLabel")} *</label>
                   <input
                     id="store-name-ar"
                     type="text"
                     required
-                    placeholder="مثال: لاونج داين هب"
+                    placeholder={isRtl ? "مثال: لاونج داين هب" : "e.g. DineHub Lounge (Arabic)"}
                     value={formData.name}
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
@@ -270,7 +298,7 @@ export default function BranchSettingsPage() {
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label htmlFor="store-name-en">اسم الفرع (بالإنجليزية - اختياري)</label>
+                  <label htmlFor="store-name-en">{t("nameEnLabel")}</label>
                   <input
                     id="store-name-en"
                     type="text"
@@ -284,11 +312,11 @@ export default function BranchSettingsPage() {
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label htmlFor="store-address">العنوان أو الحي</label>
+                  <label htmlFor="store-address">{t("addressLabel")}</label>
                   <input
                     id="store-address"
                     type="text"
-                    placeholder="مثال: طريق التخصصي، حي المعذر، الرياض"
+                    placeholder={isRtl ? "مثال: طريق التخصصي، حي المعذر، الرياض" : "e.g. Takhassusi St, Al Mathar, Riyadh"}
                     value={formData.address}
                     onChange={(e) =>
                       setFormData({ ...formData, address: e.target.value })
@@ -297,7 +325,7 @@ export default function BranchSettingsPage() {
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label htmlFor="store-phone">رقم الهاتف أو خدمة العملاء</label>
+                  <label htmlFor="store-phone">{t("phoneLabel")}</label>
                   <input
                     id="store-phone"
                     type="tel"
@@ -319,27 +347,31 @@ export default function BranchSettingsPage() {
                   <Palette size={20} />
                 </div>
                 <div>
-                  <h2>الشعار واللون المميز</h2>
-                  <p>تخصيص الهوية البصرية لشاشات الطلب وقائمة العميل.</p>
+                  <h2>{t("brandIdentity")}</h2>
+                  <p>{t("brandDesc")}</p>
                 </div>
               </div>
 
               <div className={styles.formGrid}>
                 <div className={styles.inputGroup}>
-                  <label>شعار الفرع أو المطعم</label>
+                  <label>{t("logoLabel")}</label>
                   <ImageUploader
                     value={formData.logoUrl}
                     onChange={(url) =>
                       setFormData({ ...formData, logoUrl: url })
                     }
-                    label="رفع شعار المتجر"
-                    description="يفضل صورة مربعة بخلفية شفافة PNG أو WebP"
+                    label={isRtl ? "رفع شعار المتجر" : "Upload Brand Logo"}
+                    description={
+                      isRtl
+                        ? "يفضل صورة مربعة بخلفية شفافة PNG أو WebP"
+                        : "Square PNG or WebP with transparent background recommended"
+                    }
                     aspectRatio="square"
                   />
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label>لون الهوية الرئيسي لشاشات العميل</label>
+                  <label>{t("themeColorLabel")}</label>
                   <div className={styles.colorPresetsGrid}>
                     {PRESET_COLORS.map((preset) => {
                       const isActive =
@@ -358,7 +390,7 @@ export default function BranchSettingsPage() {
                             className={styles.colorSwatch}
                             style={{ backgroundColor: preset.hex }}
                           />
-                          <span>{preset.name}</span>
+                          <span>{t(`colors.${preset.key}`)}</span>
                         </button>
                       );
                     })}
@@ -375,7 +407,7 @@ export default function BranchSettingsPage() {
                 <div className={styles.phoneSpeaker} />
               </div>
 
-              <div className={styles.phoneContent}>
+              <div className={styles.phoneContent} dir={isRtl ? "rtl" : "ltr"}>
                 {/* Brand Banner Header */}
                 <div className={styles.phoneHeader}>
                   <div className={styles.phoneLogo}>
@@ -386,8 +418,12 @@ export default function BranchSettingsPage() {
                     )}
                   </div>
                   <div className={styles.phoneTitles}>
-                    <strong>{formData.name || "اسم المطعم / المتجر"}</strong>
-                    <small>{formData.address || "حي النخيل، الرياض"}</small>
+                    <strong>
+                      {displayName || (isRtl ? "اسم المطعم / المتجر" : "Restaurant / Cafe Name")}
+                    </strong>
+                    <small>
+                      {formData.address || (isRtl ? "حي النخيل، الرياض" : "Al Nakheel, Riyadh")}
+                    </small>
                   </div>
                   <div
                     style={{
@@ -403,7 +439,7 @@ export default function BranchSettingsPage() {
                       flexShrink: 0,
                     }}
                   >
-                    طاولة #04
+                    {isRtl ? "طاولة #04" : "Table #04"}
                   </div>
                 </div>
 
@@ -427,7 +463,7 @@ export default function BranchSettingsPage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    الكل
+                    {t("sampleCategoryAll")}
                   </span>
                   <span
                     style={{
@@ -440,7 +476,7 @@ export default function BranchSettingsPage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    مشروبات
+                    {t("sampleCategoryDrinks")}
                   </span>
                   <span
                     style={{
@@ -453,22 +489,22 @@ export default function BranchSettingsPage() {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    حلويات
+                    {t("sampleCategoryDesserts")}
                   </span>
                 </div>
 
                 {/* Rich Sample Product Card */}
                 <div className={styles.sampleMenuCard}>
                   <div className={styles.sampleMenuHead}>
-                    <span style={{ fontSize: "0.78rem" }}>فلات وايت كلاسيك</span>
+                    <span style={{ fontSize: "0.78rem" }}>{t("sampleProductName")}</span>
                     <span style={{ color: formData.themeColor, fontSize: "0.78rem", fontWeight: 800 }}>
-                      18.00 ر.س
+                      {isRtl ? "18.00 ر.س" : "SAR 18.00"}
                     </span>
                   </div>
                   <p style={{ margin: 0, fontSize: "0.68rem", color: "#b9aebd", lineHeight: 1.4 }}>
-                    إسبريسو فاخر مع حليب مبخر بقوام مخملي ناعم
+                    {t("sampleProductDesc")}
                   </p>
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px" }}>
+                  <div style={{ display: "flex", justifyContent: isRtl ? "flex-start" : "flex-end", marginTop: "4px" }}>
                     <span
                       style={{
                         backgroundColor: formData.themeColor,
@@ -479,7 +515,7 @@ export default function BranchSettingsPage() {
                         borderRadius: "6px",
                       }}
                     >
-                      + إضافة
+                      {t("sampleAdd")}
                     </span>
                   </div>
                 </div>
@@ -508,9 +544,11 @@ export default function BranchSettingsPage() {
                     >
                       1
                     </span>
-                    <span>عرض ومراجعة الطلب</span>
+                    <span>{t("sampleReviewOrder")}</span>
                   </div>
-                  <span style={{ fontWeight: 800, fontFamily: "monospace" }}>18.00 ر.س</span>
+                  <span style={{ fontWeight: 800, fontFamily: "monospace" }}>
+                    {isRtl ? "18.00 ر.س" : "SAR 18.00"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -523,7 +561,7 @@ export default function BranchSettingsPage() {
                 marginTop: "12px",
               }}
             >
-              معاينة حية فورية لما يراه العميل على هاتفه الذكي
+              {t("previewDesc")}
             </p>
           </div>
         </div>

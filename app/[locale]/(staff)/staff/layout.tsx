@@ -3,15 +3,20 @@ import { PasswordChangeScreen } from "@/components/auth/password-change-screen";
 
 import { AccessProvider, useAccess } from "@/lib/access-context";
 import { useSession } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Link, useRouter } from "@/i18n/navigation";
 import { LogOut, User, Radio } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { AdminLanguageSwitcher } from "@/components/admin/admin-language-switcher";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 function StaffShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useTranslations("Staff");
+  const isRtl = locale !== "en";
+
   const { access, can, loading: accessLoading } = useAccess();
   const { data: session, isPending } = useSession();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -27,13 +32,21 @@ function StaffShell({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-[#130d1b] flex flex-col items-center justify-center gap-3 text-white">
         <LoadingSpinner size={36} />
         <p className="text-xs text-zinc-400 animate-pulse">
-          جارٍ التحقق من الجلسة…
+          {t("checkingSession")}
         </p>
       </div>
     );
   }
 
-  if (access?.mustChangePassword) return <PasswordChangeScreen forced expiresAt={access.temporaryPasswordExpiresAt} businessName={access.businessName} />;
+  if (access?.mustChangePassword) {
+    return (
+      <PasswordChangeScreen
+        forced
+        expiresAt={access.temporaryPasswordExpiresAt}
+        businessName={access.businessName}
+      />
+    );
+  }
 
   const handleLogout = async () => {
     setIsSigningOut(true);
@@ -49,9 +62,11 @@ function StaffShell({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="min-h-screen flex flex-col bg-[#110b17] text-[#fffdf9] font-sans antialiased"
-      dir="rtl"
+      dir={isRtl ? "rtl" : "ltr"}
       style={{
-        fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif",
+        fontFamily: isRtl
+          ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
+          : "var(--font-outfit), sans-serif",
       }}
     >
       {/* Sleek Operations Header */}
@@ -61,25 +76,33 @@ function StaffShell({ children }: { children: React.ReactNode }) {
             <Radio size={16} className="text-[#ff9d8c]" />
           </div>
           <span className="font-extrabold text-base sm:text-lg text-white">
-            شاشة الطلبات المباشرة
+            {t("headerTitle")}
           </span>
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Quick Language Capsule Switcher */}
+          <AdminLanguageSwitcher />
+
           <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] px-3 py-1.5 rounded-xl text-xs text-zinc-300">
             <User size={13} className="text-zinc-400" />
             <span className="font-bold truncate max-w-[120px] sm:max-w-none">
-              {session?.user?.name || "طاقم الخدمة"}
+              {session?.user?.name || t("defaultStaffName")}
             </span>
           </div>
 
-          <Link href="/account/password" className="p-3 text-sm">أمان الحساب</Link>
+          <Link
+            href="/account/password"
+            className="p-2 sm:p-3 text-xs sm:text-sm text-zinc-300 hover:text-white transition-colors"
+          >
+            {t("accountSecurity")}
+          </Link>
           <button
             type="button"
             onClick={handleLogout}
             disabled={isSigningOut}
-            aria-label="تسجيل الخروج"
-            title="تسجيل الخروج"
+            aria-label={t("signOut")}
+            title={t("signOut")}
             className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-red-500/20 text-zinc-400 hover:text-red-300 border border-white/[0.08] flex items-center justify-center transition-colors disabled:opacity-50"
           >
             <LogOut size={15} />
@@ -91,7 +114,7 @@ function StaffShell({ children }: { children: React.ReactNode }) {
         {can("orders.read") ? (
           children
         ) : (
-          <p role="alert">ليس لديك صلاحية لعرض العمليات.</p>
+          <p role="alert">{t("noPermission")}</p>
         )}
       </main>
     </div>

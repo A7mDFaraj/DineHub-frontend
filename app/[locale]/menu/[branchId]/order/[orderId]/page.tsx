@@ -12,9 +12,10 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { ReadyAlert, OrderRating } from "@/components/customer/order-feedback";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { OrderElapsed } from "@/components/orders/order-elapsed";
+import { useLocale, useTranslations } from "next-intl";
+import { AdminLanguageSwitcher } from "@/components/admin/admin-language-switcher";
 
 type OrderStatus = "pending" | "preparing" | "ready" | "delivered";
 
@@ -36,51 +37,6 @@ interface OrderData {
   items?: { nameEn?: string; nameAr?: string; quantity: number }[];
 }
 
-const statusMap: Record<
-  OrderStatus,
-  {
-    label: string;
-    sublabel: string;
-    icon: React.ReactNode;
-    color: string;
-    bgColor: string;
-    borderColor: string;
-  }
-> = {
-  pending: {
-    label: "تم استلام طلبك بنجاح",
-    sublabel: "طلبك مسجل في النظام وفي انتظار بدء التجهيز",
-    icon: <Clock className="w-9 h-9" />,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-200",
-  },
-  preparing: {
-    label: "قيد التجهيز والإعداد",
-    sublabel: "فريق العمل يقوم حالياً بتجهيز وإعداد طلبك بعناية",
-    icon: <Radio className="w-9 h-9 text-amber-500" />,
-    color: "text-amber-600",
-    bgColor: "bg-amber-50",
-    borderColor: "border-amber-200",
-  },
-  ready: {
-    label: "طلبك جاهز للتسليم!",
-    sublabel: "طلبك جاهز تماماً وهو في طريقه إلى طاولتك الآن",
-    icon: <Sparkles className="w-9 h-9 text-emerald-500" />,
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50",
-    borderColor: "border-emerald-200",
-  },
-  delivered: {
-    label: "تم تسليم الطلب • بالهناء والعافية",
-    sublabel: "نتمنى لك أطيب الأوقات! يسعدنا خدمتك دائماً",
-    icon: <CheckCircle2 className="w-9 h-9 text-stone-600" />,
-    color: "text-stone-800",
-    bgColor: "bg-stone-100",
-    borderColor: "border-stone-200",
-  },
-};
-
 const statusOrder: OrderStatus[] = [
   "pending",
   "preparing",
@@ -95,10 +51,59 @@ export default function OrderTrackingPage({
 }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const locale = useLocale();
+  const t = useTranslations("CustomerOrderTracking");
+  const isRtl = locale === "ar";
+
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const statusMap: Record<
+    OrderStatus,
+    {
+      label: string;
+      sublabel: string;
+      icon: React.ReactNode;
+      color: string;
+      bgColor: string;
+      borderColor: string;
+    }
+  > = {
+    pending: {
+      label: t("statusPending"),
+      sublabel: t("statusPendingSub"),
+      icon: <Clock className="w-9 h-9" />,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+      borderColor: "border-blue-200",
+    },
+    preparing: {
+      label: t("statusPreparing"),
+      sublabel: t("statusPreparingSub"),
+      icon: <Radio className="w-9 h-9 text-amber-500" />,
+      color: "text-amber-600",
+      bgColor: "bg-amber-50",
+      borderColor: "border-amber-200",
+    },
+    ready: {
+      label: t("statusReady"),
+      sublabel: t("statusReadySub"),
+      icon: <Sparkles className="w-9 h-9 text-emerald-500" />,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+      borderColor: "border-emerald-200",
+    },
+    delivered: {
+      label: t("statusDelivered"),
+      sublabel: t("statusDeliveredSub"),
+      icon: <CheckCircle2 className="w-9 h-9 text-stone-600" />,
+      color: "text-stone-800",
+      bgColor: "bg-stone-100",
+      borderColor: "border-stone-200",
+    },
+  };
 
   useEffect(() => {
     let active = true;
@@ -115,13 +120,18 @@ export default function OrderTrackingPage({
         setOrder(raw);
         setError("");
         finished = raw.status === "delivered";
-        if (raw.trackingPath && raw.trackingPath !== window.location.pathname)
+        const currentPathWithoutLocale = window.location.pathname.replace(/^\/(en|ar)/, "");
+        if (
+          raw.trackingPath &&
+          raw.trackingPath !== currentPathWithoutLocale &&
+          raw.trackingPath !== window.location.pathname
+        ) {
           router.replace(raw.trackingPath);
+        }
       } catch {
-        if (active)
-          setError(
-            "تعذر تحديث حالة الطلب. تحقق من اتصالك؛ آخر حالة مؤكدة ستبقى ظاهرة.",
-          );
+        if (active) {
+          setError(t("loadError"));
+        }
       } finally {
         if (active) {
           setLoading(false);
@@ -135,16 +145,16 @@ export default function OrderTrackingPage({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [resolvedParams.orderId, router, retry]);
+  }, [resolvedParams.orderId, router, retry, t]);
 
-  if (!loading && !order)
+  if (!loading && !order) {
     return (
       <div
-        dir="rtl"
+        dir={isRtl ? "rtl" : "ltr"}
         role="alert"
         className="p-6 rounded-2xl bg-red-50 text-red-800 text-center space-y-4"
       >
-        <p>{error || "تعذر العثور على الطلب."}</p>
+        <p>{error || t("loadError")}</p>
         <button
           className="min-h-11 px-5 rounded-xl border focus-visible:outline-2"
           onClick={() => {
@@ -152,17 +162,18 @@ export default function OrderTrackingPage({
             setRetry((value) => value + 1);
           }}
         >
-          إعادة المحاولة
+          {isRtl ? "إعادة المحاولة" : "Try Again"}
         </button>
       </div>
     );
+  }
 
   if (loading || !order) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-3 text-stone-700">
         <LoadingSpinner size={36} />
         <p className="text-xs text-stone-500 font-bold animate-pulse">
-          جارٍ العثور على تفاصيل طلبك…
+          {isRtl ? "جارٍ العثور على تفاصيل طلبك…" : "Finding your order details…"}
         </p>
       </div>
     );
@@ -176,21 +187,28 @@ export default function OrderTrackingPage({
   return (
     <div
       className="py-6 max-w-md mx-auto space-y-5"
-      dir="rtl"
+      dir={isRtl ? "rtl" : "ltr"}
       style={{
-        fontFamily: "var(--font-thmanyah), var(--font-arabic), sans-serif",
+        fontFamily: isRtl
+          ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
+          : "var(--font-outfit), sans-serif",
       }}
     >
-      {/* Header */}
-      <div className="text-center space-y-1.5">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-stone-200 text-xs font-mono font-bold text-stone-600 shadow-sm">
-          <span>طلب #{shortId}</span>
+      {/* Top Header with Language Switcher */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-stone-200 text-xs font-mono font-bold text-stone-600 shadow-sm">
+          <span>{t("orderNumber")}{shortId}</span>
           {tableNum && (
-            <span className="text-stone-800 font-bold">• طاولة {tableNum}</span>
+            <span className="text-stone-800 font-bold">• {t("table")} {tableNum}</span>
           )}
         </div>
+
+        <AdminLanguageSwitcher variant="light" />
+      </div>
+
+      <div className="text-center space-y-1">
         <h1 className="text-xl sm:text-2xl font-black text-stone-900">
-          متابعة حالة الطلب المباشرة
+          {isRtl ? "متابعة حالة الطلب المباشرة" : "Live Order Tracking"}
         </h1>
       </div>
 
@@ -202,9 +220,10 @@ export default function OrderTrackingPage({
           {error}
         </p>
       )}
+
       <div className="rounded-2xl border border-stone-200 bg-white p-4 text-center space-y-2">
         <p className="text-sm font-bold">
-          أظهر هذا الرمز للموظف عند استلام الطلب
+          {isRtl ? "أظهر هذا الرمز للموظف عند استلام الطلب" : "Show this code to staff upon receiving your order"}
         </p>
         <p dir="ltr" className="font-mono text-3xl font-black tracking-wider">
           #{shortId}
@@ -219,10 +238,12 @@ export default function OrderTrackingPage({
           </p>
         )}
       </div>
+
       <ReadyAlert status={order.status} token={order.publicToken} />
       {order.status === "delivered" && (
         <OrderRating token={order.publicToken} initialRating={order.rating} />
       )}
+
       {/* Main Status Display Card */}
       <motion.div
         key={order.status}
@@ -248,7 +269,7 @@ export default function OrderTrackingPage({
       {/* Step Progress Timeline Card */}
       <div className="p-5 rounded-3xl bg-white border border-stone-200 shadow-sm space-y-4">
         <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-          مراحل تجهيز وتوصيل الطلب
+          {isRtl ? "مراحل تجهيز وتوصيل الطلب" : "Order Preparation Steps"}
         </h3>
 
         <div className="space-y-4">
@@ -267,10 +288,10 @@ export default function OrderTrackingPage({
 
             return (
               <div key={step} className="flex items-center gap-3.5 relative">
-                {/* Connecting line on right in RTL */}
+                {/* Connecting line */}
                 {index < statusOrder.length - 1 && (
                   <div
-                    className={`absolute right-[11px] top-7 w-0.5 h-6 transition-colors ${
+                    className={`absolute ${isRtl ? "right-[11px]" : "left-[11px]"} top-7 w-0.5 h-6 transition-colors ${
                       index < currentStepIndex
                         ? "bg-emerald-500"
                         : "bg-stone-200"
@@ -310,7 +331,7 @@ export default function OrderTrackingPage({
                       dateTime={time}
                       className="text-xs text-stone-500 tabular-nums"
                     >
-                      {new Date(time).toLocaleTimeString("ar-SA", {
+                      {new Date(time).toLocaleTimeString(isRtl ? "ar-SA" : "en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
@@ -318,7 +339,7 @@ export default function OrderTrackingPage({
                   )}
                   {isCurrent && step !== "delivered" && (
                     <p className="text-[10px] text-amber-600 font-bold mt-0.5 animate-pulse">
-                      جاري التنفيذ حالياً…
+                      {isRtl ? "جاري التنفيذ حالياً…" : "In progress right now…"}
                     </p>
                   )}
                 </div>
@@ -336,7 +357,7 @@ export default function OrderTrackingPage({
             className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200 text-xs sm:text-sm font-bold text-stone-800 transition-all active:scale-[0.96] shadow-sm"
           >
             <ShoppingBag size={16} />
-            <span>طلب المزيد أو العودة إلى قائمة الطعام</span>
+            <span>{isRtl ? "طلب المزيد أو العودة إلى قائمة الطعام" : "Order more or return to menu"}</span>
           </Link>
         </div>
       )}

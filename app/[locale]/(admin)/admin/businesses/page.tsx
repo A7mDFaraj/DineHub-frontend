@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import axios from "axios";
+import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
 import { useAccess } from "@/lib/access-context";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,11 @@ interface Created {
 }
 
 export default function BusinessesPage() {
+  const locale = useLocale();
+  const t = useTranslations("AdminBusinesses");
+  const tCommon = useTranslations("AdminCommon");
+  const isRtl = locale !== "en";
+
   const { access } = useAccess();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,11 +66,11 @@ export default function BusinessesPage() {
     try {
       setBusinesses((await apiClient.get<Business[]>("/platform/businesses")).data);
     } catch {
-      setError("تعذر تحميل أنشطة المنصة.");
+      setError(isRtl ? "تعذر تحميل أنشطة المنصة." : "Failed to load platform businesses.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isRtl]);
 
   useEffect(() => {
     if (!access?.isPlatformAdmin) return;
@@ -85,9 +91,9 @@ export default function BusinessesPage() {
     if (!created) return;
     try {
       await navigator.clipboard.writeText(created.temporaryPassword);
-      setFeedback("password", "تم نسخ كلمة المرور إلى الحافظة بنجاح");
+      setFeedback("password", isRtl ? "تم نسخ كلمة المرور إلى الحافظة بنجاح" : "Password copied to clipboard");
     } catch {
-      setCopyStatus("يرجى تحديد كلمة المرور ونسخها يدوياً");
+      setCopyStatus(isRtl ? "يرجى تحديد كلمة المرور ونسخها يدوياً" : "Please copy password manually");
     }
   };
 
@@ -95,30 +101,42 @@ export default function BusinessesPage() {
     if (!created) return;
     try {
       await navigator.clipboard.writeText(created.owner.email);
-      setFeedback("email", "تم نسخ البريد الإلكتروني");
+      setFeedback("email", isRtl ? "تم نسخ البريد الإلكتروني" : "Email copied to clipboard");
     } catch {
-      setCopyStatus("تعذر النسخ التلقائي");
+      setCopyStatus(isRtl ? "تعذر النسخ التلقائي" : "Automatic copy failed");
     }
   };
 
   const handleCopyAll = async () => {
     if (!created) return;
     const origin = typeof window !== "undefined" ? window.location.origin : "https://dinehub.app";
-    const text = [
-      `بيانات الدخول إلى منصة DineHub:`,
-      `• المنشأة: ${created.business.name}`,
-      `• البريد الإلكتروني للمالك: ${created.owner.email}`,
-      `• كلمة المرور المؤقتة: ${created.temporaryPassword}`,
-      `• رابط الدخول: ${origin}/admin/login`,
-      ``,
-      `ملاحظة: هذه كلمة مرور مؤقتة صالحة لمدة 48 ساعة، وسيُطلب تغييرها فور أول تسجيل دخول.`,
-    ].join("\n");
+    const loginPath = isRtl ? `${origin}/admin/login` : `${origin}/en/admin/login`;
+
+    const text = isRtl
+      ? [
+          `بيانات الدخول إلى منصة DineHub:`,
+          `• المنشأة: ${created.business.name}`,
+          `• البريد الإلكتروني للمالك: ${created.owner.email}`,
+          `• كلمة المرور المؤقتة: ${created.temporaryPassword}`,
+          `• رابط الدخول: ${loginPath}`,
+          ``,
+          `ملاحظة: هذه كلمة مرور مؤقتة صالحة لمدة 48 ساعة، وسيُطلب تغييرها فور أول تسجيل دخول.`,
+        ].join("\n")
+      : [
+          `DineHub Platform Login Credentials:`,
+          `• Business: ${created.business.name}`,
+          `• Owner Email: ${created.owner.email}`,
+          `• Temporary Password: ${created.temporaryPassword}`,
+          `• Login URL: ${loginPath}`,
+          ``,
+          `Note: This is a temporary password valid for 48 hours. You will be prompted to change it upon first login.`,
+        ].join("\n");
 
     try {
       await navigator.clipboard.writeText(text);
-      setFeedback("all", "تم نسخ كامل البيانات بنجاح (جاهزة للإرسال)");
+      setFeedback("all", isRtl ? "تم نسخ كامل البيانات بنجاح (جاهزة للإرسال)" : "Full credentials copied (ready to send)");
     } catch {
-      setCopyStatus("تعذر نسخ النص بالكامل");
+      setCopyStatus(isRtl ? "تعذر نسخ النص بالكامل" : "Failed to copy full text");
     }
   };
 
@@ -140,7 +158,7 @@ export default function BusinessesPage() {
       setError(
         axios.isAxiosError(e) && typeof e.response?.data?.message === "string"
           ? e.response.data.message
-          : "تعذر إنشاء النشاط.",
+          : (isRtl ? "تعذر إنشاء النشاط." : "Failed to create business."),
       );
     } finally {
       setBusy(false);
@@ -170,7 +188,7 @@ export default function BusinessesPage() {
       setError(
         axios.isAxiosError(e) && typeof e.response?.data?.message === "string"
           ? e.response.data.message
-          : "تعذر إصدار كلمة مرور للمالك.",
+          : (isRtl ? "تعذر إصدار كلمة مرور للمالك." : "Failed to issue temporary password."),
       );
     } finally {
       setBusy(false);
@@ -178,18 +196,20 @@ export default function BusinessesPage() {
   }
 
   if (!access?.isPlatformAdmin) {
-    return <p role="alert">هذه الصفحة خاصة بإدارة منصة DineHub.</p>;
+    return (
+      <p role="alert">
+        {isRtl ? "هذه الصفحة خاصة بإدارة منصة DineHub." : "This page is restricted to DineHub platform administrators."}
+      </p>
+    );
   }
 
   return (
     <div className={styles.section}>
       <header className={styles.heading}>
         <div>
-          <p className={styles.muted}>إدارة المنصة</p>
-          <h1>أنشطة العملاء</h1>
-          <p className={styles.muted}>
-            كل نشاط معزول بقواعد بياناته وفروعه ومستخدميه وسجلاته.
-          </p>
+          <p className={styles.muted}>{isRtl ? "إدارة المنصة" : "Platform Management"}</p>
+          <h1>{t("pageTitle")}</h1>
+          <p className={styles.muted}>{t("pageDesc")}</p>
         </div>
       </header>
 
@@ -202,10 +222,13 @@ export default function BusinessesPage() {
                 <KeyRound size={22} strokeWidth={1.8} />
               </div>
               <div>
-                <h2 style={{ fontSize: "1.05rem", margin: "0 0 4px" }}>بيانات الدخول المؤقتة متاحة</h2>
+                <h2 style={{ fontSize: "1.05rem", margin: "0 0 4px" }}>
+                  {isRtl ? "بيانات الدخول المؤقتة متاحة" : "Temporary Login Credentials Available"}
+                </h2>
                 <p style={{ margin: 0, fontSize: "0.85rem", color: "#b9aebd" }}>
-                  تم إصدار بيانات الدخول المؤقتة لـ{" "}
-                  <strong>{created.business.name}</strong> ({created.owner.email}).
+                  {isRtl
+                    ? `تم إصدار بيانات الدخول المؤقتة لـ ${created.business.name} (${created.owner.email}).`
+                    : `Temporary credentials issued for ${created.business.name} (${created.owner.email}).`}
                 </p>
               </div>
             </div>
@@ -216,14 +239,14 @@ export default function BusinessesPage() {
                 onClick={() => setIsModalOpen(true)}
               >
                 <KeyRound size={16} />
-                <span>عرض بيانات الدخول ونسخها</span>
+                <span>{isRtl ? "عرض بيانات الدخول ونسخها" : "View & Copy Credentials"}</span>
               </button>
               <button
                 type="button"
                 className={styles.dismissButton}
                 onClick={() => setCreated(null)}
-                title="إغلاق التنبيه"
-                aria-label="إغلاق التنبيه"
+                title={isRtl ? "إغلاق التنبيه" : "Dismiss alert"}
+                aria-label={isRtl ? "إغلاق التنبيه" : "Dismiss alert"}
               >
                 <X size={18} />
               </button>
@@ -236,7 +259,7 @@ export default function BusinessesPage() {
       <Dialog.Root open={isModalOpen && Boolean(created)} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={styles.overlay} />
-          <Dialog.Content className={styles.credentialsModal} dir="rtl">
+          <Dialog.Content className={styles.credentialsModal} dir={isRtl ? "rtl" : "ltr"}>
             {created && (
               <>
                 <div className={styles.modalHeader}>
@@ -246,18 +269,15 @@ export default function BusinessesPage() {
                   <div className={styles.modalTitleBlock}>
                     <div className={styles.titleWithBadge}>
                       <Dialog.Title asChild>
-                        <h2>بيانات الدخول المؤقتة</h2>
+                        <h2>{t("credentialsTitle")}</h2>
                       </Dialog.Title>
                       <span className={styles.credentialsBadge}>
                         <Clock size={13} strokeWidth={2} />
-                        صالحة لمدة 48 ساعة
+                        {isRtl ? "صالحة لمدة 48 ساعة" : "Valid for 48 hours"}
                       </span>
                     </div>
                     <Dialog.Description asChild>
-                      <p className={styles.modalSubtitle}>
-                        انسخ هذه البيانات وشاركها مع المالك مباشرة. لن تظهر
-                        مرة أخرى بعد إغلاق هذه النافذة.
-                      </p>
+                      <p className={styles.modalSubtitle}>{t("credentialsDesc")}</p>
                     </Dialog.Description>
                   </div>
 
@@ -265,8 +285,8 @@ export default function BusinessesPage() {
                     <button
                       type="button"
                       className={styles.modalCloseButton}
-                      title="إغلاق النافذة"
-                      aria-label="إغلاق نافذة بيانات الدخول"
+                      title={isRtl ? "إغلاق النافذة" : "Close modal"}
+                      aria-label={isRtl ? "إغلاق نافذة بيانات الدخول" : "Close credentials modal"}
                     >
                       <X size={18} strokeWidth={2} />
                     </button>
@@ -275,7 +295,7 @@ export default function BusinessesPage() {
 
                 <div className={styles.credentialsGrid}>
                   <div className={styles.credentialItem}>
-                    <span className={styles.credentialLabel}>اسم المنشأة / النشاط</span>
+                    <span className={styles.credentialLabel}>{t("businessName")}</span>
                     <div className={styles.credentialBox}>
                       <Store size={17} className="text-zinc-400 shrink-0" />
                       <strong className={styles.credentialBoxValue}>
@@ -285,7 +305,7 @@ export default function BusinessesPage() {
                   </div>
 
                   <div className={styles.credentialItem}>
-                    <span className={styles.credentialLabel}>البريد الإلكتروني للمالك</span>
+                    <span className={styles.credentialLabel}>{t("ownerEmail")}</span>
                     <div className={styles.credentialBox}>
                       <Mail size={17} className="text-zinc-400 shrink-0" />
                       <span className={styles.credentialBoxValue} dir="ltr">
@@ -295,8 +315,8 @@ export default function BusinessesPage() {
                         type="button"
                         className={styles.eyeToggle}
                         onClick={handleCopyEmail}
-                        title="نسخ البريد الإلكتروني"
-                        aria-label="نسخ البريد الإلكتروني"
+                        title={isRtl ? "نسخ البريد الإلكتروني" : "Copy email address"}
+                        aria-label={isRtl ? "نسخ البريد الإلكتروني" : "Copy email address"}
                       >
                         {copiedField === "email" ? (
                           <Check size={15} className="text-[#77cbc3]" />
@@ -308,7 +328,9 @@ export default function BusinessesPage() {
                   </div>
 
                   <div className={cn(styles.credentialItem, styles.colSpanFull)}>
-                    <span className={styles.credentialLabel}>كلمة المرور المؤقتة</span>
+                    <span className={styles.credentialLabel}>
+                      {isRtl ? "كلمة المرور المؤقتة" : "Temporary Password"}
+                    </span>
                     <div className={styles.passwordRow}>
                       <div className={styles.passwordBox}>
                         <span className={styles.passwordText} dir="ltr">
@@ -318,8 +340,8 @@ export default function BusinessesPage() {
                           type="button"
                           className={styles.eyeToggle}
                           onClick={() => setShowPassword(!showPassword)}
-                          title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-                          aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                          title={showPassword ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
+                          aria-label={showPassword ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
                         >
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
@@ -333,12 +355,12 @@ export default function BusinessesPage() {
                         {copiedField === "password" ? (
                           <>
                             <Check size={16} strokeWidth={2.5} />
-                            <span>تم النسخ!</span>
+                            <span>{isRtl ? "تم النسخ!" : "Copied!"}</span>
                           </>
                         ) : (
                           <>
                             <Copy size={16} />
-                            <span>نسخ كلمة المرور</span>
+                            <span>{isRtl ? "نسخ كلمة المرور" : "Copy Password"}</span>
                           </>
                         )}
                       </button>
@@ -355,19 +377,23 @@ export default function BusinessesPage() {
                     {copiedField === "all" ? (
                       <>
                         <Check size={16} strokeWidth={2.5} className="text-[#77cbc3]" />
-                        <span className="text-[#77cbc3]">تم نسخ الرسالة الكاملة!</span>
+                        <span className="text-[#77cbc3]">
+                          {isRtl ? "تم نسخ الرسالة الكاملة!" : "Full message copied!"}
+                        </span>
                       </>
                     ) : (
                       <>
                         <Copy size={16} />
-                        <span>نسخ كافة البيانات (جاهزة للمشاركة)</span>
+                        <span>
+                          {isRtl ? "نسخ كافة البيانات (جاهزة للمشاركة)" : "Copy All Credentials (Ready to send)"}
+                        </span>
                       </>
                     )}
                   </button>
 
                   <Dialog.Close asChild>
                     <button type="button" className={styles.button}>
-                      تم الحفظ وإغلاق
+                      {isRtl ? "تم الحفظ وإغلاق" : "Done & Close"}
                     </button>
                   </Dialog.Close>
 
@@ -388,30 +414,28 @@ export default function BusinessesPage() {
       <section className={styles.panel}>
         <div className={styles.heading}>
           <div>
-            <h2>إضافة عميل جديد</h2>
-            <p className={styles.muted}>
-              يُنشأ حساب المالك فوراً بكلمة مرور مؤقتة وتفاصيل دخول خاصة.
-            </p>
+            <h2>{t("modalAddTitle")}</h2>
+            <p className={styles.muted}>{t("modalAddDesc")}</p>
           </div>
           <Plus aria-hidden="true" />
         </div>
 
         <form className={styles.fieldsGrid} onSubmit={submit}>
           <label className={styles.field}>
-            اسم النشاط
+            {t("businessName")}
             <input
               className={styles.input}
               required
               minLength={2}
               maxLength={120}
-              placeholder="مثال: مطعم سحاب"
+              placeholder={isRtl ? "مثال: مطعم سحاب" : "e.g. Sahab Restaurant"}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </label>
 
           <label className={styles.field}>
-            المعرّف المختصر (Slug)
+            {t("slug")}
             <input
               className={styles.input}
               dir="ltr"
@@ -426,13 +450,13 @@ export default function BusinessesPage() {
           </label>
 
           <label className={styles.field}>
-            اسم المالك
+            {t("ownerName")}
             <input
               className={styles.input}
               required
               minLength={2}
               maxLength={120}
-              placeholder="مثال: أحمد عبد الله"
+              placeholder={isRtl ? "مثال: أحمد عبد الله" : "e.g. Ahmed Abdullah"}
               value={form.ownerName}
               onChange={(e) =>
                 setForm({ ...form, ownerName: e.target.value })
@@ -441,7 +465,7 @@ export default function BusinessesPage() {
           </label>
 
           <label className={styles.field}>
-            بريد المالك
+            {t("ownerEmail")}
             <input
               className={styles.input}
               dir="ltr"
@@ -466,7 +490,7 @@ export default function BusinessesPage() {
               ) : (
                 <Plus size={17} />
               )}
-              <span>{busy ? "جارٍ الإنشاء…" : "إنشاء النشاط والمالك"}</span>
+              <span>{busy ? t("creating") : (isRtl ? "إنشاء النشاط والمالك" : "Create Business & Owner")}</span>
             </button>
           </div>
         </form>
@@ -482,19 +506,23 @@ export default function BusinessesPage() {
       <section className={styles.panel}>
         <div className={styles.heading}>
           <div>
-            <h2>العملاء الحاليون</h2>
+            <h2>{isRtl ? "العملاء الحاليون" : "Active Tenants"}</h2>
             <p className={styles.muted}>
-              قائمة بالمنشآت المسجلة وعدد الفروع والمستخدمين في كل منشأة.
+              {isRtl
+                ? "قائمة بالمنشآت المسجلة وعدد الفروع والمستخدمين في كل منشأة."
+                : "Directory of registered business tenants, branches, and authorized staff."}
             </p>
           </div>
         </div>
 
         {loading ? (
-          <p role="status">جارٍ التحميل…</p>
+          <p role="status">{tCommon("loading")}</p>
         ) : (
           <ul className={styles.list}>
             {businesses.length === 0 ? (
-              <li className={styles.muted}>لا توجد منشآت مسجلة حتى الآن.</li>
+              <li className={styles.muted}>
+                {isRtl ? "لا توجد منشآت مسجلة حتى الآن." : "No businesses registered yet."}
+              </li>
             ) : (
               businesses.map((b) => (
                 <li className={styles.row} key={b.id}>
@@ -504,7 +532,7 @@ export default function BusinessesPage() {
                       {b.slug}
                     </p>
                     <small>
-                      {b.users[0]?.name ?? "بلا مالك"} ·{" "}
+                      {b.users[0]?.name ?? (isRtl ? "بلا مالك" : "No owner")} ·{" "}
                       {b.users[0]?.email ?? "—"}
                     </small>
                   </div>
@@ -522,10 +550,12 @@ export default function BusinessesPage() {
                         type="button"
                         className={styles.credentialsRowBadge}
                         onClick={() => setIsModalOpen(true)}
-                        title="عرض بيانات الدخول المؤقتة"
+                        title={isRtl ? "عرض بيانات الدخول المؤقتة" : "View temporary credentials"}
                       >
                         <KeyRound size={14} />
-                        <span>عرض بيانات الدخول النشطة</span>
+                        <span>
+                          {isRtl ? "عرض بيانات الدخول النشطة" : "View Active Credentials"}
+                        </span>
                       </button>
                     )}
 
@@ -540,10 +570,10 @@ export default function BusinessesPage() {
                             {busy ? (
                               <>
                                 <Loader2 className="animate-spin" size={15} />
-                                <span>جارٍ إصدار كلمة المرور…</span>
+                                <span>{isRtl ? "جارٍ إصدار كلمة المرور…" : "Issuing password…"}</span>
                               </>
                             ) : (
-                              <span>تأكيد وإنهاء جلساته</span>
+                              <span>{isRtl ? "تأكيد وإصدار" : "Confirm & Issue"}</span>
                             )}
                           </button>
                           <button
@@ -551,7 +581,7 @@ export default function BusinessesPage() {
                             disabled={busy}
                             onClick={() => setResetOwnerId(null)}
                           >
-                            إلغاء
+                            {tCommon("cancel")}
                           </button>
                         </>
                       ) : (
@@ -560,7 +590,7 @@ export default function BusinessesPage() {
                           disabled={busy}
                           onClick={() => setResetOwnerId(b.users[0].id)}
                         >
-                          استعادة دخول المالك
+                          {t("resetOwnerPassword")}
                         </button>
                       ))}
                   </div>
@@ -573,5 +603,3 @@ export default function BusinessesPage() {
     </div>
   );
 }
-
-
