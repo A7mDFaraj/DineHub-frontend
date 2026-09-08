@@ -10,6 +10,7 @@ import {
   EyeOff,
   Loader2,
   Mail,
+  Menu,
   ReceiptText,
   ScanLine,
   ShieldCheck,
@@ -24,6 +25,7 @@ import { permissionForPage } from "@/lib/access-context";
 import { authClient } from "@/lib/auth-client";
 import { Link } from "@/i18n/navigation";
 import { AdminLanguageSwitcher } from "@/components/admin/admin-language-switcher";
+import { ThemeToggle } from "@/components/marketing/theme-toggle";
 import { reportClientIncident } from "@/lib/observability";
 import logo from "@/public/brand/dinehub-logo-3d.png";
 import styles from "./auth.module.css";
@@ -283,30 +285,75 @@ function SignInForm() {
 }
 
 export function AdminAuthScreen() {
+  const locale = useLocale();
   const t = useTranslations("AdminLogin");
+  const tHeader = useTranslations("Header");
+  const landingHome = locale === "en" ? "/en" : "/";
+  const landingLinks = [
+    { href: "#how-it-works", label: tHeader("howItWorks") },
+    { href: "#experience", label: tHeader("experience") },
+    { href: "#operations", label: tHeader("operations") },
+    { href: "#for-whom", label: tHeader("forWhom") },
+  ];
 
   return (
     <main className={styles.page}>
       <a className={styles.skipLink} href="#auth-form">
         {t("skipLink")}
       </a>
+      <nav className={styles.authNav} aria-label={t("utilityNavAria")}>
+        <Link className={styles.authBrand} href="/" aria-label={t("mobileBrandAria")}>
+          <Image src={logo} alt="" width={44} priority />
+          <span dir="ltr">DineHub</span>
+        </Link>
+
+        <div className={styles.authNavLinks}>
+          {landingLinks.map((item) => (
+            <a key={item.href} href={`${landingHome}${item.href}`}>
+              {item.label}
+            </a>
+          ))}
+        </div>
+
+        <div className={`${styles.authNavControls} ${styles.authNavControlsDesktop}`}>
+          <AdminLanguageSwitcher variant="adaptive" />
+          <ThemeToggle
+            darkLabel={tHeader("switchToDark")}
+            lightLabel={tHeader("switchToLight")}
+          />
+        </div>
+
+        <details className={styles.authMobileMenu}>
+          <summary aria-label={tHeader("mobileMenuAria")}>
+            <Menu aria-hidden="true" size={21} />
+          </summary>
+          <div className={styles.authMobileMenuPanel}>
+            <p className={styles.authMobileMenuTitle}>
+              <ScanLine aria-hidden="true" />
+              {tHeader("mobileMenuTitle")}
+            </p>
+            {landingLinks.map((item) => (
+              <a key={item.href} href={`${landingHome}${item.href}`}>
+                {item.label}
+              </a>
+            ))}
+            <div className={styles.authMobileMenuPreferences}>
+              <AdminLanguageSwitcher variant="adaptive" />
+              <ThemeToggle
+                darkLabel={tHeader("switchToDark")}
+                lightLabel={tHeader("switchToLight")}
+                mobile
+              />
+            </div>
+          </div>
+        </details>
+      </nav>
       <div className={styles.shell}>
         <section
           className={styles.authPanel}
           id="auth-form"
           aria-labelledby="auth-title"
         >
-          <div className={styles.authTopBar}>
-            <AdminLanguageSwitcher variant="light" />
-          </div>
-
-          <div className={styles.mobileBrand}>
-            <Link href="/" aria-label={t("mobileBrandAria")}>
-              <Image src={logo} alt="" width={58} priority />
-              <span dir="ltr">DineHub</span>
-            </Link>
-          </div>
-
           <div className={styles.authHeader}>
             <p className={styles.eyebrow}>
               <span aria-hidden="true" />
@@ -327,21 +374,6 @@ export function AdminAuthScreen() {
           className={styles.storyPanel}
           aria-label={t("storyAria")}
         >
-          <Link
-            className={styles.brand}
-            href="/"
-            aria-label="DineHub"
-          >
-            <Image
-              className={styles.logo}
-              src={logo}
-              alt=""
-              width={92}
-              priority
-            />
-            <span dir="ltr">DineHub</span>
-          </Link>
-
           <div className={styles.storyCopy}>
             <p className={styles.liveLabel}>
               <span aria-hidden="true" />

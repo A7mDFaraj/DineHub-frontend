@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { ThemeBootstrapScript } from "@/components/marketing/theme-bootstrap-script";
 import { AdminAuthScreen } from "./admin-auth-screen";
 
 export async function generateMetadata({
@@ -17,5 +18,10 @@ export async function generateMetadata({
 }
 
 export default function AdminLoginPage() {
-  return <AdminAuthScreen />;
+  return (
+    <>
+      <ThemeBootstrapScript />
+      <AdminAuthScreen />
+    </>
+  );
 }

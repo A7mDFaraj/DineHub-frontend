@@ -22,7 +22,9 @@
     "operations": "إدارة التشغيل",
     "forWhom": "لمن صُمّم",
     "mobileMenuAria": "فتح قائمة التنقل",
-    "mobileMenuTitle": "تنقّل داخل الصفحة"
+    "mobileMenuTitle": "تنقّل داخل الصفحة",
+    "switchToDark": "التبديل إلى الوضع الداكن",
+    "switchToLight": "التبديل إلى الوضع الفاتح"
   },
   "Hero": {
     "intro": "من المسح إلى الخدمة، في مسار واحد",
@@ -188,6 +190,7 @@
   "AdminLogin": {
     "pageTitle": "دخول الإدارة",
     "pageDesc": "سجّل الدخول لإدارة فروعك وقوائمك وطلباتك.",
+    "utilityNavAria": "أدوات صفحة تسجيل الدخول",
     "skipLink": "انتقل إلى نموذج الدخول",
     "mobileBrandAria": "DineHub، العودة إلى الصفحة الرئيسية",
     "eyebrow": "لوحة التحكم",

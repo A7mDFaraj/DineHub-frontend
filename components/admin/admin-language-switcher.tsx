@@ -8,7 +8,7 @@ import styles from "./admin-language-switcher.module.css";
 
 interface AdminLanguageSwitcherProps {
   className?: string;
-  variant?: "dark" | "light";
+  variant?: "dark" | "light" | "adaptive";
   mode?: "button" | "sidebar";
 }
 
@@ -82,7 +82,11 @@ export function AdminLanguageSwitcher({
     <div
       className={cn(
         styles.compactContainer,
-        variant === "light" ? styles.lightContainer : styles.darkContainer,
+        variant === "light"
+          ? styles.lightContainer
+          : variant === "adaptive"
+            ? `${styles.lightContainer} ${styles.adaptiveContainer}`
+            : styles.darkContainer,
         className
       )}
     >

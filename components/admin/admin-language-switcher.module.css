@@ -63,8 +63,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 38px;
-  min-height: 38px;
+  height: 44px;
+  min-height: 44px;
   padding-inline-start: 10px;
   padding-inline-end: 4px;
   border-radius: 12px;
@@ -151,6 +151,47 @@
 
 .lightContainer .switcherDivider {
   background: rgba(34, 24, 42, 0.12);
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+  color: #f4efe6;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer:hover {
+  border-color: rgba(242, 100, 75, 0.4);
+  background: rgba(255, 255, 255, 0.085);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer .langIcon {
+  color: #d9c7e7;
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer .switcherTrack {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer .switcherActive {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer .switcherInactive {
+  color: rgba(223, 210, 235, 0.68);
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer .switcherInactive:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+:global(html[data-landing-theme="dark"]) .adaptiveContainer .switcherDivider {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* Dark Variant - For Navigation Header / Dark Surfaces */
@@ -255,7 +296,7 @@
 }
 
 .switcherOption:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .switcherOption:focus-visible {

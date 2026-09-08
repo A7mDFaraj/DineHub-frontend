@@ -3,6 +3,8 @@ import Image from "next/image";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { Button } from "@/components/ui/button";
+import { SmartHeader } from "@/components/marketing/smart-header";
+import { ThemeToggle } from "@/components/marketing/theme-toggle";
 import { Link } from "@/i18n/navigation";
 
 export async function SiteHeader() {
@@ -21,7 +23,7 @@ export async function SiteHeader() {
   ];
 
   return (
-    <header className="site-header">
+    <SmartHeader>
       <nav className="landing-shell site-nav" aria-label={t("navAria")}>
         <Link className="brand-lockup" href="/" aria-label={t("brandAria")}>
           <span className="brand-mark" aria-hidden="true">
@@ -58,6 +60,11 @@ export async function SiteHeader() {
             <Globe aria-hidden="true" size={15} strokeWidth={1.8} />
             <span>{tCommon("otherLanguage")}</span>
           </Link>
+
+          <ThemeToggle
+            darkLabel={t("switchToDark")}
+            lightLabel={t("switchToLight")}
+          />
 
           <Button asChild variant="brand" size="default">
             <Link href="/admin/login">
@@ -96,6 +103,12 @@ export async function SiteHeader() {
               <span>{tCommon("otherLanguage")}</span>
             </Link>
 
+            <ThemeToggle
+              darkLabel={t("switchToDark")}
+              lightLabel={t("switchToLight")}
+              mobile
+            />
+
             <Button asChild variant="brand" size="default">
               <Link href="/admin/login">
                 {tCommon("startNow")}
@@ -109,6 +122,6 @@ export async function SiteHeader() {
           </div>
         </details>
       </nav>
-    </header>
+    </SmartHeader>
   );
 }

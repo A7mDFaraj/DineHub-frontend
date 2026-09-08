@@ -22,7 +22,9 @@
     "operations": "Operations",
     "forWhom": "Use Cases",
     "mobileMenuAria": "Open navigation menu",
-    "mobileMenuTitle": "Page Navigation"
+    "mobileMenuTitle": "Page Navigation",
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode"
   },
   "Hero": {
     "intro": "From scan to service, in one seamless flow",
@@ -188,6 +190,7 @@
   "AdminLogin": {
     "pageTitle": "Admin Portal",
     "pageDesc": "Sign in to manage your branches, menus, and orders.",
+    "utilityNavAria": "Login page controls",
     "skipLink": "Skip to sign in form",
     "mobileBrandAria": "DineHub, return to homepage",
     "eyebrow": "Admin Portal",

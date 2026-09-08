@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import "@/app/landing.css";
+import "@/app/landing-dark.css";
 
 import { FinalCta } from "@/components/marketing/final-cta";
 import { FlowSection } from "@/components/marketing/flow-section";
@@ -9,9 +10,11 @@ import { OperationsSection } from "@/components/marketing/operations-section";
 import { ProductShowcase } from "@/components/marketing/product-showcase";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { SiteHeader } from "@/components/marketing/site-header";
+import { ThemeBootstrapScript } from "@/components/marketing/theme-bootstrap-script";
 import { UseCasesSection } from "@/components/marketing/use-cases-section";
 
 export const viewport: Viewport = {
+  colorScheme: "light dark",
   themeColor: "#f7f3ed",
 };
 
@@ -54,6 +57,7 @@ export default async function Home({
 
   return (
     <div className="landing-page">
+      <ThemeBootstrapScript />
       <a className="skip-link" href="#main-content">
         {tCommon("skipToContent")}
       </a>
