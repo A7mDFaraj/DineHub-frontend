@@ -20,6 +20,10 @@ import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import styles from "./settings.module.css";
+import {
+  MenuThemeSettings,
+  MenuThemePreview,
+} from "@/components/admin/menu-theme-settings";
 
 const PRESET_COLORS = [
   { key: "coral", hex: "#f2644b" },
@@ -39,7 +43,6 @@ export default function BranchSettingsPage() {
   const isRtl = locale !== "en";
 
   const {
-    branches,
     selectedBranchId,
     selectedBranch,
     refreshBranches,
@@ -57,6 +60,9 @@ export default function BranchSettingsPage() {
     phone: "",
     logoUrl: "",
     themeColor: "#f2644b",
+    menuTheme: "signature",
+    showSpecialDiscount: false,
+    discountPercent: 0,
   });
 
   const [draftBranch, setDraftBranch] = useState<typeof selectedBranch>(null);
@@ -70,6 +76,9 @@ export default function BranchSettingsPage() {
         phone: selectedBranch.phone || "",
         logoUrl: selectedBranch.logoUrl || "",
         themeColor: selectedBranch.themeColor || "#f2644b",
+        menuTheme: selectedBranch.menuTheme || "signature",
+        showSpecialDiscount: selectedBranch.showSpecialDiscount ?? false,
+        discountPercent: selectedBranch.discountPercent ?? 0,
       });
       setErrorMsg("");
       setSuccessMsg("");
@@ -84,6 +93,20 @@ export default function BranchSettingsPage() {
     }
     if (!formData.name.trim() && !formData.nameEn.trim()) {
       setErrorMsg(t("errorNoName"));
+      return;
+    }
+
+    if (
+      formData.showSpecialDiscount &&
+      (!Number.isInteger(formData.discountPercent) ||
+        formData.discountPercent < 1 ||
+        formData.discountPercent > 100)
+    ) {
+      setErrorMsg(
+        isRtl
+          ? "أدخل نسبة خصم صحيحة من ١ إلى ١٠٠."
+          : "Enter a whole discount percentage from 1 to 100.",
+      );
       return;
     }
 
@@ -102,6 +125,9 @@ export default function BranchSettingsPage() {
         phone: formData.phone.trim() || undefined,
         logoUrl: formData.logoUrl.trim() || undefined,
         themeColor: formData.themeColor.trim() || "#f2644b",
+        menuTheme: formData.menuTheme,
+        showSpecialDiscount: formData.showSpecialDiscount,
+        discountPercent: formData.discountPercent,
       });
 
       setSuccessMsg(t("successSaved"));
@@ -110,7 +136,10 @@ export default function BranchSettingsPage() {
     } catch (err: unknown) {
       console.error("Save settings error:", err);
       setErrorMsg(
-        apiErrorMessage(err) || (isRtl ? "تعذر حفظ الإعدادات. يرجى المحاولة مرة أخرى." : "Failed to save settings. Please try again.")
+        apiErrorMessage(err) ||
+          (isRtl
+            ? "تعذر حفظ الإعدادات. يرجى المحاولة مرة أخرى."
+            : "Failed to save settings. Please try again."),
       );
     } finally {
       setIsSaving(false);
@@ -118,15 +147,15 @@ export default function BranchSettingsPage() {
   };
 
   const matchedColor = PRESET_COLORS.find(
-    (c) => c.hex.toLowerCase() === formData.themeColor.toLowerCase()
+    (c) => c.hex.toLowerCase() === formData.themeColor.toLowerCase(),
   );
   const selectedColorName = matchedColor
     ? t(`colors.${matchedColor.key}`)
     : t("customColor");
 
   const displayName = isRtl
-    ? (formData.name || formData.nameEn || selectedBranch?.name || "")
-    : (formData.nameEn || formData.name || selectedBranch?.name || "");
+    ? formData.name || formData.nameEn || selectedBranch?.name || ""
+    : formData.nameEn || formData.name || selectedBranch?.name || "";
 
   return (
     <div className={styles.page}>
@@ -185,9 +214,7 @@ export default function BranchSettingsPage() {
             <Store size={22} />
           </div>
           <div className={styles.kpiInfo}>
-            <span className={styles.kpiValue}>
-              {displayName || "—"}
-            </span>
+            <span className={styles.kpiValue}>{displayName || "—"}</span>
             <span className={styles.kpiLabel}>
               {isRtl ? "اسم الفرع الحالي" : "Current Branch Name"}
             </span>
@@ -201,8 +228,12 @@ export default function BranchSettingsPage() {
           <div className={styles.kpiInfo}>
             <span className={styles.kpiValue}>
               {formData.logoUrl
-                ? (isRtl ? "شعار مخصص" : "Custom Logo")
-                : (isRtl ? "الافتراضي" : "Default")}
+                ? isRtl
+                  ? "شعار مخصص"
+                  : "Custom Logo"
+                : isRtl
+                  ? "الافتراضي"
+                  : "Default"}
             </span>
             <span className={styles.kpiLabel}>
               {isRtl ? "حالة شعار المطعم" : "Brand Logo Status"}
@@ -289,7 +320,11 @@ export default function BranchSettingsPage() {
                     id="store-name-ar"
                     type="text"
                     required
-                    placeholder={isRtl ? "مثال: لاونج داين هب" : "e.g. DineHub Lounge (Arabic)"}
+                    placeholder={
+                      isRtl
+                        ? "مثال: لاونج داين هب"
+                        : "e.g. DineHub Lounge (Arabic)"
+                    }
                     value={formData.name}
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
@@ -316,7 +351,11 @@ export default function BranchSettingsPage() {
                   <input
                     id="store-address"
                     type="text"
-                    placeholder={isRtl ? "مثال: طريق التخصصي، حي المعذر، الرياض" : "e.g. Takhassusi St, Al Mathar, Riyadh"}
+                    placeholder={
+                      isRtl
+                        ? "مثال: طريق التخصصي، حي المعذر، الرياض"
+                        : "e.g. Takhassusi St, Al Mathar, Riyadh"
+                    }
                     value={formData.address}
                     onChange={(e) =>
                       setFormData({ ...formData, address: e.target.value })
@@ -340,6 +379,37 @@ export default function BranchSettingsPage() {
               </form>
             </section>
 
+            <section className={styles.sectionCard}>
+              <div className={styles.cardHead}>
+                <div className={styles.cardHeadIcon}>
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h2>
+                    {isRtl
+                      ? "مظاهر القائمة والمناسبات"
+                      : "Menu themes & occasions"}
+                  </h2>
+                  <p>
+                    {isRtl
+                      ? "هوية متكاملة لكل مناسبة، مع خصم اختياري."
+                      : "A complete look for every occasion, with an optional offer."}
+                  </p>
+                </div>
+              </div>
+              <MenuThemeSettings
+                ar={isRtl}
+                value={formData}
+                onChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    menuTheme: value.menuTheme || "signature",
+                    showSpecialDiscount: value.showSpecialDiscount ?? false,
+                    discountPercent: value.discountPercent ?? 0,
+                  })
+                }
+              />
+            </section>
             {/* Card 2: Visual Identity & Brand Color */}
             <section className={styles.sectionCard}>
               <div className={styles.cardHead}>
@@ -375,7 +445,8 @@ export default function BranchSettingsPage() {
                   <div className={styles.colorPresetsGrid}>
                     {PRESET_COLORS.map((preset) => {
                       const isActive =
-                        formData.themeColor.toLowerCase() === preset.hex.toLowerCase();
+                        formData.themeColor.toLowerCase() ===
+                        preset.hex.toLowerCase();
                       return (
                         <button
                           key={preset.hex}
@@ -402,157 +473,7 @@ export default function BranchSettingsPage() {
 
           {/* Live Mobile Customer Preview Column */}
           <div className={styles.previewCol}>
-            <div className={styles.phoneFrame}>
-              <div className={styles.phoneNotch}>
-                <div className={styles.phoneSpeaker} />
-              </div>
-
-              <div className={styles.phoneContent} dir={isRtl ? "rtl" : "ltr"}>
-                {/* Brand Banner Header */}
-                <div className={styles.phoneHeader}>
-                  <div className={styles.phoneLogo}>
-                    {formData.logoUrl ? (
-                      <img src={formData.logoUrl} alt="Logo Preview" />
-                    ) : (
-                      <Store size={20} style={{ color: formData.themeColor }} />
-                    )}
-                  </div>
-                  <div className={styles.phoneTitles}>
-                    <strong>
-                      {displayName || (isRtl ? "اسم المطعم / المتجر" : "Restaurant / Cafe Name")}
-                    </strong>
-                    <small>
-                      {formData.address || (isRtl ? "حي النخيل، الرياض" : "Al Nakheel, Riyadh")}
-                    </small>
-                  </div>
-                  <div
-                    style={{
-                      backgroundColor: `${formData.themeColor}18`,
-                      borderColor: `${formData.themeColor}35`,
-                      borderWidth: "1px",
-                      borderStyle: "solid",
-                      borderRadius: "10px",
-                      padding: "3px 7px",
-                      fontSize: "0.65rem",
-                      fontWeight: 800,
-                      color: formData.themeColor,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isRtl ? "طاولة #04" : "Table #04"}
-                  </div>
-                </div>
-
-                {/* Mini Category Pills */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "6px",
-                    overflowX: "hidden",
-                    paddingBottom: "2px",
-                  }}
-                >
-                  <span
-                    style={{
-                      backgroundColor: formData.themeColor,
-                      color: "#ffffff",
-                      fontSize: "0.65rem",
-                      fontWeight: 700,
-                      padding: "3px 8px",
-                      borderRadius: "8px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t("sampleCategoryAll")}
-                  </span>
-                  <span
-                    style={{
-                      backgroundColor: "rgba(255, 255, 255, 0.05)",
-                      color: "#b9aebd",
-                      fontSize: "0.65rem",
-                      fontWeight: 600,
-                      padding: "3px 8px",
-                      borderRadius: "8px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t("sampleCategoryDrinks")}
-                  </span>
-                  <span
-                    style={{
-                      backgroundColor: "rgba(255, 255, 255, 0.05)",
-                      color: "#b9aebd",
-                      fontSize: "0.65rem",
-                      fontWeight: 600,
-                      padding: "3px 8px",
-                      borderRadius: "8px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t("sampleCategoryDesserts")}
-                  </span>
-                </div>
-
-                {/* Rich Sample Product Card */}
-                <div className={styles.sampleMenuCard}>
-                  <div className={styles.sampleMenuHead}>
-                    <span style={{ fontSize: "0.78rem" }}>{t("sampleProductName")}</span>
-                    <span style={{ color: formData.themeColor, fontSize: "0.78rem", fontWeight: 800 }}>
-                      {isRtl ? "18.00 ر.س" : "SAR 18.00"}
-                    </span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: "0.68rem", color: "#b9aebd", lineHeight: 1.4 }}>
-                    {t("sampleProductDesc")}
-                  </p>
-                  <div style={{ display: "flex", justifyContent: isRtl ? "flex-start" : "flex-end", marginTop: "4px" }}>
-                    <span
-                      style={{
-                        backgroundColor: formData.themeColor,
-                        color: "#ffffff",
-                        fontSize: "0.65rem",
-                        fontWeight: 700,
-                        padding: "2px 8px",
-                        borderRadius: "6px",
-                      }}
-                    >
-                      {t("sampleAdd")}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Floating Cart Bar Sample */}
-                <button
-                  type="button"
-                  className={styles.sampleOrderBtn}
-                  style={{
-                    backgroundColor: formData.themeColor,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span
-                      style={{
-                        backgroundColor: "rgba(0, 0, 0, 0.25)",
-                        width: "18px",
-                        height: "18px",
-                        borderRadius: "50%",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "0.65rem",
-                        fontWeight: 800,
-                      }}
-                    >
-                      1
-                    </span>
-                    <span>{t("sampleReviewOrder")}</span>
-                  </div>
-                  <span style={{ fontWeight: 800, fontFamily: "monospace" }}>
-                    {isRtl ? "18.00 ر.س" : "SAR 18.00"}
-                  </span>
-                </button>
-              </div>
-            </div>
-
+            <MenuThemePreview value={formData} ar={isRtl} name={displayName} />
             <p
               style={{
                 textAlign: "center",

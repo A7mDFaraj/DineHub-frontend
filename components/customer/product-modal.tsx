@@ -1,18 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Minus, Check, MessageSquare, SlidersHorizontal } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { X, Plus, Minus, Check } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { FoodLabels } from "./food-labels";
+import { contrastInk } from "@/lib/menu-themes";
 
 export interface ProductAttributeItem {
-  attribute: {
-    id: string;
-    labelAr?: string;
-    labelEn?: string;
-  };
+  attribute: { id: string; labelAr?: string; labelEn?: string };
 }
-
 export interface ModalProduct {
   id: string;
   nameAr: string;
@@ -24,14 +21,17 @@ export interface ModalProduct {
   imageUrl?: string;
   isAvailable?: boolean;
   attributes?: ProductAttributeItem[];
+  calories?: number | null;
+  allergens?: string[];
+  ingredientTags?: string[];
+  dietaryTags?: string[];
 }
-
 interface ProductModalProps {
   product: ModalProduct | null;
   isOpen: boolean;
   themeColor?: string;
   onClose: () => void;
-  onAddToCart: (customizedItem: {
+  onAddToCart: (item: {
     productId: string;
     nameAr: string;
     nameEn: string;
@@ -46,52 +46,40 @@ interface ProductModalProps {
 export function ProductModal({
   product,
   isOpen,
-  themeColor = "#f2644b",
+  themeColor = "#a73e2c",
   onClose,
   onAddToCart,
 }: ProductModalProps) {
-  const locale = useLocale();
+  const ar = useLocale() === "ar";
   const t = useTranslations("CustomerProductModal");
-  const isRtl = locale === "ar";
-
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
   const [itemNote, setItemNote] = useState("");
   const [quantity, setQuantity] = useState(1);
-
   const [previous, setPrevious] = useState({ isOpen, product });
   if (previous.isOpen !== isOpen || previous.product !== product) {
     setPrevious({ isOpen, product });
-    if (isOpen && product) {
+    if (isOpen) {
       setSelectedAttributes([]);
       setItemNote("");
       setQuantity(1);
     }
   }
-
   if (!product) return null;
-
-  const prodNameAr = product.nameAr || product.name || "عنصر القائمة";
-  const prodNameEn = product.nameEn || product.name || "Menu item";
-  const prodTitle = isRtl ? prodNameAr : prodNameEn;
-  const prodDesc = isRtl
-    ? product.descriptionAr || product.descriptionEn || ""
-    : product.descriptionEn || product.descriptionAr || "";
-  const unitPrice = Number(product.price) || 0;
-  const totalPrice = unitPrice * quantity;
-  const currencyLabel = isRtl ? "ر.س" : "SAR";
-
-  const toggleAttribute = (label: string) => {
-    setSelectedAttributes((prev) =>
-      prev.includes(label) ? prev.filter((a) => a !== label) : [...prev, label]
-    );
-  };
-
-  const handleAdd = () => {
+  const nameAr = product.nameAr || product.nameEn || product.name || "عنصر";
+  const nameEn =
+    product.nameEn || product.nameAr || product.name || "Menu item";
+  const title = ar ? nameAr : nameEn;
+  const description = ar
+    ? product.descriptionAr || product.descriptionEn
+    : product.descriptionEn || product.descriptionAr;
+  const price = Number(product.price);
+  const add = () => {
+    if (product.isAvailable === false) return;
     onAddToCart({
       productId: product.id,
-      nameAr: prodNameAr,
-      nameEn: prodNameEn,
-      price: unitPrice,
+      nameAr,
+      nameEn,
+      price,
       quantity,
       imageUrl: product.imageUrl,
       selectedAttributes,
@@ -99,177 +87,150 @@ export function ProductModal({
     });
     onClose();
   };
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" 
-          dir={isRtl ? "rtl" : "ltr"}
-          style={{
-            fontFamily: isRtl
-              ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
-              : "var(--font-outfit), sans-serif",
-          }}
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          className="fixed bottom-0 left-1/2 z-50 flex max-h-[90dvh] w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white text-stone-900 shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl"
+          dir={ar ? "rtl" : "ltr"}
         >
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-          />
-
-          {/* Modal Bottom Sheet */}
-          <motion.div
-            initial={{ y: "100%", opacity: 0.5 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: "100%", opacity: 0 }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="relative z-10 w-full sm:max-w-lg bg-white border border-stone-200 rounded-t-[32px] sm:rounded-[28px] max-h-[88vh] flex flex-col overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.2)] text-stone-900"
-          >
-            {/* Close Button */}
-            <button
-              onClick={onClose}
-              className={`absolute top-4 ${isRtl ? "left-4" : "right-4"} z-20 w-9 h-9 rounded-full bg-stone-100 border border-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center transition-colors shadow-sm`}
-              aria-label="Close"
+          <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-5 py-3">
+            <Dialog.Title className="text-lg font-bold">{title}</Dialog.Title>
+            <Dialog.Close
+              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-stone-100"
+              aria-label={ar ? "إغلاق" : "Close"}
             >
-              <X size={17} />
-            </button>
-
-            {/* Scrollable Modal Content */}
-            <div className="overflow-y-auto flex-1 p-5 sm:p-6 space-y-5">
-              {/* Product Image */}
-              {product.imageUrl && (
-                <div className="w-full h-44 sm:h-52 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200/80 outline outline-1 -outline-offset-1 outline-black/5 relative -mt-1 shadow-sm">
-                  <img
-                    src={product.imageUrl}
-                    alt={prodTitle}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+              <X size={18} />
+            </Dialog.Close>
+          </div>
+          <div className="flex-1 space-y-5 overflow-y-auto p-5">
+            {product.imageUrl && (
+              <img
+                src={product.imageUrl}
+                alt={title}
+                className="h-52 w-full rounded-2xl object-cover outline outline-1 -outline-offset-1 outline-black/10"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            )}
+            <div>
+              <p className="text-xl font-bold tabular-nums">
+                {price.toFixed(2)} <small>{ar ? "ر.س" : "SAR"}</small>
+              </p>
+              {description && (
+                <p className="mt-2 text-sm leading-7 text-stone-600">
+                  {description}
+                </p>
               )}
-
-              {/* Title and Price */}
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <h2 className="text-xl sm:text-2xl font-black text-stone-900 leading-tight">
-                    {prodTitle}
-                  </h2>
-                  <span
-                    className="text-lg sm:text-xl font-black font-mono tabular-nums shrink-0"
-                    style={{ color: themeColor }}
-                  >
-                    {unitPrice.toFixed(2)} {currencyLabel}
-                  </span>
-                </div>
-                {prodDesc && (
-                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed mt-1 font-medium">
-                    {prodDesc}
-                  </p>
-                )}
-              </div>
-
-              {/* Customization Options / Attributes */}
-              {product.attributes && product.attributes.length > 0 && (
-                <div className="space-y-2.5 pt-2 border-t border-stone-100">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
-                    <SlidersHorizontal size={14} style={{ color: themeColor }} />
-                    <span>{isRtl ? "الخيارات والإضافات المتاحة" : "Available Options & Add-ons"}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {product.attributes.map((attr) => {
-                      const label = isRtl
-                        ? attr.attribute.labelAr || attr.attribute.labelEn || ""
-                        : attr.attribute.labelEn || attr.attribute.labelAr || "";
-                      const isSelected = selectedAttributes.includes(label);
-                      return (
-                        <button
-                          key={attr.attribute.id}
-                          type="button"
-                          onClick={() => toggleAttribute(label)}
-                          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
-                            isSelected
-                              ? "bg-stone-900 border-stone-900 text-white shadow-sm"
-                              : "bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100"
-                          }`}
-                        >
-                          <span className="truncate">{label}</span>
-                          <div
-                            className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
-                              isSelected
-                                ? "bg-white text-stone-900 border-white"
-                                : "border-stone-300 bg-white"
-                            }`}
-                          >
-                            {isSelected && <Check size={11} strokeWidth={3} />}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Customer Item Note */}
-              <div className="space-y-1.5 pt-2 border-t border-stone-100">
-                <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                  <MessageSquare size={13} style={{ color: themeColor }} />
-                  <span>{t("specialNote")}</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={itemNote}
-                  onChange={(e) => setItemNote(e.target.value)}
-                  placeholder={t("notePlaceholder")}
-                  className="w-full rounded-xl bg-stone-50 border border-stone-200 p-3 text-xs text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:border-stone-400 resize-none transition-all box-border font-medium"
-                />
-              </div>
+              <FoodLabels
+                ingredientTags={product.ingredientTags}
+                allergens={product.allergens}
+                dietaryTags={product.dietaryTags}
+                calories={product.calories}
+                ar={ar}
+              />
             </div>
-
-            {/* Footer: Quantity Stepper & Submit */}
-            <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 flex items-center gap-3">
-              {/* Quantity Counter */}
-              <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl p-1 shrink-0 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  disabled={quantity <= 1}
-                  className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 disabled:opacity-30 text-stone-800 flex items-center justify-center transition-colors"
-                  aria-label="Decrease quantity"
-                >
-                  <Minus size={15} />
-                </button>
-                <span className="w-8 text-center font-mono font-extrabold text-sm sm:text-base tabular-nums text-stone-900">
-                  {quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => q + 1)}
-                  className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 flex items-center justify-center transition-colors"
-                  aria-label="Increase quantity"
-                >
-                  <Plus size={15} />
-                </button>
-              </div>
-
-              {/* Add to Cart Button */}
+            {product.attributes && product.attributes.length > 0 && (
+              <fieldset>
+                <legend className="mb-3 text-sm font-bold">
+                  {ar ? "الخيارات والإضافات" : "Options & add-ons"}
+                </legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {product.attributes.map(({ attribute }) => {
+                    const label = ar
+                      ? attribute.labelAr || attribute.labelEn || ""
+                      : attribute.labelEn || attribute.labelAr || "";
+                    const checked = selectedAttributes.includes(label);
+                    return (
+                      <button
+                        type="button"
+                        key={attribute.id}
+                        aria-pressed={checked}
+                        onClick={() =>
+                          setSelectedAttributes((current) =>
+                            checked
+                              ? current.filter((value) => value !== label)
+                              : [...current, label],
+                          )
+                        }
+                        className={`flex min-h-12 items-center justify-between gap-2 rounded-xl border p-3 text-start text-xs ${checked ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50"}`}
+                      >
+                        <span>{label}</span>
+                        {checked && <Check size={16} className="shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            )}
+            <div>
+              <label
+                htmlFor="product-note"
+                className="mb-2 block text-sm font-bold"
+              >
+                {t("specialNote")}
+              </label>
+              <textarea
+                id="product-note"
+                rows={2}
+                maxLength={500}
+                value={itemNote}
+                onChange={(e) => setItemNote(e.target.value)}
+                placeholder={t("notePlaceholder")}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 bg-stone-50 p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+            <div className="flex items-center rounded-full border border-stone-200 bg-white p-1">
               <button
                 type="button"
-                onClick={handleAdd}
-                style={{ backgroundColor: themeColor }}
-                className="flex-1 min-h-[48px] rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-between px-5 shadow-sm transition-all active:scale-[0.96]"
+                onClick={() => setQuantity((v) => Math.max(1, v - 1))}
+                disabled={quantity === 1}
+                className="flex size-11 items-center justify-center rounded-full disabled:opacity-30"
+                aria-label={ar ? "تقليل الكمية" : "Decrease quantity"}
               >
-                <span>{t("addToCart")}</span>
-                <span className="font-mono tabular-nums font-black text-sm sm:text-base">
-                  {totalPrice.toFixed(2)} {currencyLabel}
-                </span>
+                <Minus size={16} />
+              </button>
+              <span className="w-7 text-center font-bold tabular-nums">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuantity((v) => Math.min(99, v + 1))}
+                disabled={quantity === 99}
+                className="flex size-11 items-center justify-center rounded-full disabled:opacity-30"
+                aria-label={ar ? "زيادة الكمية" : "Increase quantity"}
+              >
+                <Plus size={16} />
               </button>
             </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+            <button
+              type="button"
+              disabled={product.isAvailable === false}
+              onClick={add}
+              style={{
+                backgroundColor: themeColor,
+                color: contrastInk(themeColor),
+              }}
+              className="flex min-h-12 flex-1 flex-wrap items-center justify-center gap-2 rounded-full px-4 text-sm font-bold active:scale-[0.96]"
+            >
+              <span>{t("addToCart")}</span>
+              <span className="tabular-nums">
+                {(price * quantity).toFixed(2)} {ar ? "ر.س" : "SAR"}
+              </span>
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

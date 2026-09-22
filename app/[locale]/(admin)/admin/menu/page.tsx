@@ -1,19 +1,18 @@
 "use client";
 
 import { apiErrorMessage } from "@/lib/api-error";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Check,
   CheckCircle2,
+  CloudCheck,
   Edit3,
   Image as ImageIcon,
   Loader2,
   Plus,
-  RotateCcw,
   Search,
   SlidersHorizontal,
-  Tag,
   Trash2,
   UtensilsCrossed,
   X,
@@ -24,6 +23,12 @@ import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
 import { ImageUploader } from "@/components/ui/image-uploader";
 import styles from "./menu.module.css";
+import {
+  FOOD_LABELS,
+  ALLERGEN_KEYS,
+  DIETARY_KEYS,
+  INGREDIENT_KEYS,
+} from "@/components/customer/food-labels";
 
 interface Category {
   id: string;
@@ -47,6 +52,10 @@ interface Product {
   descriptionEn?: string;
   descriptionAr?: string;
   price: number;
+  calories?: number | null;
+  allergens?: string[];
+  dietaryTags?: string[];
+  ingredientTags?: string[];
   imageUrl?: string;
   isAvailable?: boolean;
   isHidden?: boolean;
@@ -55,17 +64,50 @@ interface Product {
   attributes?: { attribute: Attribute }[];
 }
 
+type ProductForm = {
+  nameAr: string;
+  nameEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  price: string;
+  calories: string;
+  allergens: string[];
+  dietaryTags: string[];
+  ingredientTags: string[];
+  categoryId: string;
+  imageUrl: string;
+  isAvailable: boolean;
+};
+
+const EMPTY_PRODUCT_FORM: ProductForm = {
+  nameAr: "",
+  nameEn: "",
+  descriptionAr: "",
+  descriptionEn: "",
+  price: "",
+  calories: "",
+  allergens: [],
+  dietaryTags: [],
+  ingredientTags: [],
+  categoryId: "",
+  imageUrl: "",
+  isAvailable: true,
+};
+
+const isDraftMeaningful = (form: ProductForm) =>
+  Boolean(
+    form.nameAr.trim() || form.nameEn.trim() || form.descriptionAr.trim() ||
+      form.descriptionEn.trim() || form.price || form.calories || form.imageUrl ||
+      form.allergens.length || form.dietaryTags.length || form.ingredientTags.length,
+  );
+
 export default function MenuManagementPage() {
   const locale = useLocale();
   const isRtl = locale === "ar";
   const t = useTranslations("AdminMenu");
   const tCommon = useTranslations("AdminCommon");
 
-  const {
-    branches,
-    selectedBranchId,
-    selectedBranch,
-  } = useAdminBranch();
+  const { selectedBranchId } = useAdminBranch();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -75,7 +117,9 @@ export default function MenuManagementPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCatFilter, setSelectedCatFilter] = useState("all");
-  const [availabilityFilter, setAvailabilityFilter] = useState<"all" | "available" | "unavailable">("all");
+  const [availabilityFilter, setAvailabilityFilter] = useState<
+    "all" | "available" | "unavailable"
+  >("all");
 
   // Modals
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -95,17 +139,10 @@ export default function MenuManagementPage() {
   const [successMsg, setSuccessMsg] = useState("");
 
   // Product Form State
-  const [formData, setFormData] = useState({
-    nameAr: "",
-    nameEn: "",
-    descriptionAr: "",
-    descriptionEn: "",
-    price: "",
-    categoryId: "",
-    imageUrl: "",
-    isAvailable: true,
-  });
+  const [formData, setFormData] = useState<ProductForm>(EMPTY_PRODUCT_FORM);
   const [selectedAttrIds, setSelectedAttrIds] = useState<string[]>([]);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [draftRestored, setDraftRestored] = useState(false);
 
   // New Attribute Tag Form
   const [newAttrData, setNewAttrData] = useState({
@@ -113,45 +150,73 @@ export default function MenuManagementPage() {
     labelEn: "",
   });
 
-  const fetchMenuData = useCallback(async (branchId: string) => {
-    if (!branchId) return;
-    try {
-      setIsLoadingMenu(true);
-      setErrorMsg("");
+  const fetchMenuData = useCallback(
+    async (branchId: string) => {
+      if (!branchId) return;
+      try {
+        setIsLoadingMenu(true);
+        setErrorMsg("");
 
-      const [categoriesRes, productsRes, attributesRes] = await Promise.allSettled([
-        apiClient.get(`/admin/categories/${branchId}`),
-        apiClient.get(`/admin/products/branch/${branchId}`),
-        apiClient.get(`/admin/attributes/${branchId}`),
-      ]);
+        const [categoriesRes, productsRes, attributesRes] =
+          await Promise.allSettled([
+            apiClient.get(`/admin/categories/${branchId}`),
+            apiClient.get(`/admin/products/branch/${branchId}`),
+            apiClient.get(`/admin/attributes/${branchId}`),
+          ]);
 
-      if (categoriesRes.status === "fulfilled") {
-        const catList = Array.isArray(categoriesRes.value.data)
-          ? categoriesRes.value.data
-          : categoriesRes.value.data?.data || [];
-        setCategories(catList);
+        if (categoriesRes.status === "fulfilled") {
+          const catList = Array.isArray(categoriesRes.value.data)
+            ? categoriesRes.value.data
+            : categoriesRes.value.data?.data || [];
+          setCategories(catList);
+        }
+
+        if (productsRes.status === "fulfilled") {
+          const prodList = Array.isArray(productsRes.value.data)
+            ? productsRes.value.data
+            : productsRes.value.data?.data || [];
+          setProducts(prodList);
+        } else {
+          const message = apiErrorMessage(productsRes.reason);
+          setErrorMsg(
+            message === "Internal server error"
+              ? isRtl
+                ? "تعذر تحميل المنتجات لأن قاعدة بيانات الخادم لم تُحدَّث بعد. شغّل ترحيل قاعدة البيانات في بيئة الإنتاج ثم أعد المحاولة."
+                : "Products could not load because the server database has not been updated yet. Run the production database migration, then try again."
+              : message || tCommon("error"),
+          );
+        }
+
+        if (attributesRes.status === "fulfilled") {
+          const attrList = Array.isArray(attributesRes.value.data)
+            ? attributesRes.value.data
+            : attributesRes.value.data?.data || [];
+          setAttributes(attrList);
+        }
+      } catch (err: unknown) {
+        console.error(err);
+        setErrorMsg(tCommon("error"));
+      } finally {
+        setIsLoadingMenu(false);
       }
+    },
+    [isRtl, tCommon],
+  );
 
-      if (productsRes.status === "fulfilled") {
-        const prodList = Array.isArray(productsRes.value.data)
-          ? productsRes.value.data
-          : productsRes.value.data?.data || [];
-        setProducts(prodList);
-      }
+  const draftKey = selectedBranchId
+    ? `dinehub:product-draft:${selectedBranchId}:${editingProductId || "new"}`
+    : "";
 
-      if (attributesRes.status === "fulfilled") {
-        const attrList = Array.isArray(attributesRes.value.data)
-          ? attributesRes.value.data
-          : attributesRes.value.data?.data || [];
-        setAttributes(attrList);
-      }
-    } catch (err: unknown) {
-      console.error(err);
-      setErrorMsg(tCommon("error"));
-    } finally {
-      setIsLoadingMenu(false);
-    }
-  }, [tCommon]);
+  useEffect(() => {
+    if (!isProductModalOpen || !draftKey || !isDraftMeaningful(formData)) return;
+    const timer = window.setTimeout(() => {
+      sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({ formData, selectedAttrIds, savedAt: Date.now() }),
+      );
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [draftKey, formData, isProductModalOpen, selectedAttrIds]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -168,17 +233,29 @@ export default function MenuManagementPage() {
 
   const handleOpenCreate = () => {
     setEditingProductId(null);
-    setFormData({
-      nameAr: "",
-      nameEn: "",
-      descriptionAr: "",
-      descriptionEn: "",
-      price: "",
-      categoryId: categories.length > 0 ? categories[0].id : "",
-      imageUrl: "",
-      isAvailable: true,
-    });
-    setSelectedAttrIds([]);
+    const key = selectedBranchId
+      ? `dinehub:product-draft:${selectedBranchId}:new`
+      : "";
+    let next = { ...EMPTY_PRODUCT_FORM, categoryId: categories[0]?.id || "" };
+    let nextAttributes: string[] = [];
+    let restored = false;
+    if (key) {
+      try {
+        const saved = sessionStorage.getItem(key);
+        if (saved) {
+          const parsed = JSON.parse(saved) as { formData?: ProductForm; selectedAttrIds?: string[] };
+          if (parsed.formData) next = { ...next, ...parsed.formData };
+          if (Array.isArray(parsed.selectedAttrIds)) nextAttributes = parsed.selectedAttrIds;
+          restored = true;
+        }
+      } catch {
+        sessionStorage.removeItem(key);
+      }
+    }
+    setFormData(next);
+    setSelectedAttrIds(nextAttributes);
+    setDraftRestored(restored);
+    setFormErrors({});
     setErrorMsg("");
     setIsProductModalOpen(true);
   };
@@ -191,23 +268,32 @@ export default function MenuManagementPage() {
       descriptionAr: prod.descriptionAr || "",
       descriptionEn: prod.descriptionEn || "",
       price: String(prod.price),
+      calories: prod.calories == null ? "" : String(prod.calories),
+      allergens: prod.allergens || [],
+      dietaryTags: prod.dietaryTags || [],
+      ingredientTags: prod.ingredientTags || [],
       categoryId: prod.categoryId,
       imageUrl: prod.imageUrl || "",
       isAvailable: prod.isAvailable !== false,
     });
     setSelectedAttrIds(prod.attributes?.map((a) => a.attribute.id) || []);
+    setDraftRestored(false);
+    setFormErrors({});
     setErrorMsg("");
     setIsProductModalOpen(true);
   };
 
-  const handleToggleAvailability = async (prod: Product, e: React.MouseEvent) => {
+  const handleToggleAvailability = async (
+    prod: Product,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     try {
       const nextStatus = !prod.isAvailable;
       setProducts((prev) =>
         prev.map((p) =>
-          p.id === prod.id ? { ...p, isAvailable: nextStatus } : p
-        )
+          p.id === prod.id ? { ...p, isAvailable: nextStatus } : p,
+        ),
       );
 
       await apiClient.patch(`/admin/products/${prod.id}`, {
@@ -225,16 +311,20 @@ export default function MenuManagementPage() {
       setErrorMsg(tCommon("currentBranch"));
       return;
     }
-    if (!formData.nameAr.trim() && !formData.nameEn.trim()) {
-      setErrorMsg(t("nameAr"));
-      return;
-    }
-    if (!formData.price || isNaN(Number(formData.price))) {
-      setErrorMsg(t("price"));
-      return;
-    }
-    if (!formData.categoryId) {
-      setErrorMsg(t("category"));
+    const errors: Record<string, string> = {};
+    if (!formData.nameAr.trim()) errors.nameAr = isRtl ? "اسم المنتج بالعربية مطلوب" : "Arabic product name is required";
+    if (formData.nameAr.trim().length > 120) errors.nameAr = isRtl ? "الحد الأقصى 120 حرفاً" : "Use 120 characters or fewer";
+    if (formData.nameEn.trim().length > 120) errors.nameEn = isRtl ? "الحد الأقصى 120 حرفاً" : "Use 120 characters or fewer";
+    const price = Number(formData.price);
+    if (!formData.price || !Number.isFinite(price) || price < 0 || price > 999999.99) errors.price = isRtl ? "أدخل سعراً صحيحاً بين 0 و999,999.99" : "Enter a valid price from 0 to 999,999.99";
+    if (!/^\d+(\.\d{1,2})?$/.test(formData.price)) errors.price = isRtl ? "استخدم منزلتين عشريتين كحد أقصى" : "Use no more than two decimal places";
+    if (formData.calories && (!Number.isInteger(Number(formData.calories)) || Number(formData.calories) < 0 || Number(formData.calories) > 100000)) errors.calories = isRtl ? "أدخل عدداً صحيحاً بين 0 و100,000" : "Enter a whole number from 0 to 100,000";
+    if (!formData.categoryId) errors.categoryId = isRtl ? "اختر تصنيفاً" : "Choose a category";
+    if (formData.descriptionAr.length > 1000 || formData.descriptionEn.length > 1000) errors.description = isRtl ? "الوصف يجب ألا يتجاوز 1000 حرف" : "Descriptions must be 1,000 characters or fewer";
+    if (formData.imageUrl && !/^https?:\/\//i.test(formData.imageUrl)) errors.imageUrl = isRtl ? "رابط الصورة غير صالح" : "Enter a valid image URL";
+    setFormErrors(errors);
+    if (Object.keys(errors).length) {
+      setErrorMsg(isRtl ? "راجع الحقول المحددة أدناه." : "Review the highlighted fields below.");
       return;
     }
 
@@ -243,39 +333,64 @@ export default function MenuManagementPage() {
       setErrorMsg("");
 
       const payload = {
-        branchId: selectedBranchId,
         categoryId: formData.categoryId,
-        name: formData.nameAr.trim() || formData.nameEn.trim(),
-        nameAr: formData.nameAr.trim() || undefined,
+        nameAr: formData.nameAr.trim() || formData.nameEn.trim(),
         nameEn: formData.nameEn.trim() || undefined,
         descriptionAr: formData.descriptionAr.trim() || undefined,
         descriptionEn: formData.descriptionEn.trim() || undefined,
         price: Number(formData.price),
+        calories: formData.calories === "" ? null : Number(formData.calories),
+        allergens: formData.allergens,
+        dietaryTags: formData.dietaryTags,
+        ingredientTags: formData.ingredientTags,
         imageUrl: formData.imageUrl || undefined,
         isAvailable: formData.isAvailable,
-        attributeIds: selectedAttrIds,
       };
 
       if (editingProductId) {
         await apiClient.patch(`/admin/products/${editingProductId}`, payload);
+        await apiClient.post(`/admin/products/${editingProductId}/attributes`, {
+          attributeIds: selectedAttrIds,
+        });
         setSuccessMsg(tCommon("success"));
       } else {
-        await apiClient.post("/admin/products", payload);
+        const created = await apiClient.post("/admin/products", payload);
+        setEditingProductId(created.data.id);
+        await apiClient.post(`/admin/products/${created.data.id}/attributes`, {
+          attributeIds: selectedAttrIds,
+        });
         setSuccessMsg(tCommon("success"));
       }
 
       await fetchMenuData(selectedBranchId);
+      if (draftKey) sessionStorage.removeItem(draftKey);
       setIsProductModalOpen(false);
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(
-        apiErrorMessage(err) || tCommon("error")
-      );
+      setErrorMsg(apiErrorMessage(err) || tCommon("error"));
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const discardDraft = () => {
+    if (draftKey) sessionStorage.removeItem(draftKey);
+    setFormData({ ...EMPTY_PRODUCT_FORM, categoryId: categories[0]?.id || "" });
+    setSelectedAttrIds([]);
+    setDraftRestored(false);
+    setFormErrors({});
+  };
+
+  const closeProductEditor = () => {
+    setIsProductModalOpen(false);
+    setErrorMsg("");
+  };
+
+  const completedRequiredFields = useMemo(
+    () => [formData.nameAr.trim(), formData.price, formData.categoryId].filter(Boolean).length,
+    [formData.categoryId, formData.nameAr, formData.price],
+  );
 
   const handleCreateAttribute = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,9 +415,7 @@ export default function MenuManagementPage() {
       setNewAttrData({ labelAr: "", labelEn: "" });
     } catch (err: unknown) {
       console.error(err);
-      setAttrError(
-        apiErrorMessage(err) || tCommon("error")
-      );
+      setAttrError(apiErrorMessage(err) || tCommon("error"));
     } finally {
       setIsSavingAttr(false);
     }
@@ -322,7 +435,7 @@ export default function MenuManagementPage() {
     setSelectedAttrIds((prev) =>
       prev.includes(attrId)
         ? prev.filter((id) => id !== attrId)
-        : [...prev, attrId]
+        : [...prev, attrId],
     );
   };
 
@@ -338,9 +451,7 @@ export default function MenuManagementPage() {
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg(
-        apiErrorMessage(err) || tCommon("error")
-      );
+      setErrorMsg(apiErrorMessage(err) || tCommon("error"));
     } finally {
       setIsDeleting(false);
     }
@@ -350,10 +461,14 @@ export default function MenuManagementPage() {
   const filteredProducts = products.filter((prod) => {
     const matchSearch =
       searchQuery === "" ||
-      (prod.nameAr && prod.nameAr.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (prod.nameEn && prod.nameEn.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (prod.name && prod.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (prod.descriptionAr && prod.descriptionAr.toLowerCase().includes(searchQuery.toLowerCase()));
+      (prod.nameAr &&
+        prod.nameAr.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (prod.nameEn &&
+        prod.nameEn.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (prod.name &&
+        prod.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (prod.descriptionAr &&
+        prod.descriptionAr.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchCategory =
       selectedCatFilter === "all" || prod.categoryId === selectedCatFilter;
@@ -434,7 +549,7 @@ export default function MenuManagementPage() {
               value={availabilityFilter}
               onChange={(e) =>
                 setAvailabilityFilter(
-                  e.target.value as "all" | "available" | "unavailable"
+                  e.target.value as "all" | "available" | "unavailable",
                 )
               }
               className={styles.selectInput}
@@ -449,10 +564,16 @@ export default function MenuManagementPage() {
               type="button"
               className={styles.secondaryButton}
               onClick={() => setIsAttrModalOpen(true)}
-              style={{ minHeight: "42px", padding: "0 14px", fontSize: "0.8rem" }}
+              style={{
+                minHeight: "42px",
+                padding: "0 14px",
+                fontSize: "0.8rem",
+              }}
             >
               <SlidersHorizontal size={15} />
-              <span>{t("attributesTitle")} ({attributes.length})</span>
+              <span>
+                {t("attributesTitle")} ({attributes.length})
+              </span>
             </button>
           </div>
         </div>
@@ -470,10 +591,12 @@ export default function MenuManagementPage() {
           </button>
 
           {categories.map((cat) => {
-            const count = products.filter((p) => p.categoryId === cat.id).length;
+            const count = products.filter(
+              (p) => p.categoryId === cat.id,
+            ).length;
             const displayName = isRtl
-              ? (cat.nameAr || cat.name || cat.nameEn || "قسم")
-              : (cat.nameEn || cat.name || cat.nameAr || "Category");
+              ? cat.nameAr || cat.name || cat.nameEn || "قسم"
+              : cat.nameEn || cat.name || cat.nameAr || "Category";
             return (
               <button
                 key={cat.id}
@@ -528,16 +651,16 @@ export default function MenuManagementPage() {
         <div className={styles.productGrid}>
           {filteredProducts.map((prod) => {
             const displayName = isRtl
-              ? (prod.nameAr || prod.name || prod.nameEn || "صنف")
-              : (prod.nameEn || prod.name || prod.nameAr || "Item");
+              ? prod.nameAr || prod.name || prod.nameEn || "صنف"
+              : prod.nameEn || prod.name || prod.nameAr || "Item";
             const secondaryName = isRtl ? prod.nameEn : prod.nameAr;
             const displayDesc = isRtl
-              ? (prod.descriptionAr || prod.descriptionEn)
-              : (prod.descriptionEn || prod.descriptionAr);
+              ? prod.descriptionAr || prod.descriptionEn
+              : prod.descriptionEn || prod.descriptionAr;
             const cat = categories.find((c) => c.id === prod.categoryId);
             const catName = isRtl
-              ? (cat?.nameAr || cat?.name || cat?.nameEn || "")
-              : (cat?.nameEn || cat?.name || cat?.nameAr || "");
+              ? cat?.nameAr || cat?.name || cat?.nameEn || ""
+              : cat?.nameEn || cat?.name || cat?.nameAr || "";
             const isAvail = prod.isAvailable !== false;
 
             return (
@@ -576,7 +699,8 @@ export default function MenuManagementPage() {
                       {secondaryName && <p>{secondaryName}</p>}
                     </div>
                     <span className={styles.priceTag}>
-                      <bdi dir="ltr">{Number(prod.price).toFixed(2)}</bdi> {tCommon("currency")}
+                      <bdi dir="ltr">{Number(prod.price).toFixed(2)}</bdi>{" "}
+                      {tCommon("currency")}
                     </span>
                   </div>
 
@@ -589,8 +713,8 @@ export default function MenuManagementPage() {
                       {prod.attributes.map((a) => (
                         <span key={a.attribute.id} className={styles.attrChip}>
                           {isRtl
-                            ? (a.attribute.labelAr || a.attribute.labelEn)
-                            : (a.attribute.labelEn || a.attribute.labelAr)}
+                            ? a.attribute.labelAr || a.attribute.labelEn
+                            : a.attribute.labelEn || a.attribute.labelAr}
                         </span>
                       ))}
                     </div>
@@ -647,27 +771,42 @@ export default function MenuManagementPage() {
       {/* Add / Edit Product Modal */}
       <Dialog.Root
         open={isProductModalOpen}
-        onOpenChange={setIsProductModalOpen}
+        onOpenChange={(open) => open && setIsProductModalOpen(true)}
       >
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
           <Dialog.Content
-            className={styles.dialogContent}
+            className={`${styles.dialogContent} ${styles.productEditor}`}
             dir={isRtl ? "rtl" : "ltr"}
+            onPointerDownOutside={(event) => event.preventDefault()}
+            onEscapeKeyDown={(event) => event.preventDefault()}
           >
             <div className={styles.dialogHead}>
-              <Dialog.Title>
-                {editingProductId ? t("editProduct") : t("addProduct")}
-              </Dialog.Title>
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className={styles.closeButton}
-                  aria-label={tCommon("cancel")}
-                >
-                  <X size={19} />
-                </button>
-              </Dialog.Close>
+              <div className={styles.editorTitleBlock}>
+                <span className={styles.editorIcon}><UtensilsCrossed size={19} /></span>
+                <div>
+                  <Dialog.Title>
+                    {editingProductId ? t("editProduct") : t("addProduct")}
+                  </Dialog.Title>
+                  <Dialog.Description>
+                    {isRtl ? "أنشئ صنفاً واضحاً وجاهزاً للطلب" : "Create a clear, order-ready menu item"}
+                  </Dialog.Description>
+                </div>
+              </div>
+              <button type="button" className={styles.closeButton} onClick={closeProductEditor} aria-label={tCommon("cancel")}>
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className={styles.draftBar} role="status">
+              <CloudCheck size={17} aria-hidden="true" />
+              <span>{draftRestored
+                ? (isRtl ? "تمت استعادة المسودة من هذه الجلسة" : "Draft restored from this tab session")
+                : (isRtl ? "تُحفظ المسودة تلقائياً في هذه الجلسة" : "Draft autosaves for this tab session")}</span>
+              <span className={styles.formProgress}>{completedRequiredFields}/3</span>
+              {isDraftMeaningful(formData) && (
+                <button type="button" onClick={discardDraft}>{isRtl ? "حذف المسودة" : "Discard draft"}</button>
+              )}
             </div>
 
             {errorMsg && (
@@ -686,7 +825,7 @@ export default function MenuManagementPage() {
                 <ImageUploader
                   value={formData.imageUrl}
                   onChange={(url) =>
-                    setFormData({ ...formData, imageUrl: url })
+                    setFormData((current) => ({ ...current, imageUrl: url }))
                   }
                   label={t("uploadImage")}
                   description="JPG, PNG, WebP (max 5MB)"
@@ -700,12 +839,19 @@ export default function MenuManagementPage() {
                     id="prod-name-ar"
                     type="text"
                     required
-                    placeholder={isRtl ? "مثال: فلات وايت كلاسيك" : "e.g. Classic Flat White"}
+                    placeholder={
+                      isRtl
+                        ? "مثال: فلات وايت كلاسيك"
+                        : "e.g. Classic Flat White"
+                    }
                     value={formData.nameAr}
                     onChange={(e) =>
-                      setFormData({ ...formData, nameAr: e.target.value })
+                      setFormData((current) => ({ ...current, nameAr: e.target.value }))
                     }
+                    maxLength={120}
+                    aria-invalid={Boolean(formErrors.nameAr)}
                   />
+                  {formErrors.nameAr && <small className={styles.fieldError}>{formErrors.nameAr}</small>}
                 </div>
 
                 <div className={styles.inputGroup}>
@@ -717,27 +863,34 @@ export default function MenuManagementPage() {
                     placeholder="e.g. Classic Flat White"
                     value={formData.nameEn}
                     onChange={(e) =>
-                      setFormData({ ...formData, nameEn: e.target.value })
+                      setFormData((current) => ({ ...current, nameEn: e.target.value }))
                     }
+                    maxLength={120}
+                    aria-invalid={Boolean(formErrors.nameEn)}
                   />
+                  {formErrors.nameEn && <small className={styles.fieldError}>{formErrors.nameEn}</small>}
                 </div>
               </div>
 
               <div className={styles.twoCol}>
                 <div className={styles.inputGroup}>
-                  <label htmlFor="prod-price">{t("price")} ({tCommon("currency")}) *</label>
+                  <label htmlFor="prod-price">
+                    {t("price")} ({tCommon("currency")}) *
+                  </label>
                   <input
                     id="prod-price"
                     type="number"
                     step="0.25"
-                    min="0"
+                    min="0" max="999999.99"
                     required
                     placeholder="0.00"
                     value={formData.price}
                     onChange={(e) =>
-                      setFormData({ ...formData, price: e.target.value })
+                      setFormData((current) => ({ ...current, price: e.target.value }))
                     }
+                    aria-invalid={Boolean(formErrors.price)}
                   />
+                  {formErrors.price && <small className={styles.fieldError}>{formErrors.price}</small>}
                 </div>
 
                 <div className={styles.inputGroup}>
@@ -747,8 +900,9 @@ export default function MenuManagementPage() {
                     required
                     value={formData.categoryId}
                     onChange={(e) =>
-                      setFormData({ ...formData, categoryId: e.target.value })
+                      setFormData((current) => ({ ...current, categoryId: e.target.value }))
                     }
+                    aria-invalid={Boolean(formErrors.categoryId)}
                   >
                     {categories.length === 0 && (
                       <option value="">{tCommon("all")}</option>
@@ -756,14 +910,87 @@ export default function MenuManagementPage() {
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {isRtl
-                          ? (c.nameAr || c.name || c.nameEn)
-                          : (c.nameEn || c.name || c.nameAr)}
+                          ? c.nameAr || c.name || c.nameEn
+                          : c.nameEn || c.name || c.nameAr}
                       </option>
                     ))}
                   </select>
+                  {formErrors.categoryId && <small className={styles.fieldError}>{formErrors.categoryId}</small>}
                 </div>
               </div>
 
+              <div className={styles.inputGroup}>
+                <label htmlFor="prod-calories">
+                  {isRtl ? "السعرات الحرارية (اختياري)" : "Calories (optional)"}
+                </label>
+                <input
+                  id="prod-calories"
+                  type="number"
+                  min="0"
+                  max="100000"
+                  step="1"
+                  value={formData.calories}
+                  onChange={(e) =>
+                    setFormData((current) => ({ ...current, calories: e.target.value }))
+                  }
+                  aria-invalid={Boolean(formErrors.calories)}
+                />
+                {formErrors.calories && <small className={styles.fieldError}>{formErrors.calories}</small>}
+              </div>
+              {[
+                {
+                  keys: INGREDIENT_KEYS,
+                  field: "ingredientTags" as const,
+                  title: isRtl ? "مكونات بارزة" : "Ingredient highlights",
+                },
+                {
+                  keys: ALLERGEN_KEYS,
+                  field: "allergens" as const,
+                  title: isRtl
+                    ? "مسببات الحساسية — يحتوي على"
+                    : "Allergens — contains",
+                },
+                {
+                  keys: DIETARY_KEYS,
+                  field: "dietaryTags" as const,
+                  title: isRtl ? "معلومات الطبق" : "Dietary labels",
+                },
+              ].map(({ keys, field, title }) => (
+                <fieldset key={field} className={styles.inputGroup}>
+                  <legend>{title}</legend>
+                  <p className={styles.fieldHint}>{field === "allergens" ? (isRtl ? "اختر فقط مسببات الحساسية المؤكدة. يظهر الاسم دائماً بجانب الرمز." : "Select confirmed allergens only. The name always appears beside its symbol.") : (isRtl ? "معلومات اختيارية تساعد الضيف على فهم الطبق." : "Optional details that help guests understand the dish.")}</p>
+                  <div className={styles.foodOptionGrid}>
+                    {keys.map((key) => {
+                      const entry =
+                        FOOD_LABELS[key as keyof typeof FOOD_LABELS];
+                      const Icon = entry.icon;
+                      return (
+                        <label
+                          key={key}
+                          className={styles.foodOption}
+                          data-selected={String(formData[field].includes(key))}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData[field].includes(key)}
+                            onChange={(e) =>
+                              setFormData((current) => ({
+                                ...current,
+                                [field]: e.target.checked
+                                  ? [...current[field], key]
+                                  : current[field].filter((v) => v !== key),
+                              }))
+                            }
+                            style={{ width: 18, height: 18 }}
+                          />
+                          <Icon size={17} aria-hidden="true" />
+                          {isRtl ? entry.ar : entry.en}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
               <div className={styles.inputGroup}>
                 <label htmlFor="prod-desc-ar">{t("descAr")}</label>
                 <textarea
@@ -775,11 +1002,12 @@ export default function MenuManagementPage() {
                   }
                   value={formData.descriptionAr}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                    setFormData((current) => ({
+                      ...current,
                       descriptionAr: e.target.value,
-                    })
+                    }))
                   }
+                  maxLength={1000}
                 />
               </div>
 
@@ -791,11 +1019,12 @@ export default function MenuManagementPage() {
                   placeholder="Rich espresso balanced with velvety steamed milk…"
                   value={formData.descriptionEn}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
+                    setFormData((current) => ({
+                      ...current,
                       descriptionEn: e.target.value,
-                    })
+                    }))
                   }
+                  maxLength={1000}
                 />
               </div>
 
@@ -816,8 +1045,8 @@ export default function MenuManagementPage() {
                           {isSelected && <Check size={13} />}
                           <span>
                             {isRtl
-                              ? (attr.labelAr || attr.labelEn)
-                              : (attr.labelEn || attr.labelAr)}
+                              ? attr.labelAr || attr.labelEn
+                              : attr.labelEn || attr.labelAr}
                           </span>
                         </button>
                       );
@@ -830,7 +1059,7 @@ export default function MenuManagementPage() {
                 <button
                   type="button"
                   className={styles.secondaryButton}
-                  onClick={() => setIsProductModalOpen(false)}
+                  onClick={closeProductEditor}
                   disabled={isSubmitting}
                 >
                   {tCommon("cancel")}
@@ -846,7 +1075,7 @@ export default function MenuManagementPage() {
                       <span>{tCommon("loading")}</span>
                     </>
                   ) : (
-                    <span>{tCommon("save")}</span>
+                    <span>{editingProductId ? tCommon("save") : (isRtl ? "إضافة المنتج" : "Add product")}</span>
                   )}
                 </button>
               </div>
@@ -892,7 +1121,11 @@ export default function MenuManagementPage() {
                   <label>{t("nameAr")}</label>
                   <input
                     type="text"
-                    placeholder={isRtl ? "مثال: الأكثر طلباً، نباتي، حار" : "e.g. Best Seller, Vegan, Spicy"}
+                    placeholder={
+                      isRtl
+                        ? "مثال: الأكثر طلباً، نباتي، حار"
+                        : "e.g. Best Seller, Vegan, Spicy"
+                    }
                     value={newAttrData.labelAr}
                     onChange={(e) =>
                       setNewAttrData({
@@ -934,15 +1167,25 @@ export default function MenuManagementPage() {
               </button>
             </form>
 
-            <div style={{ marginTop: "24px", borderTop: "1px solid rgba(223, 210, 235, 0.1)", paddingTop: "16px" }}>
-              <h4 style={{ margin: "0 0 12px", fontSize: "0.95rem", color: "#fffdf9" }}>
+            <div
+              style={{
+                marginTop: "24px",
+                borderTop: "1px solid rgba(223, 210, 235, 0.1)",
+                paddingTop: "16px",
+              }}
+            >
+              <h4
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: "0.95rem",
+                  color: "#fffdf9",
+                }}
+              >
                 {t("attributesTitle")} ({attributes.length})
               </h4>
 
               {attributes.length === 0 ? (
-                <p style={{ color: "#b9aebd", fontSize: "0.85rem" }}>
-                  —
-                </p>
+                <p style={{ color: "#b9aebd", fontSize: "0.85rem" }}>—</p>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {attributes.map((attr) => (
@@ -962,8 +1205,8 @@ export default function MenuManagementPage() {
                     >
                       <span>
                         {isRtl
-                          ? (attr.labelAr || attr.labelEn)
-                          : (attr.labelEn || attr.labelAr)}
+                          ? attr.labelAr || attr.labelEn
+                          : attr.labelEn || attr.labelAr}
                       </span>
                       <button
                         type="button"
@@ -991,10 +1234,7 @@ export default function MenuManagementPage() {
       </Dialog.Root>
 
       {/* Delete Confirmation Modal */}
-      <Dialog.Root
-        open={isDeleteModalOpen}
-        onOpenChange={setIsDeleteModalOpen}
-      >
+      <Dialog.Root open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className={styles.dialogOverlay} />
           <Dialog.Content
@@ -1014,7 +1254,14 @@ export default function MenuManagementPage() {
               </Dialog.Close>
             </div>
 
-            <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
+            <p
+              style={{
+                color: "#cbbfce",
+                fontSize: "0.9rem",
+                lineHeight: 1.7,
+                margin: "0 0 20px",
+              }}
+            >
               {t("deleteWarning")}
             </p>
 

@@ -111,9 +111,9 @@ export function AdminOnboardingGuide() {
   const stepDef = STEP_CONFIG[stepIndex];
   const isLastStep = stepIndex === STEP_CONFIG.length - 1;
   const StepIcon = stepDef.icon;
-  const stepTitle = t(`${stepDef.key}Title` as any);
-  const stepDescription = t(`${stepDef.key}Desc` as any);
-  const stepAction = t(`${stepDef.key}Action` as any);
+  const stepTitle = t(`${stepDef.key}Title`);
+  const stepDescription = t(`${stepDef.key}Desc`);
+  const stepAction = t(`${stepDef.key}Action`);
 
   const open = explicitOpen !== null ? explicitOpen : (!hasCompleted && !dismissed);
 

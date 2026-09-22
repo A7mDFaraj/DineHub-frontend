@@ -12,6 +12,9 @@ import { useAccess } from "@/lib/access-context";
 import { apiClient } from "@/lib/api-client";
 
 export interface Branch {
+  menuTheme?: string;
+  showSpecialDiscount?: boolean;
+  discountPercent?: number;
   publicCode?: string;
   id: string;
   name?: string;

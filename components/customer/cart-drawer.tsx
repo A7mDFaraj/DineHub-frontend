@@ -1,7 +1,8 @@
 "use client";
 
+import { contrastInk } from "@/lib/menu-themes";
 import { useCartStore } from "@/store/cart-store";
-import { AnimatePresence, motion } from "framer-motion";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   Minus,
   Plus,
@@ -24,10 +25,12 @@ export function CartDrawer({
   branchId,
   tableId,
   themeColor = "#f2644b",
+  preview = false,
 }: {
   branchId: string;
   tableId?: string;
   themeColor?: string;
+  preview?: boolean;
 }) {
   const {
     items,
@@ -91,7 +94,7 @@ export function CartDrawer({
   };
 
   const handleSubmitOrder = async () => {
-    if (submittingRef.current || items.length === 0) return;
+    if (preview || submittingRef.current || items.length === 0) return;
     if (!tableNumber) {
       alert(t("tableNotSpecified"));
       return;
@@ -123,13 +126,18 @@ export function CartDrawer({
         branchId: string;
         tableId: string;
         note?: string;
-        items: { productId: string; quantity: number }[];
+        items: {
+          productId: string;
+          quantity: number;
+          expectedUnitPrice: number;
+        }[];
       } = {
         branchId,
         tableId: resolvedTableId,
         items: items.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
+          expectedUnitPrice: Number(i.price),
         })),
       };
 
@@ -158,9 +166,7 @@ export function CartDrawer({
         : err instanceof Error
           ? err.message
           : null;
-      setSubmitError(
-        typeof message === "string" ? message : t("orderFailed"),
-      );
+      setSubmitError(typeof message === "string" ? message : t("orderFailed"));
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
@@ -170,266 +176,206 @@ export function CartDrawer({
   const count = totalItems();
   const total = totalAmount();
   const currencyLabel = isRtl ? "ر.س" : "SAR";
-
+  const buttonStyle = {
+    backgroundColor: themeColor,
+    color: contrastInk(themeColor),
+  };
   return (
     <>
-      {/* Floating Bottom Cart Pill */}
-      <AnimatePresence>
-        {!isCartOpen && items.length > 0 && (
-          <motion.div
-            initial={{ y: 80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md"
+      {!isCartOpen && items.length > 0 && (
+        <button
+          type="button"
+          onClick={toggleCart}
+          style={buttonStyle}
+          className="fixed bottom-5 left-1/2 z-40 flex min-h-14 w-[calc(100%-32px)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-full px-6 py-3 font-bold shadow-xl active:scale-[0.96]"
+        >
+          <span>
+            {count} · {t("viewCart")}
+          </span>
+          <span className="tabular-nums">
+            {total.toFixed(2)} {currencyLabel}
+          </span>
+        </button>
+      )}
+      <Dialog.Root
+        open={isCartOpen}
+        onOpenChange={(open) => {
+          if (open !== isCartOpen && !isSubmitting) toggleCart();
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed bottom-0 left-1/2 z-50 flex max-h-[90dvh] w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white text-stone-900 shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl"
             dir={isRtl ? "rtl" : "ltr"}
-            style={{
-              fontFamily: isRtl
-                ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
-                : "var(--font-outfit), sans-serif",
-            }}
           >
-            <button
-              onClick={toggleCart}
-              style={{ backgroundColor: themeColor }}
-              className="w-full h-14 rounded-full text-white font-black shadow-[0_12px_32px_rgba(0,0,0,0.18)] flex items-center justify-between px-5 border border-white/20 transition-all active:scale-[0.96]"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="bg-black/20 w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold text-white tabular-nums">
-                  {count}
-                </div>
-                <span className="text-xs sm:text-sm font-bold">
-                  {t("viewCart")}
-                </span>
+            <header className="flex items-center justify-between gap-3 border-b border-stone-200 bg-stone-50 px-5 py-3">
+              <div>
+                <Dialog.Title className="flex items-center gap-2 text-lg font-bold">
+                  <ShoppingBag size={20} />
+                  {t("cartTitle")}
+                </Dialog.Title>
+                <p className="mt-1 text-xs text-stone-600">
+                  {count} {count === 1 ? t("itemSingular") : t("itemPlural")}
+                </p>
               </div>
-              <span className="font-mono text-sm sm:text-base font-black tabular-nums">
-                {total.toFixed(2)} {currencyLabel}
-              </span>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Cart Drawer / Bottom Sheet */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-            dir={isRtl ? "rtl" : "ltr"}
-            style={{
-              fontFamily: isRtl
-                ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
-                : "var(--font-outfit), sans-serif",
-            }}
-          >
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={toggleCart}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-            />
-
-            {/* Sheet Box */}
-            <motion.div
-              initial={{ y: "100%", opacity: 0.5 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "100%", opacity: 0 }}
-              transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="relative z-10 w-full sm:max-w-lg bg-white border border-stone-200 rounded-t-[32px] sm:rounded-[28px] max-h-[88vh] flex flex-col overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,0.25)] text-stone-900"
-            >
-              {/* Header */}
-              <div className="p-4 sm:p-5 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
-                    style={{
-                      backgroundColor: `${themeColor}20`,
-                      color: themeColor,
-                    }}
+              <Dialog.Close
+                disabled={isSubmitting}
+                className="flex size-11 items-center justify-center rounded-full bg-white"
+                aria-label={isRtl ? "إغلاق" : "Close"}
+              >
+                <X size={18} />
+              </Dialog.Close>
+            </header>
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              {items.length === 0 ? (
+                <div className="py-12 text-center">
+                  <h3 className="font-bold">{t("emptyCartTitle")}</h3>
+                  <p className="mt-2 text-sm text-stone-600">
+                    {t("emptyCartDesc")}
+                  </p>
+                </div>
+              ) : (
+                items.map((item) => (
+                  <article
+                    key={item.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 p-3"
                   >
-                    <ShoppingBag size={18} />
-                  </div>
-                  <div>
-                    <h2 className="text-base sm:text-lg font-black text-stone-900">
-                      {t("cartTitle")}
-                    </h2>
-                    <p className="text-[0.72rem] text-stone-500 font-medium">
-                      {t("table")} #{tableNumber} • {count}{" "}
-                      {count === 1 ? t("itemSingular") : t("itemPlural")}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={toggleCart}
-                  className="w-9 h-9 rounded-xl bg-white border border-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center transition-colors shadow-sm"
-                  aria-label="Close"
-                >
-                  <X size={17} />
-                </button>
-              </div>
-
-              {/* Items List */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
-                {items.length === 0 ? (
-                  <div className="py-12 text-center text-stone-400 space-y-2">
-                    <p className="text-sm font-bold text-stone-900">
-                      {t("emptyCartTitle")}
-                    </p>
-                    <p className="text-xs text-stone-500">
-                      {t("emptyCartDesc")}
-                    </p>
-                  </div>
-                ) : (
-                  items.map((item, idx) => {
-                    const itemName = isRtl
-                      ? item.nameAr || item.nameEn || "عنصر"
-                      : item.nameEn || item.nameAr || "Item";
-                    const itemTotal = Number(item.price) * item.quantity;
-                    const hasAttrs =
-                      item.selectedAttributes &&
-                      item.selectedAttributes.length > 0;
-
-                    return (
-                      <div
-                        key={idx}
-                        className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 flex items-center justify-between gap-3"
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-bold">
+                        {isRtl
+                          ? item.nameAr || item.nameEn
+                          : item.nameEn || item.nameAr}
+                      </h3>
+                      <p className="mt-1 text-sm font-bold tabular-nums">
+                        {(item.price * item.quantity).toFixed(2)}{" "}
+                        {currencyLabel}
+                      </p>
+                      {Boolean(item.selectedAttributes?.length) && (
+                        <p className="mt-1 text-xs text-stone-600">
+                          {item.selectedAttributes!.join(" · ")}
+                        </p>
+                      )}
+                      {item.itemNote && (
+                        <p className="mt-1 break-words text-xs text-stone-600">
+                          {item.itemNote}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center rounded-full bg-stone-100 p-1">
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() =>
+                          item.quantity > 1
+                            ? updateQuantity(item.id, item.quantity - 1)
+                            : removeItem(item.id)
+                        }
+                        className="flex size-11 items-center justify-center rounded-full"
+                        aria-label={
+                          isRtl ? "تقليل الكمية" : "Decrease quantity"
+                        }
                       >
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-bold text-xs sm:text-sm text-stone-900 truncate">
-                            {itemName}
-                          </h3>
-                          <div
-                            className="font-mono text-xs font-black tabular-nums mt-0.5"
-                            style={{ color: themeColor }}
-                          >
-                            {itemTotal.toFixed(2)} {currencyLabel}
-                          </div>
-
-                          {/* Attributes and Notes */}
-                          {hasAttrs && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {item.selectedAttributes!.map((attr, aIdx) => (
-                                <span
-                                  key={aIdx}
-                                  className="text-[9px] bg-white border border-stone-200 text-stone-700 px-1.5 py-0.5 rounded font-bold"
-                                >
-                                  {attr}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {item.itemNote && (
-                            <p className="text-[10px] text-stone-500 italic mt-0.5">
-                              {t("notePrefix")}: {item.itemNote}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Quantity Stepper */}
-                        <div className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-xl p-1 shrink-0 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (item.quantity > 1) {
-                                updateQuantity(
-                                  item.productId,
-                                  item.quantity - 1,
-                                );
-                              } else {
-                                removeItem(item.productId);
-                              }
-                            }}
-                            className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-red-50 hover:text-red-600 text-stone-700 flex items-center justify-center transition-colors"
-                            aria-label="Decrease quantity"
-                          >
-                            {item.quantity === 1 ? (
-                              <Trash2 size={13} />
-                            ) : (
-                              <Minus size={13} />
-                            )}
-                          </button>
-                          <span className="w-6 text-center font-mono font-extrabold text-xs tabular-nums text-stone-900">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateQuantity(item.productId, item.quantity + 1)
-                            }
-                            className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-900 flex items-center justify-center transition-colors"
-                            aria-label="Increase quantity"
-                          >
-                            <Plus size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-
-                {/* General Order Notes */}
-                {items.length > 0 && (
-                  <div className="space-y-1.5 pt-2">
-                    <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                      <MessageSquare size={13} style={{ color: themeColor }} />
-                      <span>{t("generalNote")}</span>
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      placeholder={t("notePlaceholder")}
-                      className="w-full rounded-xl bg-stone-50 border border-stone-200 p-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:border-stone-400 resize-none transition-all box-border font-medium"
-                    />
-                  </div>
-                )}
-
-                {submitError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold">
-                    {submitError}
-                  </div>
-                )}
-              </div>
-
-              {/* Drawer Footer */}
+                        {item.quantity === 1 ? (
+                          <Trash2 size={15} />
+                        ) : (
+                          <Minus size={15} />
+                        )}
+                      </button>
+                      <span className="w-6 text-center text-sm font-bold tabular-nums">
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isSubmitting || item.quantity >= 99}
+                        onClick={() =>
+                          updateQuantity(item.id, item.quantity + 1)
+                        }
+                        className="flex size-11 items-center justify-center rounded-full disabled:opacity-30"
+                        aria-label={
+                          isRtl ? "زيادة الكمية" : "Increase quantity"
+                        }
+                      >
+                        <Plus size={15} />
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
               {items.length > 0 && (
-                <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 space-y-3">
-                  <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-stone-600">
-                    <span>{t("subtotal")}:</span>
-                    <span className="font-mono text-base sm:text-lg font-black text-stone-900 tabular-nums">
-                      {total.toFixed(2)} {currencyLabel}
-                    </span>
-                  </div>
-
+                <div>
+                  <label
+                    htmlFor="cart-note"
+                    className="mb-2 flex items-center gap-2 text-sm font-bold"
+                  >
+                    <MessageSquare size={15} />
+                    {t("generalNote")}
+                  </label>
+                  <textarea
+                    id="cart-note"
+                    rows={2}
+                    maxLength={1000}
+                    disabled={isSubmitting}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder={t("notePlaceholder")}
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
+                  />
+                </div>
+              )}
+              {submitError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                >
+                  {submitError}
                   <button
                     type="button"
-                    onClick={handleSubmitOrder}
-                    disabled={isSubmitting}
-                    style={{ backgroundColor: themeColor }}
-                    className="w-full min-h-[48px] rounded-2xl font-black text-xs sm:text-sm text-white flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.96] disabled:opacity-60"
+                    className="mt-2 block min-h-11 underline"
+                    onClick={() => window.location.reload()}
                   >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>{t("submitting")}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>{t("placeOrder")}</span>
-                        <SubmitArrow size={16} />
-                      </>
-                    )}
+                    {isRtl ? "تحديث القائمة" : "Refresh menu"}
                   </button>
                 </div>
               )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div>
+            {items.length > 0 && (
+              <footer className="space-y-4 border-t border-stone-200 bg-stone-50 p-5 pb-[max(20px,env(safe-area-inset-bottom))]">
+                <div className="flex justify-between gap-3 font-bold">
+                  <span>{t("subtotal")}</span>
+                  <span className="tabular-nums">
+                    {total.toFixed(2)} {currencyLabel}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSubmitOrder}
+                  disabled={isSubmitting || preview}
+                  style={buttonStyle}
+                  className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full p-3 text-sm font-bold disabled:opacity-60"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={17} className="animate-spin" />
+                      {t("submitting")}
+                    </>
+                  ) : (
+                    <>
+                      {preview
+                        ? isRtl
+                          ? "معاينة فقط — لا يُرسل طلب"
+                          : "Preview only — ordering disabled"
+                        : t("placeOrder")}
+                      <SubmitArrow size={17} />
+                    </>
+                  )}
+                </button>
+              </footer>
+            )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }
