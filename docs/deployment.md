@@ -1,4 +1,26 @@
-# Frontend deployment runbook (Vercel)
+# Frontend deployment runbook (Cloudflare active; Vercel deferred)
+
+## Current Cloudflare release
+
+The frontend remains on the existing `dinehub` Worker. All application performance and order fixes are retained. No backend or database changes are needed for this hosting repair.
+
+- Install: `pnpm install --frozen-lockfile`.
+- Build command in Cloudflare Workers Builds: `pnpm run build:cf`.
+- Deploy command after that build: `pnpm exec opennextjs-cloudflare deploy`.
+- For a complete manual build and publish: `pnpm deploy`.
+- Local Worker preview: `pnpm preview`.
+
+Keep the existing Worker name, routes and KV namespace. The adapter and Wrangler versions are pinned, and both pnpm patches must be committed with the lockfile. CI runs the full Cloudflare build. Keep the legacy `middleware.ts` entry point for this adapter: Next.js deprecates the name, but its Edge middleware path avoids the experimental Node proxy path. Revisit the rename when changing adapters. Before release also run deployment checks, lint, menu verification and realtime verification. Confirm the compatible backend is deployed first.
+
+Set `NEXT_PUBLIC_API_URL=https://dinehub-backend-42eq.onrender.com/api` and `NEXT_PUBLIC_BETTER_AUTH_URL=https://dinehub-backend-42eq.onrender.com` in the Cloudflare build environment. These public values are embedded at build time. Never add database or auth secrets to the frontend. Keep the active Cloudflare origin allowed by the backend.
+
+Images use their original URLs on Cloudflare because the Worker has no `IMAGES` binding. Lazy loading, dimensions, and existing image fallbacks remain. Enable and verify a Cloudflare image service before opting into resizing; see https://opennext.js.org/cloudflare/howtos/image. Native Vercel image optimization remains enabled when `VERCEL=1`.
+
+Run a provider deployment and browser/API smoke checks after pushing; local build success does not prove the live deployment. Do not create real orders for smoke tests.
+
+## Deferred Vercel migration
+
+The following is a future cutover plan, not the current hosting configuration. Keep `build:cf` and all Cloudflare configuration until the switch is confirmed.
 
 ## Release order
 
@@ -23,4 +45,4 @@ Vercel Hobby may be used only where its current terms permit. A commercial resta
 
 ## GitHub checks
 
-`Deployment checks / verify` validates the lockfile, lint, menu fixture, and native Next.js production build. It does not publish or mutate the database. Require it in repository rules before production promotion.
+`Deployment checks / verify` validates the lockfile, lint, menu fixture, and full Cloudflare adapter build. It does not publish or mutate the database. Require it in repository rules before production promotion.

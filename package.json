@@ -6,7 +6,10 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:cf": "opennextjs-cloudflare build",
+    "deploy": "pnpm run build:cf && opennextjs-cloudflare deploy",
+    "preview": "pnpm run build:cf && opennextjs-cloudflare preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -41,7 +44,9 @@
     "eslint-config-next": "16.3.3",
     "styled-jsx": "^5.1.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@opennextjs/cloudflare": "1.20.4",
+    "wrangler": "4.127.1"
   },
   "packageManager": "pnpm@11.24.0"
 }

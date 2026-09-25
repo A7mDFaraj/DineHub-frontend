@@ -7,7 +7,9 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const remotePatterns = imageRemotePatterns;
 
 const nextConfig: NextConfig = {
-  images: { remotePatterns },
+  // Cloudflare has no IMAGES binding yet; serve originals until configured.
+  // Vercel keeps its native optimizer when explicitly deployed there later.
+  images: { remotePatterns, unoptimized: process.env.VERCEL !== "1" },
   async headers() {
     return [
       {

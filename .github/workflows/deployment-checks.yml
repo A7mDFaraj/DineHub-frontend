@@ -30,4 +30,4 @@ jobs:
       - run: pnpm lint
       - run: node --experimental-strip-types scripts/verify-menu.mjs
       - run: node --experimental-strip-types scripts/verify-realtime.mjs
-      - run: pnpm build
+      - run: pnpm build:cf

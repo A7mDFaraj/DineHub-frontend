@@ -1,0 +1,28 @@
+diff --git a/dist/build/copyTracedFiles.js b/dist/build/copyTracedFiles.js
+index c847154da1464b71bbd871ba668336ae0078cfed..8d85a142118fa8563dd5360e61f92f5c69ca8eb8 100644
+--- a/dist/build/copyTracedFiles.js
++++ b/dist/build/copyTracedFiles.js
+@@ -238,7 +238,22 @@ File ${serverPath} does not exist
+             }
+             catch (e) {
+                 if (e.code !== "EEXIST") {
+-                    throw e;
++                    try {
++                        const targetPath = path.resolve(path.dirname(from), symlink);
++                        if (existsSync(targetPath) && statSync(targetPath).isDirectory()) {
++                            cpSync(targetPath, to, { recursive: true });
++                        } else {
++                            copyFileAndMakeOwnerWritable(targetPath, to);
++                        }
++                    } catch (fallbackErr) {
++                        try {
++                            copyFileAndMakeOwnerWritable(from, to);
++                        } catch (err2) {
++                            if (e.code !== "EEXIST") {
++                                throw e;
++                            }
++                        }
++                    }
+                 }
+             }
+         }
