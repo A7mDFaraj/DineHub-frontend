@@ -3,8 +3,9 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-assert.equal(pkg.scripts['build:cf'], 'opennextjs-cloudflare build', 'Keep the complete Cloudflare production build.');
-assert.equal(pkg.scripts.deploy, 'opennextjs-cloudflare build && wrangler deploy', 'Publishing must stop if the build fails.');
+assert.equal(pkg.scripts.build, 'next build', 'Vercel must use the native Next.js production build.');
+assert.ok(!pkg.scripts.deploy, 'Vercel deploys from Git; keep publishing out of package scripts.');
+assert.ok(!pkg.devDependencies?.wrangler && !pkg.devDependencies?.['@opennextjs/cloudflare'], 'Cloudflare deployment dependencies must stay removed.');
 const config = readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
 assert.ok(!/ignoreBuildErrors\s*:\s*true/.test(config), 'Do not bypass production TypeScript checks.');
 const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0');

@@ -1,24 +1,26 @@
-# Frontend deployment runbook
+# Frontend deployment runbook (Vercel)
 
 ## Release order
 
-1. Coordinate with the backend repository's `docs/deployment.md`. Apply and verify required additive database migrations separately from server startup.
-2. Deploy the compatible backend and verify a real branch menu returns the required fields. `/api/health` only proves that the process is running.
-3. Install with `pnpm install --frozen-lockfile`. Run `node scripts/check-deployment.mjs`, `pnpm lint`, `node --experimental-strip-types scripts/verify-menu.mjs`, and `pnpm build:cf`. The Cloudflare build includes the Next.js production build and type checking.
-4. Verify hosting environment values: `NEXT_PUBLIC_API_URL=https://dinehub-backend-42eq.onrender.com/api` and `NEXT_PUBLIC_BETTER_AUTH_URL=https://dinehub-backend-42eq.onrender.com`. Public variables are embedded at build time. Never put database credentials in frontend variables.
-5. Push/deploy only after checks pass. Keep dependency patches and the lockfile committed. Do not replace build failures with `ignoreBuildErrors` or shell commands that swallow errors.
-6. Confirm the provider actually deployed the intended commit. Check public and QR menus in Arabic and English, loading/error states, and authorized admin editing where access is available. Do not place real orders as a release test.
+1. Apply and verify additive database migrations using the backend runbook.
+2. Deploy the compatible backend and verify `/api/health/ready` plus a populated public menu.
+3. Run `pnpm install --frozen-lockfile`, `node scripts/check-deployment.mjs`, `pnpm lint`, `node --experimental-strip-types scripts/verify-menu.mjs`, `node --experimental-strip-types scripts/verify-realtime.mjs`, and `pnpm build`.
+4. Import this repository into Vercel as a native Next.js project. The committed `vercel.json` uses the frozen pnpm install and native production build.
+5. Configure Production and Preview values for `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, and `NEXT_PUBLIC_IMAGE_ORIGIN`. These values are public and embedded during the build. Never add database, Better Auth, or Supabase service-role credentials to Vercel.
+6. Add the exact Vercel production and preview origins to backend `FRONTEND_URLS`, deploy the backend, and verify credentialed CORS and Better Auth before promoting the preview.
+7. Verify Arabic and English menus, QR/table links, images, login/logout, password changes, permissions, dashboard, staff order streams, customer tracking, and error states. Use a staging branch for write tests.
+8. Point the existing custom web hostname to Vercel only after TLS and preview verification. Keeping the hostname preserves printed QR links. Cloudflare may continue providing DNS; moving nameservers is unnecessary.
 
-## Recovery
+## Cutover and rollback
 
-If the frontend release fails, keep or restore the previous frontend deployment. If the API fails, diagnose its response and backend/database state; do not couple migrations to server startup. Use additive migrations so the previous application remains compatible during a rollback.
+Keep the Cloudflare Worker deployment and its configuration intact during the Vercel preview and initial custom-domain cutover. The old `workers.dev` hostname cannot be transferred to Vercel, so retain a redirect Worker if any printed or shared URL uses it. Do not delete Worker routes, KV namespaces, DNS records, or secrets until access logs and the agreed rollback window show they are unused.
 
-Local `.env` files do not move with Git and do not update provider settings. Keep them ignored and restore them securely when changing computers.
+If Vercel verification fails, restore the previous DNS record or promote the previous Vercel deployment. Do not change database migrations or backend startup to repair a frontend deployment.
+
+## Plan limitation
+
+Vercel Hobby may be used only where its current terms permit. A commercial restaurant SaaS must use an eligible commercial plan before production traffic. Provider billing and terms are an operational requirement, independent of whether the build succeeds.
 
 ## GitHub checks
 
-`Deployment checks / verify` runs deployment guards, frozen installation, lint, menu/cart verification, and the Cloudflare build on pushes and pull requests. It needs no production secrets and does not publish or mutate the database. Runtime and pnpm setup follow the [pnpm setup action documentation](https://github.com/pnpm/setup).
-
-Require the check in GitHub repository rules and configure the hosting provider to wait for successful checks, or release manually after success. The workflow alone does not block an existing automatic deployment or direct push. No provider settings are changed by these files.
-
-A green build cannot guarantee working production credentials, network availability, or correct database state. Report Git push, CI result, migration result, and hosting verification separately.
+`Deployment checks / verify` validates the lockfile, lint, menu fixture, and native Next.js production build. It does not publish or mutate the database. Require it in repository rules before production promotion.

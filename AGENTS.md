@@ -51,5 +51,5 @@ These rules explicitly support the **DineHub MVP** architecture (QR ordering, PO
 - Never add database migration commands to backend server startup to repair a frontend deployment. Keep backend `start:prod` as `node dist/main`.
 - Never commit `.env` files or credentials. Local environment files and hosting-provider variables are separate; verify the configured production URLs without printing secrets.
 - Install with the frozen lockfile. Chain install/build steps with `&&` so errors cannot be hidden. Do not suppress TypeScript/build failures.
-- Run `node scripts/check-deployment.mjs`, lint, menu verification, and the Cloudflare production build before releasing. Preserve dependency patches and keep the lockfile consistent.
+- Run `node scripts/check-deployment.mjs`, lint, menu verification, and the native Next.js production build before releasing to Vercel. Keep the lockfile consistent.
 - Git push is not proof of deployment. Verify the provider build and deployed browser/API behavior; report any checks that remain unverified. Do not create real orders for smoke tests.

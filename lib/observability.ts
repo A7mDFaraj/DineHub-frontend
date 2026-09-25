@@ -24,10 +24,15 @@ function truncate(value: string | undefined, maximum: number): string | undefine
 
 function safePath(value?: string): string | undefined {
   if (!value) return undefined;
+  const redact = (path: string) =>
+    path
+      .replace(/((?:\/api)?\/orders)\/[^/]+/, "$1/[redacted]")
+      .replace(/(\/menu\/[^/]+\/order)\/[^/]+/, "$1/[redacted]")
+      .replace(/(\/(?:en|ar)?\/?order)\/[^/]+/, "$1/[redacted]");
   try {
-    return new URL(value, window.location.origin).pathname;
+    return redact(new URL(value, window.location.origin).pathname);
   } catch {
-    return value.split(/[?#]/, 1)[0].slice(0, 500);
+    return redact(value.split(/[?#]/, 1)[0].slice(0, 500));
   }
 }
 

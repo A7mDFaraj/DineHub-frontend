@@ -47,10 +47,8 @@ export default function CategoriesPage() {
   const tCommon = useTranslations("AdminCommon");
 
   const {
-    branches,
     selectedBranchId,
     selectedBranch,
-    isLoadingBranches,
   } = useAdminBranch();
 
   const [categories, setCategories] = useState<Category[]>([]);

@@ -43,7 +43,6 @@ export default function QrCodeManagementPage() {
   const isRtl = locale !== "en";
 
   const {
-    branches,
     selectedBranchId,
     selectedBranch,
   } = useAdminBranch();

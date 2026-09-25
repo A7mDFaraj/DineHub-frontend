@@ -22,6 +22,7 @@ import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
 import { ImageUploader } from "@/components/ui/image-uploader";
+import NextImage from "@/components/ui/menu-image";
 import styles from "./menu.module.css";
 import {
   FOOD_LABELS,
@@ -667,11 +668,13 @@ export default function MenuManagementPage() {
               <article key={prod.id} className={styles.productCard}>
                 <div className={styles.imageWrapper}>
                   {prod.imageUrl ? (
-                    <img
+                    <NextImage
                       src={prod.imageUrl}
                       alt={displayName}
+                      width={640}
+                      height={480}
+                      sizes="(max-width: 640px) 100vw, 320px"
                       className={styles.productImg}
-                      loading="lazy"
                     />
                   ) : (
                     <div className={styles.noImage}>

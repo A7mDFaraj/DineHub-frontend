@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { apiClient } from "@/lib/api-client";
+import { subscribeToEvents } from "@/lib/event-stream";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { motion } from "framer-motion";
 import {
@@ -107,10 +108,14 @@ export default function OrderTrackingPage({
 
   useEffect(() => {
     let active = true;
-    let timer: ReturnType<typeof setTimeout>;
+    let inFlight = false;
+    let queued = false;
     const controller = new AbortController();
     const fetchOrder = async () => {
-      let finished = false;
+      if (!active) return;
+      if (inFlight) { queued = true; return; }
+      queued = false;
+      inFlight = true;
       try {
         const res = await apiClient.get(`/orders/${resolvedParams.orderId}`, {
           signal: controller.signal,
@@ -119,7 +124,6 @@ export default function OrderTrackingPage({
         const raw: OrderData = res.data.data || res.data;
         setOrder(raw);
         setError("");
-        finished = raw.status === "delivered";
         const currentPathWithoutLocale = window.location.pathname.replace(/^\/(en|ar)/, "");
         if (
           raw.trackingPath &&
@@ -133,17 +137,29 @@ export default function OrderTrackingPage({
           setError(t("loadError"));
         }
       } finally {
-        if (active) {
-          setLoading(false);
-          if (!finished) timer = setTimeout(fetchOrder, 3500);
-        }
+        inFlight = false;
+        if (active) setLoading(false);
+        if (queued && active) void fetchOrder();
       }
     };
     void fetchOrder();
+    const closeStream = subscribeToEvents(
+      `/orders/${encodeURIComponent(resolvedParams.orderId)}/stream`,
+      (event) => {
+        if (event.type === "connected" || event.type.startsWith("order.")) void fetchOrder();
+      },
+    );
+    const reconciliation = window.setInterval(() => void fetchOrder(), 60_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void fetchOrder();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       active = false;
       controller.abort();
-      clearTimeout(timer);
+      closeStream();
+      window.clearInterval(reconciliation);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [resolvedParams.orderId, router, retry, t]);
 

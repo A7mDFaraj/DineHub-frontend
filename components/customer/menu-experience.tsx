@@ -20,16 +20,19 @@ import { FoodLabels } from "./food-labels";
 import { ProductModal } from "./product-modal";
 import { CartDrawer } from "./cart-drawer";
 import styles from "./menu-experience.module.css";
+import Image from "@/components/ui/menu-image";
 
 export function MenuImage({ src, name }: { src?: string; name: string }) {
   const [failed, setFailed] = useState(false);
   return (
     <div className={styles.productImage}>
       {src && !failed ? (
-        <img
+        <Image
           src={src}
           alt={name}
-          loading="lazy"
+          width={640}
+          height={480}
+          sizes="(max-width: 640px) 45vw, 280px"
           onError={() => setFailed(true)}
         />
       ) : (
@@ -98,10 +101,12 @@ export function MenuExperience({
         <header className={styles.header}>
           <div className={styles.brand}>
             {branch.logoUrl ? (
-              <img
+              <Image
                 className={styles.logo}
                 src={branch.logoUrl}
                 alt=""
+                width={80}
+                height={80}
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
                 }}

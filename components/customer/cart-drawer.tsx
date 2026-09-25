@@ -53,6 +53,7 @@ export function CartDrawer({
   const params = useParams();
   const router = useRouter();
   const submittingRef = useRef(false);
+  const idempotencyRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const tableNumber = params?.tableNumber as string;
@@ -145,7 +146,16 @@ export function CartDrawer({
         payload.note = formattedNote;
       }
 
-      const res = await apiClient.post("/orders", payload);
+      const fingerprint = JSON.stringify(payload);
+      if (idempotencyRef.current?.fingerprint !== fingerprint) {
+        idempotencyRef.current = {
+          fingerprint,
+          key: crypto.randomUUID().replaceAll("-", ""),
+        };
+      }
+      const res = await apiClient.post("/orders", payload, {
+        headers: { "Idempotency-Key": idempotencyRef.current.key },
+      });
       const trackingPath = res.data?.trackingPath;
 
       if (
@@ -153,6 +163,7 @@ export function CartDrawer({
         trackingPath.startsWith("/order/")
       ) {
         clearCart();
+        idempotencyRef.current = null;
         toggleCart();
         const finalPath = isRtl ? trackingPath : `/en${trackingPath}`;
         router.push(finalPath);

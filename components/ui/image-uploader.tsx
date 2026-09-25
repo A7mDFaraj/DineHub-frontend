@@ -7,6 +7,7 @@ import { useLocale } from "next-intl"
 import { Upload, Link as LinkIcon, X, Loader2, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
+import Image from "@/components/ui/menu-image"
 
 interface ImageUploaderProps {
   value?: string
@@ -49,12 +50,12 @@ export function ImageUploader({
     }
 
     // Allowed MIME types
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/svg+xml", "image/gif"]
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"]
     if (!allowedTypes.includes(file.type)) {
       setError(
         isRtl
-          ? "صيغة الملف غير مدعومة. الصيغ المسموحة: JPG, PNG, WebP, SVG, GIF."
-          : "Unsupported file format. Allowed formats: JPG, PNG, WebP, SVG, GIF."
+          ? "صيغة الملف غير مدعومة. الصيغ المسموحة: JPG, PNG, WebP."
+          : "Unsupported file format. Allowed formats: JPG, PNG, WebP."
       )
       return
     }
@@ -150,10 +151,12 @@ export function ImageUploader({
               aspectRatio === "banner" ? "w-28 h-18 sm:w-32 sm:h-20" : "w-16 h-16 sm:w-20 sm:h-20"
             )}
           >
-            <img
+            <Image
               src={value}
               alt={isRtl ? "معاينة الشعار" : "Logo preview"}
-              className="w-full h-full object-cover"
+              fill
+              sizes="128px"
+              className="object-cover"
             />
           </div>
 

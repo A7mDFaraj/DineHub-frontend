@@ -296,8 +296,9 @@ export default function LogsPage() {
   }, [filters, isSlowMode, isRtl]);
 
   useEffect(() => {
+    const versionRef = requestVersion;
     const timer = setTimeout(() => void loadLogs(), 0);
-    return () => { clearTimeout(timer); ++requestVersion.current; pendingRequest.current?.abort(); pendingRequest.current = null; };
+    return () => { clearTimeout(timer); ++versionRef.current; pendingRequest.current?.abort(); pendingRequest.current = null; };
   }, [loadLogs]);
 
   useEffect(() => {

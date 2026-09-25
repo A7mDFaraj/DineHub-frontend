@@ -11,7 +11,6 @@ import {
   Building2,
   ChefHat,
   CircleAlert,
-  HelpCircle,
   LayoutDashboard,
   Loader2,
   LogOut,

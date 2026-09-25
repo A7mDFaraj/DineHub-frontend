@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { useLocale, useTranslations } from "next-intl";
 import { apiClient } from "@/lib/api-client";
+import { reconcileOrders } from "@/lib/order-reconciliation";
+import { subscribeToEvents } from "@/lib/event-stream";
 import { OrderCard, Order } from "@/components/staff/order-card";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AnimatePresence } from "framer-motion";
@@ -19,6 +21,8 @@ interface Branch {
 }
 
 interface RawOrderItem {
+  nameArAtOrder?: string | null;
+  nameEnAtOrder?: string | null;
   id?: string;
   productId?: string;
   product?: { nameAr?: string; nameEn?: string };
@@ -61,9 +65,10 @@ function readBranches(data: unknown): Branch[] {
 function readOrders(data: unknown): RawOrder[] {
   if (Array.isArray(data)) return data as RawOrder[];
   if (!data || typeof data !== "object") return [];
-  const envelope = data as { data?: unknown; orders?: unknown };
+  const envelope = data as { data?: unknown; orders?: unknown; items?: unknown };
   if (Array.isArray(envelope.data)) return envelope.data as RawOrder[];
   if (Array.isArray(envelope.orders)) return envelope.orders as RawOrder[];
+  if (Array.isArray(envelope.items)) return envelope.items as RawOrder[];
   return [];
 }
 
@@ -82,8 +87,8 @@ function normalizeOrders(rawOrders: RawOrder[]): Order[] {
     items: Array.isArray(order.items)
       ? order.items.map((item) => ({
           productId: item.productId ?? item.id ?? "unknown-product",
-          nameAr: item.product?.nameAr ?? item.nameAr ?? item.name,
-          nameEn: item.product?.nameEn ?? item.nameEn ?? item.name ?? "item",
+          nameAr: item.nameArAtOrder ?? item.product?.nameAr ?? item.nameAr ?? item.name,
+          nameEn: item.nameEnAtOrder ?? item.product?.nameEn ?? item.nameEn ?? item.name ?? "item",
           quantity: item.quantity ?? 1,
           note: item.note,
           selectedAttributes: item.selectedAttributes ?? [],
@@ -114,6 +119,12 @@ export default function StaffDashboard() {
   const [error, setError] = useState("");
 
   const fetchingBranches = useRef(new Set<string>());
+  const queuedRefresh = useRef(new Set<string>());
+  const historyCursor = useRef<string | null | undefined>(undefined);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const historyInFlight = useRef(false);
+  const branchEpoch = useRef(0);
   const pendingRef = useRef(new Set<string>());
   const requestVersion = useRef(0);
   const branchRef = useRef("");
@@ -145,77 +156,73 @@ export default function StaffDashboard() {
 
   const fetchOrders = useCallback(
     async (branchId: string, isManual = false) => {
-      if (fetchingBranches.current.has(branchId)) return;
+      if (branchRef.current !== branchId) return;
+      if (fetchingBranches.current.has(branchId)) {
+        queuedRefresh.current.add(branchId);
+        return;
+      }
       fetchingBranches.current.add(branchId);
-      const version = ++requestVersion.current;
       if (isManual) setIsRefreshing(true);
       try {
-        const [liveRes, historyRes] = await Promise.allSettled([
-          apiClient.get(`/staff/orders/${branchId}`),
-          apiClient.get(`/staff/orders/${branchId}/history`),
-        ]);
-
-        if (liveRes.status === "rejected" && historyRes.status === "rejected") {
-          throw liveRes.reason;
-        }
-
-        let combinedRaw: RawOrder[] = [];
-
-        if (liveRes.status === "fulfilled") {
-          const liveList = readOrders(liveRes.value.data);
-          combinedRaw = [...combinedRaw, ...liveList];
-        }
-
-        if (historyRes.status === "fulfilled") {
-          const histList = readOrders(historyRes.value.data);
-          const existingIds = new Set(combinedRaw.map((o) => o.id));
-          const uniqueHist = histList.filter(
-            (order) => !existingIds.has(order.id),
-          );
-          combinedRaw = [...combinedRaw, ...uniqueHist];
-        }
-
-        if (
-          version !== requestVersion.current ||
-          branchRef.current !== branchId
-        )
-          return;
-        if (liveRes.status === "rejected" || historyRes.status === "rejected") {
-          throw new Error("Partial refresh failed");
-        }
-        setOrders((previous) => {
-          const existing = new Map(previous.map((order) => [order.id, order]));
-          const rank = { pending: 0, preparing: 1, ready: 2, delivered: 3 };
-          const receivedIds = new Set(combinedRaw.map((order) => order.id));
-          return [
-            ...normalizeOrders(combinedRaw).map((order) => {
-              const old = existing.get(order.id);
-              return old &&
-                (pendingRef.current.has(order.id) ||
-                  rank[old.status] > rank[order.status])
-                ? old
-                : order;
-            }),
-            ...previous.filter((order) => !receivedIds.has(order.id)),
-          ];
-        });
-        setError("");
-      } catch (err: unknown) {
-        if (
-          version !== requestVersion.current ||
-          branchRef.current !== branchId
-        )
-          return;
-        console.error("Failed to fetch live orders:", err);
-        setError(requestMessage(err, t("loadOrdersError")));
+        do {
+          queuedRefresh.current.delete(branchId);
+          const version = ++requestVersion.current;
+          try {
+            const [liveRes, historyRes] = await Promise.all([
+              apiClient.get(`/staff/orders/${branchId}`),
+              apiClient.get(`/staff/orders/${branchId}/history`),
+            ]);
+            if (version !== requestVersion.current || branchRef.current !== branchId) continue;
+            const live = readOrders(liveRes.data);
+            const liveIds = new Set(live.map(order => order.id));
+            const received = [...live, ...readOrders(historyRes.data).filter(order => !liveIds.has(order.id))];
+            setOrders(previous => reconcileOrders(previous, normalizeOrders(received), pendingRef.current));
+            if (historyCursor.current === undefined) {
+              historyCursor.current = historyRes.data.nextCursor ?? null;
+              setHasMoreHistory(!!historyCursor.current);
+            }
+            setError("");
+          } catch (err: unknown) {
+            if (version === requestVersion.current && branchRef.current === branchId) {
+              setError(requestMessage(err, t("loadOrdersError")));
+            }
+          } finally {
+            if (version === requestVersion.current) setLoading(false);
+          }
+        } while (queuedRefresh.current.has(branchId) && branchRef.current === branchId);
       } finally {
         fetchingBranches.current.delete(branchId);
-        if (version === requestVersion.current) setLoading(false);
         if (isManual) setIsRefreshing(false);
       }
     },
     [t],
   );
+
+  const loadMoreHistory = async () => {
+    const cursor = historyCursor.current;
+    if (!cursor || historyInFlight.current) return;
+    const branchId = selectedBranchId;
+    const epoch = branchEpoch.current;
+    historyInFlight.current = true;
+    setLoadingHistory(true);
+    try {
+      const { data } = await apiClient.get(`/staff/orders/${branchId}/history`, { params: { cursor } });
+      if (epoch !== branchEpoch.current || branchRef.current !== branchId) return;
+      const older = normalizeOrders(readOrders(data));
+      setOrders(previous => {
+        const ids = new Set(previous.map(order => order.id));
+        return [...previous, ...older.filter(order => !ids.has(order.id))];
+      });
+      historyCursor.current = data.nextCursor ?? null;
+      setHasMoreHistory(!!historyCursor.current);
+      setError("");
+    } catch (err) {
+      if (epoch === branchEpoch.current) setError(requestMessage(err, t("loadOrdersError")));
+    } finally {
+      historyInFlight.current = false;
+      setLoadingHistory(false);
+    }
+  };
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void fetchBranches(), 0);
@@ -228,6 +235,7 @@ export default function StaffDashboard() {
 
     const invalidateRequests = () => {
       ++requestVersion.current;
+      ++branchEpoch.current;
     };
     const refreshOrders = () => {
       if (document.visibilityState === "visible")
@@ -237,14 +245,36 @@ export default function StaffDashboard() {
       () => void fetchOrders(selectedBranchId),
       0,
     );
-    const intervalId = window.setInterval(refreshOrders, 4000);
+    const seenEvents = new Set<string>();
+    const closeStream = subscribeToEvents(
+      `/staff/orders/${encodeURIComponent(selectedBranchId)}/stream`,
+      (event) => {
+      if (event.type === "unavailable") {
+        ++requestVersion.current;
+        setOrders([]);
+        setError(t("loadOrdersError"));
+        return;
+      }
+      if (event.type !== "connected" && !event.type.startsWith("order.")) return;
+      if (event.id && seenEvents.has(event.id)) return;
+      if (event.id) {
+        seenEvents.add(event.id);
+        if (seenEvents.size > 500) seenEvents.delete(seenEvents.values().next().value!);
+      }
+      refreshOrders();
+      },
+    );
+    const intervalId = window.setInterval(refreshOrders, 60_000);
+    document.addEventListener("visibilitychange", refreshOrders);
 
     return () => {
       invalidateRequests();
       window.clearTimeout(initialLoad);
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshOrders);
+      closeStream();
     };
-  }, [fetchOrders, selectedBranchId]);
+  }, [fetchOrders, selectedBranchId, t]);
 
   const handleStatusChange = async (
     orderId: string,
@@ -325,6 +355,9 @@ export default function StaffDashboard() {
                 onChange={(e) => {
                   branchRef.current = e.target.value;
                   ++requestVersion.current;
+                  historyCursor.current = undefined;
+                  setHasMoreHistory(false);
+                  ++branchEpoch.current;
                   setOrders([]);
                   setError("");
                   setLoading(true);
@@ -476,6 +509,12 @@ export default function StaffDashboard() {
             </div>
           )}
         </div>
+      )}
+      {hasMoreHistory && (statusFilter === "delivered" || statusFilter === "all") && (
+        <button type="button" onClick={() => void loadMoreHistory()} disabled={loadingHistory}
+          className="min-h-11 rounded-xl border border-white/10 px-5 text-sm font-bold text-white disabled:opacity-50">
+          {loadingHistory ? t("loadingOrders") : isRtl ? "تحميل طلبات أقدم" : "Load older orders"}
+        </button>
       )}
     </div>
   );

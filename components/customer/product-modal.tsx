@@ -6,6 +6,7 @@ import { X, Plus, Minus, Check } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { FoodLabels } from "./food-labels";
 import { contrastInk } from "@/lib/menu-themes";
+import Image from "@/components/ui/menu-image";
 
 export interface ProductAttributeItem {
   attribute: { id: string; labelAr?: string; labelEn?: string };
@@ -112,9 +113,12 @@ export function ProductModal({
           </div>
           <div className="flex-1 space-y-5 overflow-y-auto p-5">
             {product.imageUrl && (
-              <img
+              <Image
                 src={product.imageUrl}
                 alt={title}
+                width={800}
+                height={416}
+                sizes="(max-width: 640px) 100vw, 512px"
                 className="h-52 w-full rounded-2xl object-cover outline outline-1 -outline-offset-1 outline-black/10"
                 onError={(e) => {
                   e.currentTarget.style.display = "none";

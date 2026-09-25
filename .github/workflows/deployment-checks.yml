@@ -29,4 +29,5 @@ jobs:
           require-lockfile: true
       - run: pnpm lint
       - run: node --experimental-strip-types scripts/verify-menu.mjs
-      - run: pnpm build:cf
+      - run: node --experimental-strip-types scripts/verify-realtime.mjs
+      - run: pnpm build
