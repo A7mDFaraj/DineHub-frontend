@@ -12,6 +12,7 @@ import axios from "axios";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 const pagePermissions: Record<string, string> = {
+  "/admin/events": "events.read",
   "/admin": "dashboard.read",
   "/admin/branches": "branches.read",
   "/admin/categories": "categories.read",

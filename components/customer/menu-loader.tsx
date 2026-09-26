@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api-client";
 import type { PublicMenu } from "@/lib/menu-types";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useCartStore } from "@/store/cart-store";
+import { VenueMatches } from "@/components/events/venue-matches";
 import { MenuExperience } from "./menu-experience";
 
 export function MenuLoader({
@@ -113,12 +114,17 @@ export function MenuLoader({
       </div>
     );
   return (
-    <MenuExperience
-      key={`${branchId}:${tableNumber ?? "browse"}`}
-      menu={menu}
-      table={table}
-      tableError={tableError}
-      onRetry={() => setAttempt((n) => n + 1)}
-    />
+    <>
+      {!tableNumber && (
+        <VenueMatches branchCode={menu.branch.publicCode || branchId} />
+      )}
+      <MenuExperience
+        key={`${branchId}:${tableNumber ?? "browse"}`}
+        menu={menu}
+        table={table}
+        tableError={tableError}
+        onRetry={() => setAttempt((n) => n + 1)}
+      />
+    </>
   );
 }

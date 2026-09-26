@@ -8,6 +8,7 @@ import {
 } from "@/lib/access-context";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
+  CalendarDays,
   Building2,
   ChefHat,
   CircleAlert,
@@ -45,6 +46,7 @@ const navigationItems = [
   { key: "navBranches", href: "/admin/branches", icon: Building2 },
   { key: "navCategories", href: "/admin/categories", icon: Tags },
   { key: "navMenu", href: "/admin/menu", icon: UtensilsCrossed },
+  { key: "navEvents", href: "/admin/events", icon: CalendarDays },
   { key: "navQrCode", href: "/admin/qr-code", icon: QrCode },
   { key: "navUsers", href: "/admin/users", icon: UsersRound },
   { key: "navLogs", href: "/admin/logs", icon: ScrollText },

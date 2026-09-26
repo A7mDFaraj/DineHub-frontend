@@ -83,6 +83,7 @@ function StaffShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2.5">
           {/* Quick Language Capsule Switcher */}
           <AdminLanguageSwitcher />
+          {can("events.read") && <Link href="/admin/events" className="min-h-11 inline-flex items-center px-3 text-sm">{isRtl ? "الحجوزات والكاشير" : "Reservations"}</Link>}
 
           <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] px-3 py-1.5 rounded-xl text-xs text-zinc-300">
             <User size={13} className="text-zinc-400" />
