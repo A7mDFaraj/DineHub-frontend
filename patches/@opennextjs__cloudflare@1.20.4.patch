@@ -22,3 +22,32 @@ index 6cc1cb15b8b5cf8aaa8ef2c922bff499b35f9704..2e57b57160aada3b18157d2012763592
          external: ["node:*", "./open-next.config.mjs"],
          define: {
              // The base of the middleware compiled by Next.js is runtime agnostic. "edge" selects its
+diff --git a/dist/cli/build/patches/plugins/next-server.js b/dist/cli/build/patches/plugins/next-server.js
+index d816e838c1b2a23355161f0859ba9cd81f76d6d0..f8bfd64df89f526801fc00cb785fc9c492d68a25 100644
+--- a/dist/cli/build/patches/plugins/next-server.js
++++ b/dist/cli/build/patches/plugins/next-server.js
+@@ -28,6 +28,7 @@ export function patchNextServer(updater, buildOpts) {
+                 contents = patchCode(contents, createComposableCacheHandlersRule(composableCacheHandler));
+                 // Node middleware are not supported on Cloudflare yet
+                 contents = patchCode(contents, disableNodeMiddlewareRule);
++                contents = patchCode(contents, getMiddlewareManifestRule);
+                 contents = patchCode(contents, attachRequestMetaRule);
+                 return contents;
+             },
+@@ -45,6 +46,16 @@ fix: |-
+     // patched by open next
+   }
+ `;
++export const getMiddlewareManifestRule = `
++rule:
++  pattern:
++    selector: method_definition
++    context: "class { getMiddlewareManifest($$$PARAMS) { $$$_ } }"
++fix: |-
++  getMiddlewareManifest($$$PARAMS) {
++    return null;
++  }
++`;
+ export const buildIdRule = `
+ rule:
+   pattern:
