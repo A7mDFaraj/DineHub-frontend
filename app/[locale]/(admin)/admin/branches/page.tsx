@@ -16,6 +16,7 @@ import {
   Settings,
   Sparkles,
   Store,
+  Trash2,
   UtensilsCrossed,
   X,
 } from "lucide-react";
@@ -36,11 +37,18 @@ export default function BranchesPage() {
     isLoadingBranches,
     refreshBranches,
     setSelectedBranchId,
+    removeBranch,
+    upsertBranch,
   } = useAdminBranch();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -68,6 +76,33 @@ export default function BranchesPage() {
     setIsDialogOpen(true);
   };
 
+  const handleOpenDelete = (branch: Branch) => {
+    setBranchToDelete(branch);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!branchToDelete) return;
+    try {
+      setIsDeleting(true);
+      setErrorMsg("");
+      await apiClient.delete(`/admin/branches/${branchToDelete.id}`);
+      removeBranch(branchToDelete.id);
+      setSuccessMsg(tCommon("success"));
+      setIsDeleteDialogOpen(false);
+      setBranchToDelete(null);
+      void refreshBranches();
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err: unknown) {
+      console.error(err);
+      setErrorMsg(
+        apiErrorMessage(err) || tCommon("error"),
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -80,7 +115,15 @@ export default function BranchesPage() {
       setErrorMsg("");
 
       if (editingBranch) {
-        await apiClient.patch(`/admin/branches/${editingBranch.id}`, {
+        const { data } = await apiClient.patch(`/admin/branches/${editingBranch.id}`, {
+          name: formData.name.trim(),
+          nameAr: formData.name.trim(),
+          address: formData.address.trim() || undefined,
+          phone: formData.phone.trim() || undefined,
+        });
+        const updated = data?.data || data;
+        upsertBranch(updated || {
+          ...editingBranch,
           name: formData.name.trim(),
           nameAr: formData.name.trim(),
           address: formData.address.trim() || undefined,
@@ -95,13 +138,14 @@ export default function BranchesPage() {
         });
         const createdBranch = data?.data || data;
         if (createdBranch?.id) {
+          upsertBranch(createdBranch);
           setSelectedBranchId(createdBranch.id);
         }
         setSuccessMsg(tCommon("success"));
       }
 
-      await refreshBranches();
       setIsDialogOpen(false);
+      void refreshBranches();
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);
@@ -253,14 +297,25 @@ export default function BranchesPage() {
                   </Link>
                 </div>
 
-                <button
-                  type="button"
-                  className={styles.editAction}
-                  onClick={() => handleOpenEdit(branch)}
-                >
-                  <Edit3 size={15} />
-                  <span>{t("editBranch")}</span>
-                </button>
+                <div className={styles.cardActions}>
+                  <button
+                    type="button"
+                    className={styles.editAction}
+                    onClick={() => handleOpenEdit(branch)}
+                  >
+                    <Edit3 size={15} />
+                    <span>{t("editBranch")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.deleteAction}
+                    onClick={() => handleOpenDelete(branch)}
+                    aria-label={`${t("deleteConfirm")} ${displayName}`}
+                    title={tCommon("delete")}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </article>
             );
           })}
@@ -367,6 +422,64 @@ export default function BranchesPage() {
                 </button>
               </div>
             </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog.Root open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={styles.dialogOverlay} />
+          <Dialog.Content
+            className={styles.dialogContent}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
+            <div className={styles.dialogHead}>
+              <Dialog.Title>{t("deleteConfirm")}</Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  aria-label={tCommon("cancel")}
+                >
+                  <X size={18} />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            <p style={{ color: "#cbbfce", fontSize: "0.9rem", lineHeight: 1.7, margin: "0 0 20px" }}>
+              {t("deleteWarning")}
+            </p>
+
+            <div className={styles.dialogActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setIsDeleteDialogOpen(false)}
+                disabled={isDeleting}
+              >
+                {tCommon("cancel")}
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{ background: "#be4936", borderColor: "rgba(255,255,255,0.18)" }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>{tCommon("loading")}</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    <span>{tCommon("delete")}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

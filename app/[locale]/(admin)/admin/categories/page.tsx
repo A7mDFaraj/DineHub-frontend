@@ -161,8 +161,8 @@ export default function CategoriesPage() {
         setSuccessMsg(tCommon("success"));
       }
 
-      await fetchCategories(selectedBranchId);
       setIsDialogOpen(false);
+      void fetchCategories(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);
@@ -209,10 +209,11 @@ export default function CategoriesPage() {
     try {
       setIsDeleting(true);
       await apiClient.delete(`/admin/categories/${categoryToDelete.id}`);
+      setCategories((prev) => prev.filter((c) => c.id !== categoryToDelete.id));
       setSuccessMsg(tCommon("success"));
       setIsDeleteDialogOpen(false);
       setCategoryToDelete(null);
-      await fetchCategories(selectedBranchId);
+      void fetchCategories(selectedBranchId);
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err: unknown) {
       console.error(err);

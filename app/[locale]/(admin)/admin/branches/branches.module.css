@@ -77,6 +77,72 @@
   flex-wrap: wrap;
 }
 
+.createButton {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: var(--admin-coral, #f2644b);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 18px rgba(242, 100, 75, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out, background-color 140ms ease-out;
+}
+
+.createButton:hover:not(:disabled) {
+  background: #ff735c;
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 24px rgba(242, 100, 75, 0.48);
+}
+
+.createButton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.createButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refreshButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(223, 210, 235, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2d8e6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 140ms ease-out;
+  flex-shrink: 0;
+}
+
+.refreshButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(140, 209, 202, 0.35);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.refreshButton:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.refreshButton:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 /* Buttons */
 .primaryButton,
 .secondaryButton,
@@ -392,8 +458,15 @@
   color: #ff9d8c;
 }
 
-.editAction {
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
+}
+
+.editAction {
+  flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -412,6 +485,29 @@
 .editAction:hover {
   background: rgba(223, 210, 235, 0.14);
   border-color: rgba(223, 210, 235, 0.28);
+  transform: translateY(-1px);
+}
+
+.deleteAction {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(242, 100, 75, 0.08);
+  border: 1px solid rgba(242, 100, 75, 0.22);
+  color: #ff9d8c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 140ms ease;
+  flex-shrink: 0;
+}
+
+.deleteAction:hover {
+  background: rgba(242, 100, 75, 0.2);
+  border-color: #f2644b;
+  color: #ffffff;
+  transform: translateY(-1px);
 }
 
 /* Modal */

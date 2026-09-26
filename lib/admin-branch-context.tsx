@@ -36,6 +36,8 @@ interface AdminBranchContextType {
   isLoadingBranches: boolean;
   branchError: string;
   refreshBranches: () => Promise<Branch[]>;
+  removeBranch: (id: string) => void;
+  upsertBranch: (branch: Branch) => void;
 }
 
 const STORAGE_KEY = "dinehub_admin_selected_branch_id";
@@ -109,6 +111,38 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const removeBranch = useCallback(
+    (id: string) => {
+      setBranches((prev) => {
+        const remaining = prev.filter((b) => b.id !== id);
+        if (selectedBranchId === id) {
+          const nextId = remaining.length > 0 ? remaining[0].id : "";
+          setSelectedBranchIdState(nextId);
+          try {
+            if (nextId) localStorage.setItem(STORAGE_KEY, nextId);
+            else localStorage.removeItem(STORAGE_KEY);
+          } catch {
+            // Ignore
+          }
+        }
+        return remaining;
+      });
+    },
+    [selectedBranchId],
+  );
+
+  const upsertBranch = useCallback((branch: Branch) => {
+    setBranches((prev) => {
+      const idx = prev.findIndex((b) => b.id === branch.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...branch };
+        return next;
+      }
+      return [branch, ...prev];
+    });
+  }, []);
+
   const selectedBranch =
     branches.find((b) => b.id === selectedBranchId) ||
     (branches.length > 0 ? branches[0] : null);
@@ -123,6 +157,8 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
         isLoadingBranches,
         branchError,
         refreshBranches,
+        removeBranch,
+        upsertBranch,
       }}
     >
       {children}
