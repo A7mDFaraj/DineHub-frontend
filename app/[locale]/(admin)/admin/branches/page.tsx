@@ -6,6 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import {
   Building2,
   CheckCircle2,
+  CircleAlert,
   Edit3,
   Loader2,
   MapPin,
@@ -88,7 +89,7 @@ export default function BranchesPage() {
       setErrorMsg("");
       await apiClient.delete(`/admin/branches/${branchToDelete.id}`);
       removeBranch(branchToDelete.id);
-      setSuccessMsg(tCommon("success"));
+      setSuccessMsg(isRtl ? "تم حذف الفرع بنجاح." : "Branch deleted successfully.");
       setIsDeleteDialogOpen(false);
       setBranchToDelete(null);
       void refreshBranches();
@@ -129,7 +130,7 @@ export default function BranchesPage() {
           address: formData.address.trim() || undefined,
           phone: formData.phone.trim() || undefined,
         });
-        setSuccessMsg(tCommon("success"));
+        setSuccessMsg(isRtl ? "تم تحديث بيانات الفرع بنجاح." : "Branch updated successfully.");
       } else {
         const { data } = await apiClient.post("/admin/branches", {
           name: formData.name.trim(),
@@ -141,7 +142,7 @@ export default function BranchesPage() {
           upsertBranch(createdBranch);
           setSelectedBranchId(createdBranch.id);
         }
-        setSuccessMsg(tCommon("success"));
+        setSuccessMsg(isRtl ? "تم إنشاء الفرع بنجاح." : "Branch created successfully.");
       }
 
       setIsDialogOpen(false);
@@ -195,10 +196,33 @@ export default function BranchesPage() {
       </header>
 
       {successMsg && (
-        <div className={styles.successBanner} role="status">
+        <aside className={styles.successBanner} role="status" aria-live="polite">
           <CheckCircle2 size={18} />
           <span>{successMsg}</span>
-        </div>
+          <button
+            type="button"
+            className={styles.bannerClose}
+            onClick={() => setSuccessMsg("")}
+            aria-label={tCommon("cancel")}
+          >
+            <X size={14} />
+          </button>
+        </aside>
+      )}
+
+      {errorMsg && !isDialogOpen && !isDeleteDialogOpen && (
+        <aside className={styles.errorToast} role="alert" aria-live="assertive">
+          <CircleAlert size={18} />
+          <span>{errorMsg}</span>
+          <button
+            type="button"
+            className={styles.bannerClose}
+            onClick={() => setErrorMsg("")}
+            aria-label={tCommon("cancel")}
+          >
+            <X size={14} />
+          </button>
+        </aside>
       )}
 
       {isLoadingBranches && branches.length === 0 ? (
@@ -260,7 +284,9 @@ export default function BranchesPage() {
                   {branch.phone && (
                     <div className={styles.detailRow}>
                       <Phone size={15} />
-                      <span dir="ltr">{branch.phone}</span>
+                      <a href={`tel:${branch.phone}`} dir="ltr" className={styles.detailLink}>
+                        {branch.phone}
+                      </a>
                     </div>
                   )}
                 </div>
@@ -462,10 +488,9 @@ export default function BranchesPage() {
               </button>
               <button
                 type="button"
-                className={styles.primaryButton}
+                className={styles.dangerButton}
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
-                style={{ background: "#be4936", borderColor: "rgba(255,255,255,0.18)" }}
               >
                 {isDeleting ? (
                   <>

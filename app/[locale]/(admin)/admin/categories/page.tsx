@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
+  CircleAlert,
   Edit3,
   Layers,
   Loader2,
@@ -149,7 +150,7 @@ export default function CategoriesPage() {
             nameEn: formData.nameEn.trim() || undefined,
           }
         );
-        setSuccessMsg(tCommon("success"));
+        setSuccessMsg(isRtl ? "تم تحديث التصنيف بنجاح." : "Category updated successfully.");
       } else {
         await apiClient.post("/admin/categories", {
           branchId: selectedBranchId,
@@ -158,7 +159,7 @@ export default function CategoriesPage() {
           nameEn: formData.nameEn.trim() || undefined,
           sortOrder: categories.length,
         });
-        setSuccessMsg(tCommon("success"));
+        setSuccessMsg(isRtl ? "تم إنشاء التصنيف بنجاح." : "Category created successfully.");
       }
 
       setIsDialogOpen(false);
@@ -210,7 +211,7 @@ export default function CategoriesPage() {
       setIsDeleting(true);
       await apiClient.delete(`/admin/categories/${categoryToDelete.id}`);
       setCategories((prev) => prev.filter((c) => c.id !== categoryToDelete.id));
-      setSuccessMsg(tCommon("success"));
+      setSuccessMsg(isRtl ? "تم حذف التصنيف بنجاح." : "Category deleted successfully.");
       setIsDeleteDialogOpen(false);
       setCategoryToDelete(null);
       void fetchCategories(selectedBranchId);
@@ -252,16 +253,33 @@ export default function CategoriesPage() {
       </header>
 
       {successMsg && (
-        <div className={styles.successBanner} role="status">
+        <aside className={styles.successBanner} role="status" aria-live="polite">
           <CheckCircle2 size={18} />
           <span>{successMsg}</span>
-        </div>
+          <button
+            type="button"
+            className={styles.bannerClose}
+            onClick={() => setSuccessMsg("")}
+            aria-label={tCommon("cancel")}
+          >
+            <X size={14} />
+          </button>
+        </aside>
       )}
 
-      {errorMsg && (
-        <div className={styles.errorBanner} role="alert">
+      {errorMsg && !isDialogOpen && !isDeleteDialogOpen && (
+        <aside className={styles.errorToast} role="alert" aria-live="assertive">
+          <CircleAlert size={18} />
           <span>{errorMsg}</span>
-        </div>
+          <button
+            type="button"
+            className={styles.bannerClose}
+            onClick={() => setErrorMsg("")}
+            aria-label={tCommon("cancel")}
+          >
+            <X size={14} />
+          </button>
+        </aside>
       )}
 
       {categories.length === 0 && !isLoadingCats && (
