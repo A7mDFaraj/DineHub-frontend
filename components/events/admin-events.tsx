@@ -6,6 +6,7 @@ import { useAccess } from "@/lib/access-context";
 import { apiClient } from "@/lib/api-client";
 import { Link } from "@/i18n/navigation";
 import { ScheduleWidget } from "./schedule-widget";
+import { ManualMatchForm } from "./manual-match-form";
 import { MatchHeading } from "./match-heading";
 import { eventError, eventErrorCode } from "./errors";
 import {
@@ -52,6 +53,8 @@ export function AdminEvents() {
     provider === "365scores-widget" || provider === "sportscore-widget"
       ? provider
       : null;
+  // ponytail: widget and manual providers share the same flow — no API sync, manual fixture entry
+  const isNoApiMode = Boolean(widgetProvider) || provider === "manual";
   const providerConfigured =
     syncStatus?.providers.find((p) => p.id === provider)?.configured ?? false;
   const base = `/admin/events/${branchId}`;
@@ -231,7 +234,7 @@ export function AdminEvents() {
                 >
                   {ar ? "تحديث القائمة" : "Reload list"}
                 </button>
-                {!widgetProvider && (
+                {!isNoApiMode && (
                   <button
                     disabled={busy || syncing || !providerConfigured}
                     onClick={() => void refreshFixtures()}
@@ -279,7 +282,7 @@ export function AdminEvents() {
                   provider={widgetProvider}
                   ar={ar}
                 />
-              ) : (
+              ) : isNoApiMode ? null : (
                 <>
                   <p className={styles.muted}>
                     {provider === "thesportsdb"
@@ -323,43 +326,63 @@ export function AdminEvents() {
                       )}
                     </p>
                   )}
-                  <label className={styles.field}>
-                    {ar ? "اختر مباراة لإعداد عرضها" : "Choose a match to show"}
-                    <select
-                      aria-label={
-                        ar
-                          ? "اختر مباراة لإعداد عرضها"
-                          : "Choose a match to show"
-                      }
-                      disabled={busy}
-                      value={selected?.id || ""}
-                      onChange={(e) =>
-                        setSelected(
-                          fixtures.find((f) => f.id === e.target.value) || null,
-                        )
-                      }
-                    >
-                      <option value="">
-                        {ar ? "اختر مباراة" : "Select a match"}
-                      </option>
-                      {fixtures.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {matchName(f, ar)} ·{" "}
-                          {new Date(f.kickoff).toLocaleDateString(locale, {
-                            timeZone: "Asia/Riyadh",
-                          })}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {fixtures.length === 0 && (
-                    <p className={styles.muted}>
-                      {ar
-                        ? "لا توجد مباريات قادمة مخزنة لهذا المزود. حدّث المباريات أو اختر مصدرًا آخر."
-                        : "No upcoming matches cached for this provider. Refresh fixtures or choose another source."}
-                    </p>
-                  )}
                 </>
+              )}
+              {isNoApiMode && (
+                <ManualMatchForm
+                  base={base}
+                  busy={busy}
+                  onCreated={(fixture) => {
+                    setFixtures((prev) => [fixture, ...prev]);
+                    setSelected(fixture);
+                  }}
+                />
+              )}
+              <label className={styles.field}>
+                {ar
+                  ? isNoApiMode
+                    ? "اختر مباراة أنشأتها يدويًا"
+                    : "اختر مباراة لإعداد عرضها"
+                  : isNoApiMode
+                    ? "Select a manually created match"
+                    : "Choose a match to show"}
+                <select
+                  aria-label={
+                    ar
+                      ? "اختر مباراة لإعداد عرضها"
+                      : "Choose a match to show"
+                  }
+                  disabled={busy}
+                  value={selected?.id || ""}
+                  onChange={(e) =>
+                    setSelected(
+                      fixtures.find((f) => f.id === e.target.value) || null,
+                    )
+                  }
+                >
+                  <option value="">
+                    {ar ? "اختر مباراة" : "Select a match"}
+                  </option>
+                  {fixtures.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {matchName(f, ar)} ·{" "}
+                      {new Date(f.kickoff).toLocaleDateString(locale, {
+                        timeZone: "Asia/Riyadh",
+                      })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {fixtures.length === 0 && (
+                <p className={styles.muted}>
+                  {isNoApiMode
+                    ? ar
+                      ? "لم تنشئ مباريات يدوية بعد. أضف مباراة أعلاه."
+                      : "No manual matches yet. Add one above."
+                    : ar
+                      ? "لا توجد مباريات قادمة مخزنة لهذا المزود. حدّث المباريات أو اختر مصدرًا آخر."
+                      : "No upcoming matches cached for this provider. Refresh fixtures or choose another source."}
+                </p>
               )}
             </section>
           )}
@@ -542,7 +565,13 @@ function EventEditor({
   busy,
   onSave,
 }: {
-  fixture: Fixture;
+  fixture: Fixture & {
+    sourceMeta?: {
+      requiresApproval?: boolean;
+      inStoreOnlyTableIds?: string[];
+      [key: string]: unknown;
+    };
+  };
   existing?: VenueEvent;
   tables: EventTable[];
   busy: boolean;
@@ -550,7 +579,9 @@ function EventEditor({
 }) {
   const locale = useLocale(),
     ar = locale === "ar";
-  const [mode, setMode] = useState(existing?.paymentMode || "free");
+  const [mode, setMode] = useState<VenueEvent["paymentMode"]>(
+    existing?.paymentMode || "free",
+  );
   const local = (date: string | number) =>
     new Date(new Date(date).getTime() + 3 * 3600000).toISOString().slice(0, 16);
   return (
@@ -559,17 +590,23 @@ function EventEditor({
       onSubmit={(e) => {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
+        const selectedTableIds = f.getAll("table") as string[];
+        const inStoreOnlyTableIds = selectedTableIds.filter((id) =>
+          f.has(`instore_${id}`),
+        );
         void onSave({
           fixtureId: fixture.id,
           showing: f.has("showing"),
           bookingOpen: f.has("open"),
+          requiresApproval: f.has("requiresApproval"),
           startsAt: new Date(`${f.get("start")}:00+03:00`).toISOString(),
           endsAt: new Date(`${f.get("end")}:00+03:00`).toISOString(),
           paymentMode: mode,
           amountMinor:
             mode === "free" ? 0 : Math.round(Number(f.get("amount")) * 100),
           cancellationHours: Number(f.get("hours")),
-          tableIds: f.getAll("table"),
+          tableIds: selectedTableIds,
+          inStoreOnlyTableIds,
         });
       }}
     >
@@ -590,6 +627,20 @@ function EventEditor({
             defaultChecked={existing?.bookingOpen ?? false}
           />
           {ar ? "فتح الحجز" : "Open reservations"}
+        </label>
+        <label className={styles.tableOption}>
+          <input
+            type="checkbox"
+            name="requiresApproval"
+            defaultChecked={
+              existing?.fixture?.sourceMeta?.requiresApproval ??
+              fixture?.sourceMeta?.requiresApproval ??
+              false
+            }
+          />
+          {ar
+            ? "يتطلب موافقة الإدارة (مراجعة الحجز قبل تأكيده)"
+            : "Requires manual approval before confirmation"}
         </label>
       </div>
       <div className={styles.grid}>
@@ -619,40 +670,59 @@ function EventEditor({
         </label>
       </div>
       <label className={styles.field}>
-        {ar ? "نوع الحجز" : "Reservation policy"}
+        {ar ? "نظام تسعير الحجز" : "Reservation pricing system"}
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as VenueEvent["paymentMode"])}
         >
-          <option value="free">{ar ? "مجاني" : "Free"}</option>
+          <option value="free">{ar ? "حجز مجاني" : "Free reservation"}</option>
           <option value="fee">
             {ar
-              ? "رسوم غير مستردة عند إلغاء العميل"
-              : "Non-refundable booking fee"}
+              ? "مبلغ حجز غير مسترد (مثل 25 ريال)"
+              : "Non-refundable booking fee (e.g. 25 SAR)"}
           </option>
           <option value="deposit">
-            {ar ? "عربون يُخصم من الطلب" : "Deposit credited toward orders"}
+            {ar
+              ? "عربون يُخصم لاحقًا من الطلب (مثل 40 أو 50 ريال)"
+              : "Deposit credited toward order (e.g. 50 SAR)"}
+          </option>
+          <option value="preorder">
+            {ar
+              ? "تأكيد بدفع قيمة طلب مسبق (حد أدنى)"
+              : "Pre-order minimum spend requirement"}
           </option>
         </select>
       </label>
       {mode !== "free" && (
         <label className={styles.field}>
-          {ar ? "المبلغ لكل طاولة — ريال" : "Amount per table — SAR"}
+          {ar
+            ? mode === "preorder"
+              ? "الحد الأدنى للطلب المسبق للطاولة — ريال"
+              : mode === "deposit"
+                ? "قيمة العربون المسترد من الطلب — ريال"
+                : "مبلغ الرسوم غير المستردة — ريال"
+            : "Amount per table — SAR"}
           <input
             name="amount"
             type="number"
             min={1}
             max={10000}
             step="0.01"
-            defaultValue={(existing?.amountMinor || 2500) / 100}
+            defaultValue={
+              mode === "fee"
+                ? 25
+                : mode === "deposit"
+                  ? 50
+                  : (existing?.amountMinor || 5000) / 100
+            }
             required
           />
         </label>
       )}
       <label className={styles.field}>
         {ar
-          ? "مهلة استرداد العربون قبل بداية المباراة — ساعات"
-          : "Deposit refund cutoff before kickoff — hours"}
+          ? "مهلة استرداد العربون/الطلب قبل بداية المباراة — ساعات"
+          : "Deposit/preorder refund cutoff before kickoff — hours"}
         <input
           name="hours"
           type="number"
@@ -664,25 +734,70 @@ function EventEditor({
       </label>
       <fieldset className={styles.form}>
         <legend>
-          {ar ? "الطاولات المتاحة للحجز" : "Tables offered for reservation"}
+          {ar
+            ? "الطاولات المتاحة وقنوات الحجز"
+            : "Tables & booking availability"}
         </legend>
+        <p className={styles.muted}>
+          {ar
+            ? "حدد الطاولات المتاحة لهذا الموعد. يمكنك تفعيل (في المحل فقط) للطاولات التي ترغب بحجزها فقط لمن يحضر ويمسح رمز QR."
+            : "Select tables for this match. You can set (In-store only) for tables reserved exclusively for walk-ins scanning QR."}
+        </p>
         <div className={styles.grid}>
-          {tables.map((table) => (
-            <label key={table.id} className={styles.tableOption}>
-              <input
-                type="checkbox"
-                name="table"
-                value={table.id}
-                defaultChecked={
-                  existing
-                    ? existing.tables?.some((t) => t.tableId === table.id)
-                    : true
-                }
-              />
-              {ar ? "طاولة" : "Table"} {table.number} · {table.capacity}{" "}
-              {ar ? "مقاعد" : "seats"}
-            </label>
-          ))}
+          {tables.map((table) => {
+            const isInstoreOnly = Boolean(
+              existing?.fixture?.sourceMeta?.inStoreOnlyTableIds?.includes(
+                table.id,
+              ),
+            );
+            return (
+              <div
+                key={table.id}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.25rem",
+                  padding: "0.75rem",
+                  borderRadius: "0.5rem",
+                  border: "1px solid var(--border, #e5e7eb)",
+                }}
+              >
+                <label className={styles.tableOption}>
+                  <input
+                    type="checkbox"
+                    name="table"
+                    value={table.id}
+                    defaultChecked={
+                      existing
+                        ? existing.tables?.some((t) => t.tableId === table.id)
+                        : true
+                    }
+                  />
+                  <strong>
+                    {ar ? "طاولة" : "Table"} {table.number}
+                  </strong>{" "}
+                  · {table.capacity} {ar ? "مقاعد" : "seats"}
+                </label>
+                <label
+                  className={styles.tableOption}
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "var(--muted, #6b7280)",
+                    paddingInlineStart: "1.5rem",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    name={`instore_${table.id}`}
+                    defaultChecked={isInstoreOnly}
+                  />
+                  {ar
+                    ? "الحجز عبر QR في المحل فقط"
+                    : "In-store QR booking only"}
+                </label>
+              </div>
+            );
+          })}
         </div>
       </fieldset>
       <button className={styles.primary} disabled={busy || tables.length === 0}>
@@ -755,6 +870,38 @@ function CashierReservation({
       {error && <p role="alert">{error}</p>}
       {canCashier && (
         <div className={styles.row}>
+          {r.status === "pending_approval" && (
+            <>
+              <button
+                className={styles.primary}
+                disabled={busy}
+                onClick={() => {
+                  void act(() =>
+                    apiClient.post(`${base}/reservations/${r.id}/approve`),
+                  );
+                }}
+              >
+                {ar ? "قبول الحجز" : "Approve reservation"}
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      ar
+                        ? "هل أنت متأكد من رفض هذا الحجز؟"
+                        : "Are you sure you want to reject this reservation?",
+                    )
+                  )
+                    void act(() =>
+                      apiClient.post(`${base}/reservations/${r.id}/reject`),
+                    );
+                }}
+              >
+                {ar ? "رفض الحجز" : "Reject"}
+              </button>
+            </>
+          )}
           {r.paymentStatus === "unpaid" &&
             ["confirmed", "checked_in"].includes(r.status) && (
               <button

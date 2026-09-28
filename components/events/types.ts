@@ -3,7 +3,8 @@ export type FootballProvider =
   | "openfootapi"
   | "thesportsdb"
   | "365scores-widget"
-  | "sportscore-widget";
+  | "sportscore-widget"
+  | "manual";
 export interface FootballSyncStatus {
   selectedProvider: FootballProvider;
   running: boolean;
@@ -25,6 +26,7 @@ export const providerNames: Record<FootballProvider, string> = {
   thesportsdb: "TheSportsDB",
   "365scores-widget": "365Scores · Widget",
   "sportscore-widget": "SportScore · Widget",
+  manual: "Manual · No API",
 };
 export interface Fixture {
   id: string;
@@ -46,20 +48,46 @@ export interface EventTable {
   number: number;
   capacity: number;
   available?: boolean;
+  inStoreOnly?: boolean;
 }
 export interface VenueEvent {
   id: string;
   fixtureId: string;
-  fixture: Fixture;
+  fixture: Fixture & {
+    sourceMeta?: {
+      requiresApproval?: boolean;
+      inStoreOnlyTableIds?: string[];
+      [key: string]: unknown;
+    };
+  };
   showing: boolean;
   bookingOpen: boolean;
   reviewRequired: boolean;
   startsAt: string;
   endsAt: string;
-  paymentMode: "free" | "fee" | "deposit";
+  paymentMode: "free" | "fee" | "deposit" | "preorder";
   amountMinor: number;
   cancellationHours: number;
   tables?: { tableId: string; table: EventTable }[];
+}
+export interface TableStatusResponse {
+  hasEvent: boolean;
+  table?: { id: string; number: number; capacity: number };
+  isBooked?: boolean;
+  reserverName?: string;
+  reservationStatus?: string;
+  userCanBook?: boolean;
+  inStoreOnly?: boolean;
+  event?: {
+    id: string;
+    fixture: Fixture;
+    startsAt: string;
+    endsAt: string;
+    paymentMode: "free" | "fee" | "deposit" | "preorder";
+    amountMinor: number;
+    bookingOpen: boolean;
+    requiresApproval: boolean;
+  };
 }
 export interface Reservation {
   amountMinor?: number;
@@ -98,6 +126,7 @@ export function reservationStatus(status: string, ar: boolean) {
   const names: Record<string, [string, string]> = {
     no_show: ["لم يحضر", "No-show"],
     confirmed: ["مؤكد", "Confirmed"],
+    pending_approval: ["بانتظار موافقة الإدارة", "Pending approval"],
     checked_in: ["حضر", "Checked in"],
     cancelled: ["ملغي", "Cancelled"],
     held: ["بانتظار الدفع", "Awaiting payment"],

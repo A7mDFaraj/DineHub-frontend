@@ -8,6 +8,7 @@ import type { PublicMenu } from "@/lib/menu-types";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useCartStore } from "@/store/cart-store";
 import { VenueMatches } from "@/components/events/venue-matches";
+import { TableEventBanner } from "@/components/events/table-event-banner";
 import { MenuExperience } from "./menu-experience";
 
 export function MenuLoader({
@@ -132,7 +133,12 @@ export function MenuLoader({
           </button>
         </div>
       )}
-      {!tableNumber && (
+      {tableNumber ? (
+        <TableEventBanner
+          branchCode={menu.branch.publicCode || branchId}
+          tableNumber={tableNumber}
+        />
+      ) : (
         <VenueMatches branchCode={menu.branch.publicCode || branchId} />
       )}
       <MenuExperience

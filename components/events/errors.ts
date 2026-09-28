@@ -50,6 +50,14 @@ export function eventErrorCode(code: unknown, ar: boolean) {
       "السعة الجديدة أقل من عدد ضيوف حجز قائم.",
       "Capacity cannot be smaller than an existing party.",
     ],
+    KICKOFF_MUST_BE_FUTURE: [
+      "يجب أن يكون موعد المباراة في المستقبل.",
+      "Kickoff must be a future date.",
+    ],
+    TABLE_INSTORE_ONLY: [
+      "هذه الطاولة مخصصة للحجز المباشر في المحل عبر مسح رمز QR فقط.",
+      "This table is reserved for in-store QR scan booking only.",
+    ],
   };
   return typeof code === "string" && messages[code]
     ? messages[code][ar ? 0 : 1]

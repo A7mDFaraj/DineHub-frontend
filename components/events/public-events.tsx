@@ -224,7 +224,15 @@ export function PublicEvents({ branchCode }: { branchCode: string }) {
                       ? ar
                         ? "حجز مجاني"
                         : "Free reservation"
-                      : `${(event.amountMinor / 100).toFixed(2)} SAR`}
+                      : event.paymentMode === "deposit"
+                        ? ar
+                          ? `عربون: ${(event.amountMinor / 100).toFixed(2)} SAR (يُخصم من الطلب)`
+                          : `Deposit: ${(event.amountMinor / 100).toFixed(2)} SAR (credited to order)`
+                        : event.paymentMode === "preorder"
+                          ? ar
+                            ? `طلب مسبق: ${(event.amountMinor / 100).toFixed(2)} SAR (حد أدنى)`
+                            : `Pre-order: ${(event.amountMinor / 100).toFixed(2)} SAR (minimum spend)`
+                          : `${(event.amountMinor / 100).toFixed(2)} SAR`}
                   </p>
                   <button
                     className={styles.primary}
@@ -321,6 +329,7 @@ function BookingForm({
           customerName: String(form.get("name")).trim(),
           phone: String(form.get("phone")).trim(),
           guests: Number(form.get("guests")),
+          source: "online" as const,
         };
         const fingerprint = JSON.stringify(payload);
         if (key.current?.fingerprint !== fingerprint)
@@ -362,13 +371,25 @@ function BookingForm({
                 ? "اختر طاولة"
                 : "Choose a table"}
           </option>
-          {tables.map((table) => (
-            <option key={table.id} value={table.id} disabled={!table.available}>
-              {ar ? "طاولة" : "Table"} {table.number} · {table.capacity}{" "}
-              {ar ? "مقاعد" : "seats"}{" "}
-              {!table.available ? (ar ? "— محجوزة" : "— Reserved") : ""}
-            </option>
-          ))}
+          {tables.map((table) => {
+            const isInstoreOnly = Boolean(table.inStoreOnly);
+            const isAvailable = Boolean(table.available) && !isInstoreOnly;
+            return (
+              <option key={table.id} value={table.id} disabled={!isAvailable}>
+                {ar ? "طاولة" : "Table"} {table.number} · {table.capacity}{" "}
+                {ar ? "مقاعد" : "seats"}{" "}
+                {isInstoreOnly
+                  ? ar
+                    ? "— حجز مباشر بالفرع فقط"
+                    : "— In-store QR only"
+                  : !table.available
+                    ? ar
+                      ? "— محجوزة"
+                      : "— Reserved"
+                    : ""}
+              </option>
+            );
+          })}
         </select>
       </label>
       <label className={styles.field}>

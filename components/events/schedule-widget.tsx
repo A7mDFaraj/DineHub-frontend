@@ -42,12 +42,12 @@ export function ScheduleWidget({
     <div className={styles.form}>
       <div className={styles.notice}>
         <strong>
-          {ar ? "عرض جدول المباريات فقط" : "Schedule viewing only"}
+          {ar ? "جدول مباريات — مرجع بصري" : "Match schedule — visual reference"}
         </strong>
         <p>
           {ar
-            ? "تصفح المواعيد والنتائج هنا. هذه الأداة لا تستورد المباريات ولا تفعّل الحجز؛ اختر أحد مزودي API لإعداد مباراة للحجز."
-            : "Browse fixtures and results here. This widget does not import matches or enable bookings; choose an API provider to set up a reservable match."}
+            ? "تصفّح المواعيد والنتائج. لإعداد مباراة للحجز، أضفها يدويًا من النموذج أسفل الجدول."
+            : "Browse fixtures and results. To set up a bookable match, add it manually using the form below the schedule."}
         </p>
       </div>
       <div className={styles.row}>
