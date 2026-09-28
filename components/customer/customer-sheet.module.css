@@ -1,0 +1,12 @@
+/* Small landscape/keyboard viewports need one scroll surface so enlarged text
+   cannot push the footer outside an overflow-hidden sheet. */
+@media (max-height: 600px) {
+  .sheet {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .body {
+    overflow: visible;
+  }
+}

@@ -7,6 +7,11 @@ import { useLocale, useTranslations } from "next-intl";
 import { FoodLabels } from "./food-labels";
 import { contrastInk } from "@/lib/menu-themes";
 import Image from "@/components/ui/menu-image";
+import { checkoutMessage, validPrice } from "@/lib/checkout";
+import type { CartOption } from "@/lib/checkout";
+import type { CartItem } from "@/store/cart-store";
+import { useCartStore } from "@/store/cart-store";
+import sheetStyles from "./customer-sheet.module.css";
 
 export interface ProductAttributeItem {
   attribute: { id: string; labelAr?: string; labelEn?: string };
@@ -32,6 +37,7 @@ interface ProductModalProps {
   isOpen: boolean;
   themeColor?: string;
   onClose: () => void;
+  initialItem?: CartItem;
   onAddToCart: (item: {
     productId: string;
     nameAr: string;
@@ -39,9 +45,9 @@ interface ProductModalProps {
     price: number;
     quantity: number;
     imageUrl?: string;
-    selectedAttributes: string[];
+    selectedAttributes: CartOption[];
     itemNote?: string;
-  }) => void;
+  }) => boolean;
 }
 
 export function ProductModal({
@@ -50,19 +56,24 @@ export function ProductModal({
   themeColor = "#a73e2c",
   onClose,
   onAddToCart,
+  initialItem,
 }: ProductModalProps) {
   const ar = useLocale() === "ar";
   const t = useTranslations("CustomerProductModal");
-  const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
-  const [itemNote, setItemNote] = useState("");
-  const [quantity, setQuantity] = useState(1);
+  const [selectedAttributes, setSelectedAttributes] = useState<CartOption[]>(
+    initialItem?.selectedAttributes ?? [],
+  );
+  const issue = useCartStore((state) => state.issue);
+  const pending = useCartStore((state) => state.pending);
+  const [itemNote, setItemNote] = useState(initialItem?.itemNote ?? "");
+  const [quantity, setQuantity] = useState(initialItem?.quantity ?? 1);
   const [previous, setPrevious] = useState({ isOpen, product });
   if (previous.isOpen !== isOpen || previous.product !== product) {
     setPrevious({ isOpen, product });
     if (isOpen) {
-      setSelectedAttributes([]);
-      setItemNote("");
-      setQuantity(1);
+      setSelectedAttributes(initialItem?.selectedAttributes ?? []);
+      setItemNote(initialItem?.itemNote ?? "");
+      setQuantity(initialItem?.quantity ?? 1);
     }
   }
   if (!product) return null;
@@ -76,7 +87,7 @@ export function ProductModal({
   const price = Number(product.price);
   const add = () => {
     if (product.isAvailable === false) return;
-    onAddToCart({
+    const accepted = onAddToCart({
       productId: product.id,
       nameAr,
       nameEn,
@@ -86,7 +97,7 @@ export function ProductModal({
       selectedAttributes,
       itemNote: itemNote.trim() || undefined,
     });
-    onClose();
+    if (accepted) onClose();
   };
   return (
     <Dialog.Root
@@ -98,8 +109,14 @@ export function ProductModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
         <Dialog.Content
+          onCloseAutoFocus={(event) => {
+            if (!initialItem) {
+              event.preventDefault();
+              document.getElementById(`menu-product-${product.id}`)?.focus();
+            }
+          }}
           aria-describedby={undefined}
-          className="fixed bottom-0 left-1/2 z-50 flex max-h-[90dvh] w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white text-stone-900 shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl"
+          className={`${sheetStyles.sheet} fixed bottom-0 left-1/2 z-50 flex max-h-[90dvh] w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white text-stone-900 shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl`}
           dir={ar ? "rtl" : "ltr"}
         >
           <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-5 py-3">
@@ -111,7 +128,14 @@ export function ProductModal({
               <X size={18} />
             </Dialog.Close>
           </div>
-          <div className="flex-1 space-y-5 overflow-y-auto p-5">
+          <div
+            className={`${sheetStyles.body} min-h-0 flex-1 space-y-5 overflow-y-auto p-5`}
+          >
+            {issue && (
+              <p role="alert" className="text-sm text-red-800">
+                {checkoutMessage(issue, ar)}
+              </p>
+            )}
             {product.imageUrl && (
               <Image
                 src={product.imageUrl}
@@ -152,7 +176,9 @@ export function ProductModal({
                     const label = ar
                       ? attribute.labelAr || attribute.labelEn || ""
                       : attribute.labelEn || attribute.labelAr || "";
-                    const checked = selectedAttributes.includes(label);
+                    const checked = selectedAttributes.some(
+                      (option) => option.id === attribute.id,
+                    );
                     return (
                       <button
                         type="button"
@@ -161,8 +187,17 @@ export function ProductModal({
                         onClick={() =>
                           setSelectedAttributes((current) =>
                             checked
-                              ? current.filter((value) => value !== label)
-                              : [...current, label],
+                              ? current.filter(
+                                  (value) => value.id !== attribute.id,
+                                )
+                              : [
+                                  ...current,
+                                  {
+                                    id: attribute.id,
+                                    labelAr: attribute.labelAr ?? "",
+                                    labelEn: attribute.labelEn ?? "",
+                                  },
+                                ],
                           )
                         }
                         className={`flex min-h-12 items-center justify-between gap-2 rounded-xl border p-3 text-start text-xs ${checked ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50"}`}
@@ -219,7 +254,11 @@ export function ProductModal({
             </div>
             <button
               type="button"
-              disabled={product.isAvailable === false}
+              disabled={
+                Boolean(pending) ||
+                product.isAvailable === false ||
+                !validPrice(price)
+              }
               onClick={add}
               style={{
                 backgroundColor: themeColor,
@@ -227,7 +266,13 @@ export function ProductModal({
               }}
               className="flex min-h-12 flex-1 flex-wrap items-center justify-center gap-2 rounded-full px-4 text-sm font-bold active:scale-[0.96]"
             >
-              <span>{t("addToCart")}</span>
+              <span>
+                {initialItem
+                  ? ar
+                    ? "حفظ التعديلات"
+                    : "Save changes"
+                  : t("addToCart")}
+              </span>
               <span className="tabular-nums">
                 {(price * quantity).toFixed(2)} {ar ? "ر.س" : "SAR"}
               </span>

@@ -87,7 +87,7 @@ export function MenuLoader({
     return () => controller.abort();
   }, [branchId, tableNumber, router, t, attempt]);
 
-  if (loading)
+  if (loading && !menu)
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center gap-4 bg-stone-50 text-stone-700"
@@ -97,7 +97,7 @@ export function MenuLoader({
         <p>{t("loadingMenu")}</p>
       </div>
     );
-  if (error || !menu)
+  if (!menu)
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center gap-4 bg-stone-50 p-6 text-center text-stone-800"
@@ -115,6 +115,23 @@ export function MenuLoader({
     );
   return (
     <>
+      {loading && (
+        <p role="status" className="bg-stone-50 p-3 text-center text-sm">
+          {t("loadingMenu")}
+        </p>
+      )}
+      {error && (
+        <div role="alert" className="bg-red-50 p-3 text-center text-red-800">
+          {error}
+          <button
+            type="button"
+            className="min-h-11 px-4 underline"
+            onClick={() => setAttempt((n) => n + 1)}
+          >
+            {ar ? "إعادة المحاولة" : "Try again"}
+          </button>
+        </div>
+      )}
       {!tableNumber && (
         <VenueMatches branchCode={menu.branch.publicCode || branchId} />
       )}

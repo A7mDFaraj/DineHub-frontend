@@ -32,5 +32,6 @@ store.getState().setContext('branch-a:table-2');
 assert.equal(store.getState().items.length,0);
 store.getState().addItem(item);
 store.getState().syncPrices([]);
-assert.equal(store.getState().items.length,0);
+assert.equal(store.getState().items.length,1);
+assert.equal(store.getState().items[0].unavailable,true);
 console.log('Passed: all six theme contrast pairs, discount visibility, customized cart quantities, menu repricing, unavailable items, and table isolation.');

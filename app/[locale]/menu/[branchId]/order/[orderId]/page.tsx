@@ -122,7 +122,8 @@ export default function OrderTrackingPage({
         });
         if (!active) return;
         const raw: OrderData = res.data.data || res.data;
-        setOrder(raw);
+        if (!statusOrder.includes(raw.status) || typeof raw.publicToken !== 'string' || !Number.isInteger(raw.orderNumber)) throw new Error('Invalid order response');
+        setOrder(previous => previous?.publicToken === raw.publicToken && statusOrder.indexOf(previous.status) > statusOrder.indexOf(raw.status) ? previous : raw);
         setError("");
         const currentPathWithoutLocale = window.location.pathname.replace(/^\/(en|ar)/, "");
         if (

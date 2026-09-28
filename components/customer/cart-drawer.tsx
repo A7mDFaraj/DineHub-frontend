@@ -14,23 +14,37 @@ import {
   Loader2,
   MessageSquare,
 } from "lucide-react";
+import {
+  prepareCheckout,
+  checkoutMessage,
+  optionLabel,
+  trackingPathIsValid,
+  uuidPattern,
+} from "@/lib/checkout";
+import { reportClientIncident } from "@/lib/observability";
+import type { CartItem } from "@/store/cart-store";
 import { armOrderSound } from "@/lib/order-alert";
 import axios from "axios";
 import { apiClient } from "@/lib/api-client";
-import { useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import sheetStyles from "./customer-sheet.module.css";
 
 export function CartDrawer({
   branchId,
   tableId,
   themeColor = "#f2644b",
   preview = false,
+  onRefresh,
+  onEdit,
 }: {
   branchId: string;
   tableId?: string;
   themeColor?: string;
   preview?: boolean;
+  onRefresh?: () => void;
+  onEdit?: (item: CartItem) => void;
 }) {
   const {
     items,
@@ -41,7 +55,15 @@ export function CartDrawer({
     totalAmount,
     note,
     setNote,
-    clearCart,
+    pending,
+    phase,
+    issue,
+    acceptPrices,
+    removed,
+    undoRemove,
+    beginSubmission,
+    resolveSubmission,
+    trackingPath,
     totalItems,
   } = useCartStore();
 
@@ -50,139 +72,132 @@ export function CartDrawer({
   const isRtl = locale === "ar";
   const SubmitArrow = isRtl ? ArrowLeft : ArrowRight;
 
-  const params = useParams();
   const router = useRouter();
   const submittingRef = useRef(false);
-  const idempotencyRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const tableNumber = params?.tableNumber as string;
-
-  if (!isCartOpen && items.length === 0) return null;
-
-  const buildFormattedOrderNote = () => {
-    const customizedLines: string[] = [];
-
-    items.forEach((item) => {
-      const hasAttrs =
-        item.selectedAttributes && item.selectedAttributes.length > 0;
-      const hasItemNote = Boolean(item.itemNote);
-
-      if (hasAttrs || hasItemNote) {
-        const itemName = isRtl
-          ? item.nameAr || item.nameEn
-          : item.nameEn || item.nameAr;
-        let line = `• ${item.quantity}× ${itemName}`;
-        if (hasAttrs) {
-          line += ` [${item.selectedAttributes!.join(", ")}]`;
-        }
-        if (hasItemNote) {
-          line += ` (${t("notePrefix")}: ${item.itemNote})`;
-        }
-        customizedLines.push(line);
-      }
-    });
-
-    const generalNote = note.trim();
-
-    if (customizedLines.length > 0 && generalNote) {
-      return `${t("optionsPrefix")}:\n${customizedLines.join("\n")}\n\n${t("generalNotePrefix")}: ${generalNote}`;
-    } else if (customizedLines.length > 0) {
-      return `${t("optionsPrefix")}:\n${customizedLines.join("\n")}`;
-    } else {
-      return generalNote;
-    }
+  const [retryDelay, setRetryDelay] = useState(0);
+  useEffect(() => {
+    if (!retryDelay) return;
+    const timer = window.setTimeout(() => setRetryDelay(0), retryDelay);
+    return () => window.clearTimeout(timer);
+  }, [retryDelay]);
+  const prepared = prepareCheckout(items, note, isRtl);
+  const locked = isSubmitting || Boolean(pending);
+  const showError = (code: string) => {
+    setSubmitError(checkoutMessage(code, isRtl));
+    requestAnimationFrame(() => errorRef.current?.focus());
   };
-
   const handleSubmitOrder = async () => {
-    if (preview || submittingRef.current || items.length === 0) return;
-    if (!tableNumber) {
-      alert(t("tableNotSpecified"));
+    if (preview || submittingRef.current || !items.length) return;
+    if (retryDelay) {
+      showError("RATE_LIMIT");
       return;
     }
-
-    armOrderSound();
+    if (!pending && prepared.issues.length) {
+      showError(prepared.issues[0].code);
+      return;
+    }
+    if (
+      !tableId ||
+      !uuidPattern.test(branchId) ||
+      !uuidPattern.test(tableId) ||
+      items.some((item) => !uuidPattern.test(item.productId))
+    ) {
+      showError("TABLE");
+      return;
+    }
+    const attempt = pending ?? {
+      key: crypto.randomUUID().replaceAll("-", ""),
+      payload: {
+        branchId,
+        tableId,
+        items: prepared.items,
+        ...(prepared.note ? { note: prepared.note } : {}),
+      },
+    };
+    if (!beginSubmission(attempt)) {
+      showError("STORAGE");
+      return;
+    }
+    void armOrderSound();
     submittingRef.current = true;
     setIsSubmitting(true);
     setSubmitError("");
-
     try {
-      let resolvedTableId = tableId;
-
-      // Fetch table UUID if not present
-      if (!resolvedTableId) {
-        const tableRes = await apiClient.get(
-          `/table/${branchId}/${tableNumber}`,
-        );
-        resolvedTableId = tableRes.data?.id;
-      }
-
-      if (!resolvedTableId) {
-        throw new Error(t("tableNotSpecified"));
-      }
-
-      const formattedNote = buildFormattedOrderNote();
-
-      const payload: {
-        branchId: string;
-        tableId: string;
-        note?: string;
-        items: {
-          productId: string;
-          quantity: number;
-          expectedUnitPrice: number;
-        }[];
-      } = {
-        branchId,
-        tableId: resolvedTableId,
-        items: items.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-          expectedUnitPrice: Number(i.price),
-        })),
-      };
-
-      if (formattedNote) {
-        payload.note = formattedNote;
-      }
-
-      const fingerprint = JSON.stringify(payload);
-      if (idempotencyRef.current?.fingerprint !== fingerprint) {
-        idempotencyRef.current = {
-          fingerprint,
-          key: crypto.randomUUID().replaceAll("-", ""),
-        };
-      }
-      const res = await apiClient.post("/orders", payload, {
-        headers: { "Idempotency-Key": idempotencyRef.current.key },
+      const res = await apiClient.post("/orders", attempt.payload, {
+        headers: { "Idempotency-Key": attempt.key },
       });
-      const trackingPath = res.data?.trackingPath;
-
-      if (
-        typeof trackingPath === "string" &&
-        trackingPath.startsWith("/order/")
-      ) {
-        clearCart();
-        idempotencyRef.current = null;
-        toggleCart();
-        const finalPath = isRtl ? trackingPath : `/en${trackingPath}`;
-        router.push(finalPath);
-      } else {
-        throw new Error(t("orderFailed"));
-      }
+      if (!trackingPathIsValid(res.data?.trackingPath))
+        throw new Error("Invalid confirmation");
+      const requestContext = `${attempt.payload.branchId}:${attempt.payload.tableId}`;
+      resolveSubmission("confirmed", res.data.trackingPath, requestContext);
+      if (useCartStore.getState().context === requestContext)
+        router.push(
+          isRtl ? res.data.trackingPath : `/en${res.data.trackingPath}`,
+        );
     } catch (err: unknown) {
-      console.error("Order error:", err);
-      const message = axios.isAxiosError(err)
-        ? err.response?.data?.message
-        : err instanceof Error
-          ? err.message
-          : null;
-      setSubmitError(typeof message === "string" ? message : t("orderFailed"));
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const code = axios.isAxiosError(err)
+        ? err.response?.data?.code
+        : undefined;
+      // A generic error or server failure can follow a successful commit.
+      const definitive = ["PRICE_CHANGED", "UNAVAILABLE", "TABLE"].includes(
+        code,
+      );
+      const rejected =
+        definitive ||
+        (!pending &&
+          status !== undefined &&
+          [400, 401, 403, 404, 422, 429].includes(status));
+      resolveSubmission(
+        rejected ? "rejected" : "unknown",
+        undefined,
+        `${attempt.payload.branchId}:${attempt.payload.tableId}`,
+      );
+      if (status === 429) {
+        const header = axios.isAxiosError(err)
+          ? err.response?.headers?.["retry-after"]
+          : undefined;
+        const seconds = Number(header);
+        setRetryDelay(
+          Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 30000,
+        );
+      }
+      showError(
+        !rejected
+          ? "UNKNOWN"
+          : status === 429
+            ? "RATE_LIMIT"
+            : typeof code === "string"
+              ? code
+              : "FAILED",
+      );
+      reportClientIncident({
+        level: "warn",
+        event: "checkout.outcome",
+        message: rejected ? "rejected" : "confirmation_unknown",
+        metadata: {
+          statusCode: status,
+          code: typeof code === "string" ? code : "UNCLASSIFIED",
+        },
+      });
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
+  if (!isCartOpen && items.length === 0)
+    return trackingPath ? (
+      <button
+        type="button"
+        className="fixed bottom-5 left-1/2 z-40 min-h-12 -translate-x-1/2 rounded-full bg-stone-900 px-6 text-white"
+        onClick={() => router.push(isRtl ? trackingPath : `/en${trackingPath}`)}
+      >
+        {isRtl ? "متابعة طلبك السابق" : "Track your previous order"}
+      </button>
+    ) : null;
 
   const count = totalItems();
   const total = totalAmount();
@@ -218,7 +233,7 @@ export function CartDrawer({
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed bottom-0 left-1/2 z-50 flex max-h-[90dvh] w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white text-stone-900 shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl"
+            className={`${sheetStyles.sheet} fixed bottom-0 left-1/2 z-50 flex max-h-[90dvh] w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden rounded-t-3xl border border-stone-200 bg-white text-stone-900 shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl`}
             dir={isRtl ? "rtl" : "ltr"}
           >
             <header className="flex items-center justify-between gap-3 border-b border-stone-200 bg-stone-50 px-5 py-3">
@@ -232,14 +247,16 @@ export function CartDrawer({
                 </p>
               </div>
               <Dialog.Close
-                disabled={isSubmitting}
+                disabled={locked}
                 className="flex size-11 items-center justify-center rounded-full bg-white"
                 aria-label={isRtl ? "إغلاق" : "Close"}
               >
                 <X size={18} />
               </Dialog.Close>
             </header>
-            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+            <div
+              className={`${sheetStyles.body} min-h-0 flex-1 space-y-4 overflow-y-auto p-5`}
+            >
               {items.length === 0 ? (
                 <div className="py-12 text-center">
                   <h3 className="font-bold">{t("emptyCartTitle")}</h3>
@@ -251,6 +268,7 @@ export function CartDrawer({
                 items.map((item) => (
                   <article
                     key={item.id}
+                    id={`cart-item-${items.indexOf(item)}`}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 p-3"
                   >
                     <div className="min-w-0 flex-1">
@@ -265,8 +283,36 @@ export function CartDrawer({
                       </p>
                       {Boolean(item.selectedAttributes?.length) && (
                         <p className="mt-1 text-xs text-stone-600">
-                          {item.selectedAttributes!.join(" · ")}
+                          {item
+                            .selectedAttributes!.map((option) =>
+                              optionLabel(option, isRtl),
+                            )
+                            .join(" · ")}
                         </p>
+                      )}
+                      {item.unavailable && (
+                        <p role="status" className="mt-2 text-sm text-red-800">
+                          {checkoutMessage("UNAVAILABLE", isRtl)}
+                        </p>
+                      )}
+                      {item.previousPrice !== undefined && (
+                        <p className="mt-2 text-sm text-amber-900">
+                          {isRtl ? "السعر السابق" : "Previous price"}:{" "}
+                          {item.previousPrice.toFixed(2)} →{" "}
+                          {item.price.toFixed(2)}
+                        </p>
+                      )}
+                      {onEdit && (
+                        <button
+                          type="button"
+                          disabled={locked}
+                          className="min-h-11 underline disabled:opacity-50"
+                          onClick={() => onEdit(item)}
+                        >
+                          {isRtl
+                            ? "تعديل الخيارات والملاحظات"
+                            : "Edit options and notes"}
+                        </button>
                       )}
                       {item.itemNote && (
                         <p className="mt-1 break-words text-xs text-stone-600">
@@ -277,7 +323,7 @@ export function CartDrawer({
                     <div className="flex items-center rounded-full bg-stone-100 p-1">
                       <button
                         type="button"
-                        disabled={isSubmitting}
+                        disabled={locked}
                         onClick={() =>
                           item.quantity > 1
                             ? updateQuantity(item.id, item.quantity - 1)
@@ -299,7 +345,12 @@ export function CartDrawer({
                       </span>
                       <button
                         type="button"
-                        disabled={isSubmitting || item.quantity >= 99}
+                        disabled={
+                          locked ||
+                          items
+                            .filter((i) => i.productId === item.productId)
+                            .reduce((sum, i) => sum + i.quantity, 0) >= 99
+                        }
                         onClick={() =>
                           updateQuantity(item.id, item.quantity + 1)
                         }
@@ -314,6 +365,27 @@ export function CartDrawer({
                   </article>
                 ))
               )}
+              {removed && !locked && (
+                <button
+                  type="button"
+                  className="min-h-11 underline"
+                  onClick={undoRemove}
+                >
+                  {isRtl ? "تراجع عن حذف الطبق" : "Undo removed dish"}
+                </button>
+              )}
+              {items.some((item) => item.previousPrice !== undefined) &&
+                !locked && (
+                  <button
+                    type="button"
+                    className="min-h-11 rounded-xl border border-amber-600 px-4"
+                    onClick={acceptPrices}
+                  >
+                    {isRtl
+                      ? "راجعت الأسعار الجديدة وأوافق عليها"
+                      : "I reviewed and accept the new prices"}
+                  </button>
+                )}
               {items.length > 0 && (
                 <div>
                   <label
@@ -327,7 +399,7 @@ export function CartDrawer({
                     id="cart-note"
                     rows={2}
                     maxLength={1000}
-                    disabled={isSubmitting}
+                    disabled={locked}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     placeholder={t("notePlaceholder")}
@@ -335,19 +407,52 @@ export function CartDrawer({
                   />
                 </div>
               )}
-              {submitError && (
+              {(submitError ||
+                issue ||
+                prepared.issues.length > 0 ||
+                phase === "unknown") && (
                 <div
+                  ref={errorRef}
+                  tabIndex={-1}
                   role="alert"
-                  className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                  className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800 focus:outline-2"
                 >
-                  {submitError}
-                  <button
-                    type="button"
-                    className="mt-2 block min-h-11 underline"
-                    onClick={() => window.location.reload()}
-                  >
-                    {isRtl ? "تحديث القائمة" : "Refresh menu"}
-                  </button>
+                  {phase === "unknown"
+                    ? checkoutMessage("UNKNOWN", isRtl)
+                    : submitError ||
+                      checkoutMessage(
+                        issue ?? prepared.issues[0]?.code ?? "FAILED",
+                        isRtl,
+                      )}
+                  {retryDelay > 0 && (
+                    <p>{checkoutMessage("RATE_LIMIT", isRtl)}</p>
+                  )}
+                  {!locked &&
+                    prepared.issues.map((problem, index) =>
+                      problem.itemId ? (
+                        <a
+                          className="block min-h-11 underline"
+                          key={index}
+                          href={`#cart-item-${items.findIndex((i) => i.id === problem.itemId)}`}
+                        >
+                          {checkoutMessage(problem.code, isRtl)}
+                        </a>
+                      ) : null,
+                    )}
+                  {!locked && onRefresh && (
+                    <button
+                      type="button"
+                      className="mt-2 block min-h-11 underline"
+                      onClick={() => {
+                        setSubmitError("");
+                        onRefresh();
+                      }}
+                    >
+                      {isRtl
+                        ? "تحديث القائمة مع الاحتفاظ بالسلة"
+                        : "Refresh menu and keep cart"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -361,7 +466,7 @@ export function CartDrawer({
                 </div>
                 <button
                   type="button"
-                  onClick={handleSubmitOrder}
+                  onClick={() => void handleSubmitOrder()}
                   disabled={isSubmitting || preview}
                   style={buttonStyle}
                   className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full p-3 text-sm font-bold disabled:opacity-60"
@@ -377,7 +482,11 @@ export function CartDrawer({
                         ? isRtl
                           ? "معاينة فقط — لا يُرسل طلب"
                           : "Preview only — ordering disabled"
-                        : t("placeOrder")}
+                        : pending
+                          ? isRtl
+                            ? "التحقق من استلام الطلب"
+                            : "Check order confirmation"
+                          : t("placeOrder")}
                       <SubmitArrow size={17} />
                     </>
                   )}

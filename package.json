@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:checkout": "node --experimental-strip-types scripts/verify-checkout.mjs",
+    "test:customer": "playwright test",
     "build:cf": "opennextjs-cloudflare build",
     "deploy": "pnpm run build:cf && opennextjs-cloudflare deploy",
     "preview": "pnpm run build:cf && opennextjs-cloudflare preview"
@@ -35,6 +37,8 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.4",
+    "@playwright/test": "1.63.0",
     "@swc/helpers": "^0.5.23",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -45,7 +49,6 @@
     "styled-jsx": "^5.1.7",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "@opennextjs/cloudflare": "1.20.4",
     "wrangler": "4.127.1"
   },
   "packageManager": "pnpm@11.24.0"

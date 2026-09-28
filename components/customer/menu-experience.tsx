@@ -15,6 +15,7 @@ import { AdminLanguageSwitcher } from "@/components/admin/admin-language-switche
 import { menuThemeStyle, getMenuTheme } from "@/lib/menu-themes";
 import type { PublicMenu, MenuProduct } from "@/lib/menu-types";
 import { useCartStore } from "@/store/cart-store";
+import type { CartItem } from "@/store/cart-store";
 import { CelebrationBanner } from "./celebration-banner";
 import { FoodLabels } from "./food-labels";
 import { ProductModal } from "./product-modal";
@@ -60,7 +61,8 @@ export function MenuExperience({
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("all");
   const [selected, setSelected] = useState<MenuProduct | null>(null);
-  const { items, addItem } = useCartStore();
+  const [editing, setEditing] = useState<CartItem | undefined>();
+  const { items, addItem, editItem, toggleCart } = useCartStore();
   const { branch, categories } = menu;
   const name = (value: { name?: string; nameAr?: string; nameEn?: string }) =>
     ar
@@ -272,6 +274,7 @@ export function MenuExperience({
                               type="button"
                               disabled={product.isAvailable === false}
                               aria-label={`${ar ? "إضافة" : "Add"} ${name(product)}`}
+                              id={`menu-product-${product.id}`}
                               onClick={() => setSelected(product)}
                             >
                               {product.isAvailable === false ? (
@@ -319,15 +322,34 @@ export function MenuExperience({
           <ProductModal
             product={selected}
             isOpen={Boolean(selected)}
-            onClose={() => setSelected(null)}
+            key={editing?.id ?? selected?.id ?? "product"}
+            initialItem={editing}
+            onClose={() => {
+              setSelected(null);
+              if (editing) {
+                setEditing(undefined);
+                toggleCart();
+              }
+            }}
             themeColor={accent}
-            onAddToCart={addItem}
+            onAddToCart={(input) =>
+              editing ? editItem(editing.id, input) : addItem(input)
+            }
           />
           <CartDrawer
             branchId={branch.id}
             tableId={table.id}
             themeColor={accent}
             preview={preview}
+            onRefresh={onRetry}
+            onEdit={(item) => {
+              const product = categories
+                .flatMap((category) => category.products)
+                .find((product) => product.id === item.productId);
+              setEditing(item);
+              setSelected(product ?? { ...item, isAvailable: false });
+              toggleCart();
+            }}
           />
         </>
       )}

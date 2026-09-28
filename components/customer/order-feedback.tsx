@@ -78,7 +78,8 @@ export function ReadyAlert({
   useEffect(() => {
     let active = true;
     const notify = () => {
-      if (!active || muted || status !== "ready" || notified.current === token) return;
+      if (!active || muted || status !== "ready" || notified.current === token)
+        return;
       const key = `order-ready:${token}`;
       try {
         if (sessionStorage.getItem(key)) {
@@ -93,7 +94,11 @@ export function ReadyAlert({
       } catch {}
     };
     const arm = (event: Event) => {
-      if (event.target instanceof Element && event.target.closest("[data-order-sound-toggle]")) return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-order-sound-toggle]")
+      )
+        return;
       void armOrderSound().then(notify);
     };
     notify();
@@ -166,18 +171,13 @@ export function OrderRating({
   const t = useTranslations("CustomerFeedback");
   const isRtl = locale === "ar";
 
-  const labels = [
-    t("star1"),
-    t("star2"),
-    t("star3"),
-    t("star4"),
-    t("star5"),
-  ];
+  const labels = [t("star1"), t("star2"), t("star3"), t("star4"), t("star5")];
 
   const [rating, setRating] = useState(initialRating ?? 0);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [saving, setSaving] = useState(0);
   const [error, setError] = useState("");
+  const [attemptedRating, setAttemptedRating] = useState<number | null>(null);
   const locked = useRef(false);
 
   // Active stars to display: hover takes preview priority, falls back to saved rating
@@ -186,6 +186,7 @@ export function OrderRating({
   const save = async (value: number) => {
     if (locked.current) return;
     locked.current = true;
+    setAttemptedRating(value);
     setSaving(value);
     setError("");
     try {
@@ -215,12 +216,13 @@ export function OrderRating({
       <p className="text-xs font-bold text-stone-400 tracking-wide uppercase">
         {t("eyebrow")}
       </p>
-      <h2 id="rating-title" className="mt-1 text-lg sm:text-xl font-black text-stone-900">
+      <h2
+        id="rating-title"
+        className="mt-1 text-lg sm:text-xl font-black text-stone-900"
+      >
         {t("title")}
       </h2>
-      <p className="mt-1 text-xs text-stone-500 font-medium">
-        {t("subtitle")}
-      </p>
+      <p className="mt-1 text-xs text-stone-500 font-medium">{t("subtitle")}</p>
 
       {/* Interactive Stars Row with Mouse Hover Feedback */}
       <div
@@ -275,11 +277,27 @@ export function OrderRating({
       </div>
 
       {/* Interactive Status & Live Feedback Label */}
-      <div aria-live="polite" className="min-h-7 flex items-center justify-center text-xs sm:text-sm">
+      <div
+        aria-live="polite"
+        className="min-h-7 flex items-center justify-center text-xs sm:text-sm"
+      >
         {error ? (
-          <p className="text-red-700 font-bold">{error}</p>
+          <div role="alert" className="text-red-700 font-bold">
+            <p>{error}</p>
+            <button
+              type="button"
+              className="min-h-11 underline"
+              onClick={() => attemptedRating && void save(attemptedRating)}
+            >
+              {isRtl
+                ? `إعادة إرسال التقييم (${attemptedRating}/5)`
+                : `Retry rating (${attemptedRating}/5)`}
+            </button>
+          </div>
         ) : saving ? (
-          <p className="text-stone-500 font-medium animate-pulse">{t("saving")}</p>
+          <p className="text-stone-500 font-medium animate-pulse">
+            {t("saving")}
+          </p>
         ) : hoverRating !== null ? (
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-300/80 text-amber-900 font-bold text-xs sm:text-sm shadow-xs animate-in fade-in duration-150">
             <span className="text-amber-500 font-black">★</span>
@@ -292,7 +310,9 @@ export function OrderRating({
             <span className="flex size-4 sm:size-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
               <Check size={13} strokeWidth={3} />
             </span>
-            <span>{labels[rating - 1]} — {t("thankYou")}</span>
+            <span>
+              {labels[rating - 1]} — {t("thankYou")}
+            </span>
           </p>
         ) : (
           <p className="text-stone-400 font-medium text-xs">{t("legend")}</p>
