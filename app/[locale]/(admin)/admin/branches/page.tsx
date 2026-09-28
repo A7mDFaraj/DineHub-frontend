@@ -55,13 +55,15 @@ export default function BranchesPage() {
 
   const [formData, setFormData] = useState({
     name: "",
+    nameEn: "",
     address: "",
+    addressEn: "",
     phone: "",
   });
 
   const handleOpenCreate = () => {
     setEditingBranch(null);
-    setFormData({ name: "", address: "", phone: "" });
+    setFormData({ name: "", nameEn: "", address: "", addressEn: "", phone: "" });
     setErrorMsg("");
     setIsDialogOpen(true);
   };
@@ -69,8 +71,10 @@ export default function BranchesPage() {
   const handleOpenEdit = (branch: Branch) => {
     setEditingBranch(branch);
     setFormData({
-      name: branch.nameAr || branch.name || branch.nameEn || "",
-      address: branch.address || branch.addressAr || branch.addressEn || "",
+      name: branch.nameAr || branch.name || "",
+      nameEn: branch.nameEn || "",
+      address: branch.addressAr || branch.address || "",
+      addressEn: branch.addressEn || "",
       phone: branch.phone || "",
     });
     setErrorMsg("");
@@ -106,8 +110,8 @@ export default function BranchesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setErrorMsg(t("branchNameLabel"));
+    if (!formData.name.trim() && !formData.nameEn.trim()) {
+      setErrorMsg(t("branchNameArLabel"));
       return;
     }
 
@@ -115,28 +119,29 @@ export default function BranchesPage() {
       setIsSubmitting(true);
       setErrorMsg("");
 
+      const primaryName = formData.name.trim() || formData.nameEn.trim();
+      const primaryAddress = formData.address.trim() || formData.addressEn.trim();
+
+      const payload = {
+        name: primaryName,
+        nameAr: formData.name.trim() || undefined,
+        nameEn: formData.nameEn.trim() || undefined,
+        address: primaryAddress || undefined,
+        addressAr: formData.address.trim() || undefined,
+        addressEn: formData.addressEn.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+      };
+
       if (editingBranch) {
-        const { data } = await apiClient.patch(`/admin/branches/${editingBranch.id}`, {
-          name: formData.name.trim(),
-          nameAr: formData.name.trim(),
-          address: formData.address.trim() || undefined,
-          phone: formData.phone.trim() || undefined,
-        });
+        const { data } = await apiClient.patch(`/admin/branches/${editingBranch.id}`, payload);
         const updated = data?.data || data;
         upsertBranch(updated || {
           ...editingBranch,
-          name: formData.name.trim(),
-          nameAr: formData.name.trim(),
-          address: formData.address.trim() || undefined,
-          phone: formData.phone.trim() || undefined,
+          ...payload,
         });
         setSuccessMsg(isRtl ? "تم تحديث بيانات الفرع بنجاح." : "Branch updated successfully.");
       } else {
-        const { data } = await apiClient.post("/admin/branches", {
-          name: formData.name.trim(),
-          address: formData.address.trim() || undefined,
-          phone: formData.phone.trim() || undefined,
-        });
+        const { data } = await apiClient.post("/admin/branches", payload);
         const createdBranch = data?.data || data;
         if (createdBranch?.id) {
           upsertBranch(createdBranch);
@@ -162,10 +167,6 @@ export default function BranchesPage() {
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>
-            <span aria-hidden="true" />
-            DineHub • {t("pageTitle")}
-          </p>
           <h1>{t("pageTitle")}</h1>
           <p className={styles.pageLead}>{t("pageDesc")}</p>
         </div>
@@ -382,39 +383,95 @@ export default function BranchesPage() {
             )}
 
             <form onSubmit={handleSubmit} className={styles.formGrid}>
-              <div className={styles.inputGroup}>
-                <label htmlFor="branch-name">{t("branchNameLabel")} *</label>
-                <input
-                  id="branch-name"
-                  type="text"
-                  required
-                  placeholder={t("branchNamePlaceholder")}
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                />
+              {/* Row 1: English Name (Left) | Arabic Name (Right) */}
+              <div className={styles.bilingualRow}>
+                <div className={styles.bilingualCol}>
+                  <label htmlFor="branch-name-en" className={styles.fieldLabel}>
+                    <span>{t("branchNameEnLabel")}</span>
+                    <span className={styles.inputBadge} data-lang="en">EN</span>
+                  </label>
+                  <input
+                    id="branch-name-en"
+                    type="text"
+                    dir="ltr"
+                    className={styles.modalInput}
+                    placeholder={t("branchNameEnPlaceholder")}
+                    value={formData.nameEn}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nameEn: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className={styles.bilingualCol} dir="rtl">
+                  <label htmlFor="branch-name-ar" className={styles.fieldLabel}>
+                    <span>{t("branchNameArLabel")} *</span>
+                    <span className={styles.inputBadge} data-lang="ar">عربي</span>
+                  </label>
+                  <input
+                    id="branch-name-ar"
+                    type="text"
+                    dir="rtl"
+                    className={styles.modalInput}
+                    required={!formData.nameEn.trim()}
+                    placeholder={t("branchNameArPlaceholder")}
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                  />
+                </div>
               </div>
 
-              <div className={styles.inputGroup}>
-                <label htmlFor="branch-address">{t("addressLabel")}</label>
-                <input
-                  id="branch-address"
-                  type="text"
-                  placeholder={t("addressPlaceholder")}
-                  value={formData.address}
-                  onChange={(e) =>
-                    setFormData({ ...formData, address: e.target.value })
-                  }
-                />
+              {/* Row 2: English Address (Left) | Arabic Address (Right) */}
+              <div className={styles.bilingualRow}>
+                <div className={styles.bilingualCol}>
+                  <label htmlFor="branch-address-en" className={styles.fieldLabel}>
+                    <span>{t("addressEnLabel")}</span>
+                    <span className={styles.inputBadge} data-lang="en">EN</span>
+                  </label>
+                  <input
+                    id="branch-address-en"
+                    type="text"
+                    dir="ltr"
+                    className={styles.modalInput}
+                    placeholder={t("addressEnPlaceholder")}
+                    value={formData.addressEn}
+                    onChange={(e) =>
+                      setFormData({ ...formData, addressEn: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className={styles.bilingualCol} dir="rtl">
+                  <label htmlFor="branch-address-ar" className={styles.fieldLabel}>
+                    <span>{t("addressArLabel")}</span>
+                    <span className={styles.inputBadge} data-lang="ar">عربي</span>
+                  </label>
+                  <input
+                    id="branch-address-ar"
+                    type="text"
+                    dir="rtl"
+                    className={styles.modalInput}
+                    placeholder={t("addressArPlaceholder")}
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
+                  />
+                </div>
               </div>
 
+              {/* Row 3: Phone Number */}
               <div className={styles.inputGroup}>
-                <label htmlFor="branch-phone">{t("phoneLabel")}</label>
+                <label htmlFor="branch-phone" className={styles.fieldLabel}>
+                  <span>{t("phoneLabel")}</span>
+                </label>
                 <input
                   id="branch-phone"
                   type="tel"
                   dir="ltr"
+                  className={styles.modalInput}
                   placeholder={t("phonePlaceholder")}
                   value={formData.phone}
                   onChange={(e) =>

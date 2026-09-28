@@ -71,7 +71,7 @@ export function MenuExperience({
   const branchName = name(branch) || "DineHub";
   const theme = getMenuTheme(branch.menuTheme);
   const accent =
-    theme.id === "signature" && /^#[0-9a-f]{6}$/i.test(branch.themeColor ?? "")
+    /^#[0-9a-f]{6}$/i.test(branch.themeColor ?? "")
       ? branch.themeColor!
       : theme.accent;
   const q = query.trim().toLocaleLowerCase();

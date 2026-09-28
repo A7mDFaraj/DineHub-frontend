@@ -133,11 +133,10 @@ export function contrastInk(hex: string) {
 }
 export function menuThemeStyle(appearance: MenuAppearance): CSSProperties {
   const theme = getMenuTheme(appearance.menuTheme);
-  const accent =
-    theme.id === "signature" &&
-    /^#[0-9a-f]{6}$/i.test(appearance.themeColor ?? "")
-      ? appearance.themeColor!
-      : theme.accent;
+  const customAccent = /^#[0-9a-f]{6}$/i.test(appearance.themeColor ?? "")
+    ? appearance.themeColor!
+    : null;
+  const accent = customAccent ?? theme.accent;
   return {
     "--menu-bg": theme.background,
     "--menu-surface": theme.surface,

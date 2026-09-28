@@ -39,7 +39,6 @@ export function AdminLanguageSwitcher({
           onClick={() => setLocaleCookie(targetLocale)}
           className={styles.sidebarBtnLead}
           aria-label={ariaLabel}
-          title={ariaLabel}
         >
           <Languages size={17} strokeWidth={1.8} className={styles.langIcon} aria-hidden="true" />
           <span className={styles.sidebarBtnLabel}>{currentLabel}</span>
@@ -96,7 +95,6 @@ export function AdminLanguageSwitcher({
         onClick={() => setLocaleCookie(targetLocale)}
         className={styles.compactLead}
         aria-label={ariaLabel}
-        title={ariaLabel}
       >
         <Languages size={15} strokeWidth={1.8} className={styles.langIcon} aria-hidden="true" />
       </Link>

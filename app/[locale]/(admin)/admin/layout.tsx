@@ -240,17 +240,6 @@ function AuthenticatedAdminShell({
         <NavigationLinks pathname={pathname} />
 
         <div className={styles.sidebarFoot}>
-          <div className={styles.sidebarControlsRow}>
-            <AdminLanguageSwitcher mode="sidebar" className={styles.sidebarLangSwitcher} />
-            <AdminGuideTrigger
-              className={styles.guideIconButton}
-              aria-label={t("guideButton")}
-              title={t("guideButton")}
-            >
-              <span className={styles.guideQuestionMark} aria-hidden="true">?</span>
-            </AdminGuideTrigger>
-          </div>
-
           <div className={styles.userCard}>
             <span aria-hidden="true">
               {session.user.name.slice(0, 1).toUpperCase()}
@@ -314,17 +303,12 @@ function AuthenticatedAdminShell({
                     onNavigate={() => setMobileNavOpen(false)}
                   />
                   <div className={styles.drawerFoot}>
-                    <div className={styles.sidebarControlsRow}>
-                      <AdminLanguageSwitcher mode="sidebar" className={styles.sidebarLangSwitcher} />
-                      <AdminGuideTrigger
-                        className={styles.guideIconButton}
-                        onClick={() => setMobileNavOpen(false)}
-                        aria-label={t("guideButton")}
-                        title={t("guideButton")}
-                      >
-                        <span className={styles.guideQuestionMark} aria-hidden="true">?</span>
-                      </AdminGuideTrigger>
-                    </div>
+                    <AdminGuideTrigger
+                      className={styles.guideButton}
+                      onClick={() => setMobileNavOpen(false)}
+                      aria-label={t("guideButton")}
+                      title={t("guideButton")}
+                    />
                     <button
                       className={styles.logoutButton}
                       type="button"
@@ -344,15 +328,24 @@ function AuthenticatedAdminShell({
         </header>
 
         <div className={styles.contextBar}>
-          <div>
-            <span>{access?.businessName ?? t("adminRole")}</span>
-            <strong>{currentPage}</strong>
+          <div className={styles.contextTitleGroup}>
+            <span className={styles.contextBusinessBadge}>
+              <Store aria-hidden="true" size={13} className={styles.contextStoreIcon} />
+              <span>{access?.businessName ?? t("adminRole")}</span>
+            </span>
+            <span className={styles.contextBreadcrumbDivider} aria-hidden="true">/</span>
+            <strong className={styles.contextPageTitle}>{currentPage}</strong>
           </div>
           <div className={styles.contextBarActions}>
-            <p>
-              <i aria-hidden="true" />
-              {t("signalConnected")}
-            </p>
+            <AdminLanguageSwitcher className={styles.topBarLangSwitcher} />
+
+            <AdminGuideTrigger
+              className={styles.topBarGuideButton}
+              aria-label={t("guideButton")}
+              title={t("guideButton")}
+            >
+              <span className={styles.guideQuestionMark} aria-hidden="true">?</span>
+            </AdminGuideTrigger>
           </div>
         </div>
 

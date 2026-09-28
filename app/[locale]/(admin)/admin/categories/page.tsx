@@ -230,10 +230,6 @@ export default function CategoriesPage() {
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>
-            <span aria-hidden="true" />
-            DineHub • {t("pageTitle")}
-          </p>
           <h1>{t("pageTitle")}</h1>
           <p className={styles.pageLead}>{t("pageDesc")}</p>
         </div>
@@ -368,58 +364,73 @@ export default function CategoriesPage() {
               const secondaryName = isRtl ? cat.nameEn : cat.nameAr;
 
               return (
-                <div key={cat.id} className={styles.categoryRow}>
-                  <div className={styles.orderControls}>
-                    <button
-                      type="button"
-                      className={styles.orderBtn}
-                      onClick={() => handleMove(index, "up")}
-                      disabled={index === 0}
-                      aria-label={t("moveUp")}
-                      title={t("moveUp")}
-                    >
-                      <ArrowUp size={15} />
-                    </button>
-                    <span className={styles.orderIndex}>#{index + 1}</span>
-                    <button
-                      type="button"
-                      className={styles.orderBtn}
-                      onClick={() => handleMove(index, "down")}
-                      disabled={index === categories.length - 1}
-                      aria-label={t("moveDown")}
-                      title={t("moveDown")}
-                    >
-                      <ArrowDown size={15} />
-                    </button>
+                <div key={cat.id} className={styles.categoryCard}>
+                  <div className={styles.categoryLead}>
+                    <div className={styles.reorderCluster}>
+                      <button
+                        type="button"
+                        className={styles.orderBtn}
+                        onClick={() => handleMove(index, "up")}
+                        disabled={index === 0}
+                        aria-label={t("moveUp")}
+                        title={t("moveUp")}
+                      >
+                        <ArrowUp size={13} strokeWidth={2.2} />
+                      </button>
+                      <span className={styles.orderNumber}>#{index + 1}</span>
+                      <button
+                        type="button"
+                        className={styles.orderBtn}
+                        onClick={() => handleMove(index, "down")}
+                        disabled={index === categories.length - 1}
+                        aria-label={t("moveDown")}
+                        title={t("moveDown")}
+                      >
+                        <ArrowDown size={13} strokeWidth={2.2} />
+                      </button>
+                    </div>
+
+                    <div className={styles.categoryIconWrap} aria-hidden="true">
+                      <Tags size={18} strokeWidth={1.7} />
+                    </div>
+
+                    <div className={styles.categoryTitles}>
+                      <div className={styles.categoryNameRow}>
+                        <h3 className={styles.categoryName}>{displayName}</h3>
+                        {secondaryName && (
+                          <span
+                            className={styles.secondaryLangBadge}
+                            dir={isRtl ? "ltr" : "rtl"}
+                          >
+                            {secondaryName}
+                          </span>
+                        )}
+                      </div>
+                      <p className={styles.categoryMeta}>
+                        {isRtl ? `الترتيب #${index + 1}` : `Order position #${index + 1}`}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className={styles.catDetails}>
-                    <span className={styles.catName}>{displayName}</span>
-                    {secondaryName && (
-                      <span className={styles.catSub} dir={isRtl ? "ltr" : "rtl"}>
-                        {secondaryName}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className={styles.rowActions}>
+                  <div className={styles.categoryActions}>
                     <button
                       type="button"
-                      className={styles.actionBtn}
+                      className={styles.editBtn}
                       onClick={() => handleOpenEdit(cat)}
                       title={t("editCategory")}
                       aria-label={`${t("editCategory")} ${displayName}`}
                     >
-                      <Edit3 size={15} />
+                      <Edit3 size={15} strokeWidth={1.8} />
+                      <span>{t("editCategory")}</span>
                     </button>
                     <button
                       type="button"
-                      className={`${styles.actionBtn} ${styles.danger}`}
+                      className={styles.deleteBtn}
                       onClick={() => handleOpenDelete(cat)}
                       title={t("deleteConfirm")}
                       aria-label={`${t("deleteConfirm")} ${displayName}`}
                     >
-                      <Trash2 size={15} />
+                      <Trash2 size={15} strokeWidth={1.8} />
                     </button>
                   </div>
                 </div>

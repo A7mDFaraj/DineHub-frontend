@@ -13,8 +13,10 @@ import {
   Save,
   Sparkles,
   Store,
+  Star,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
@@ -63,6 +65,8 @@ export default function BranchSettingsPage() {
     menuTheme: "signature",
     showSpecialDiscount: false,
     discountPercent: 0,
+    googleReviewUrl: "",
+    enableReviews: true,
   });
 
   const [draftBranch, setDraftBranch] = useState<typeof selectedBranch>(null);
@@ -79,6 +83,8 @@ export default function BranchSettingsPage() {
         menuTheme: selectedBranch.menuTheme || "signature",
         showSpecialDiscount: selectedBranch.showSpecialDiscount ?? false,
         discountPercent: selectedBranch.discountPercent ?? 0,
+        googleReviewUrl: selectedBranch.googleReviewUrl || "",
+        enableReviews: selectedBranch.enableReviews ?? true,
       });
       setErrorMsg("");
       setSuccessMsg("");
@@ -89,10 +95,6 @@ export default function BranchSettingsPage() {
     if (e) e.preventDefault();
     if (!selectedBranchId) {
       setErrorMsg(t("selectBranchFirst"));
-      return;
-    }
-    if (!formData.name.trim() && !formData.nameEn.trim()) {
-      setErrorMsg(t("errorNoName"));
       return;
     }
 
@@ -115,19 +117,14 @@ export default function BranchSettingsPage() {
       setErrorMsg("");
       setSuccessMsg("");
 
-      const primaryName = formData.name.trim() || formData.nameEn.trim();
-
       await apiClient.patch(`/admin/branches/${selectedBranchId}`, {
-        name: primaryName,
-        nameAr: formData.name.trim() || undefined,
-        nameEn: formData.nameEn.trim() || undefined,
-        address: formData.address.trim() || undefined,
-        phone: formData.phone.trim() || undefined,
         logoUrl: formData.logoUrl.trim() || undefined,
         themeColor: formData.themeColor.trim() || "#f2644b",
         menuTheme: formData.menuTheme,
         showSpecialDiscount: formData.showSpecialDiscount,
         discountPercent: formData.discountPercent,
+        googleReviewUrl: formData.googleReviewUrl.trim() || null,
+        enableReviews: formData.enableReviews,
       });
 
       setSuccessMsg(t("successSaved"));
@@ -297,86 +294,70 @@ export default function BranchSettingsPage() {
         <div className={styles.settingsGrid}>
           {/* Form Column */}
           <div className={styles.settingsCol}>
-            {/* Card 1: Store Details */}
+            {/* Card 1: Active Branch Overview (Eliminates duplication with Branches page) */}
             <section className={styles.sectionCard}>
               <div className={styles.cardHead}>
                 <div className={styles.cardHeadIcon}>
                   <Store size={20} />
                 </div>
                 <div>
-                  <h2>{t("generalInfo")}</h2>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                    <h2>{isRtl ? "بيانات الفرع النشط" : "Active Branch Profile"}</h2>
+                    <Link
+                      href="/admin/branches"
+                      className={styles.branchEditLink}
+                    >
+                      <Building2 size={15} />
+                      <span>{isRtl ? "إدارة وتعديل الفروع ←" : "Manage in Branches →"}</span>
+                    </Link>
+                  </div>
                   <p>
                     {isRtl
-                      ? "المعلومات الأساسية التي تظهر في ترويسة القائمة والفاتورة."
-                      : "Basic branch information displayed in digital menus and guest receipts."}
+                      ? "تتم إدارة أسماء الفروع والعناوين وأرقام التواصل مركزيًا من صفحة الفروع لتجنب التكرار. أدناه يمكنك تخصيص مظهر القائمة، ألوان الهوية، والتقييمات."
+                      : "Branch names, addresses, and contacts are managed centrally in the Branches page. Below, customize this branch's menu theme, brand colors, discounts, and Google Reviews."}
                   </p>
                 </div>
               </div>
 
-              <form onSubmit={handleSave} className={styles.formGrid}>
-                <div className={styles.inputGroup}>
-                  <label htmlFor="store-name-ar">{t("nameArLabel")} *</label>
-                  <input
-                    id="store-name-ar"
-                    type="text"
-                    required
-                    placeholder={
-                      isRtl
-                        ? "مثال: لاونج داين هب"
-                        : "e.g. DineHub Lounge (Arabic)"
-                    }
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                  />
-                </div>
+              <div className={styles.branchSummaryCard}>
+                <div className={styles.branchSummaryGrid}>
+                  <div className={styles.branchSummaryItem}>
+                    <span className={styles.branchSummaryLabel}>
+                      {isRtl ? "الاسم بالعربية" : "Arabic Name"}
+                    </span>
+                    <span className={styles.branchSummaryValue}>
+                      {selectedBranch?.nameAr || selectedBranch?.name || "—"}
+                    </span>
+                  </div>
 
-                <div className={styles.inputGroup}>
-                  <label htmlFor="store-name-en">{t("nameEnLabel")}</label>
-                  <input
-                    id="store-name-en"
-                    type="text"
-                    dir="ltr"
-                    placeholder="e.g. DineHub Lounge"
-                    value={formData.nameEn}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nameEn: e.target.value })
-                    }
-                  />
-                </div>
+                  <div className={styles.branchSummaryItem}>
+                    <span className={styles.branchSummaryLabel}>
+                      {isRtl ? "الاسم بالإنجليزية" : "English Name"}
+                    </span>
+                    <span className={styles.branchSummaryValue}>
+                      {selectedBranch?.nameEn || selectedBranch?.name || "—"}
+                    </span>
+                  </div>
 
-                <div className={styles.inputGroup}>
-                  <label htmlFor="store-address">{t("addressLabel")}</label>
-                  <input
-                    id="store-address"
-                    type="text"
-                    placeholder={
-                      isRtl
-                        ? "مثال: طريق التخصصي، حي المعذر، الرياض"
-                        : "e.g. Takhassusi St, Al Mathar, Riyadh"
-                    }
-                    value={formData.address}
-                    onChange={(e) =>
-                      setFormData({ ...formData, address: e.target.value })
-                    }
-                  />
-                </div>
+                  <div className={styles.branchSummaryItem}>
+                    <span className={styles.branchSummaryLabel}>
+                      {isRtl ? "العنوان والموقع" : "Address & Location"}
+                    </span>
+                    <span className={styles.branchSummaryValue}>
+                      {selectedBranch?.addressAr || selectedBranch?.address || selectedBranch?.addressEn || (isRtl ? "غير محدد" : "Not specified")}
+                    </span>
+                  </div>
 
-                <div className={styles.inputGroup}>
-                  <label htmlFor="store-phone">{t("phoneLabel")}</label>
-                  <input
-                    id="store-phone"
-                    type="tel"
-                    dir="ltr"
-                    placeholder="+966 50 000 0000"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                  />
+                  <div className={styles.branchSummaryItem}>
+                    <span className={styles.branchSummaryLabel}>
+                      {isRtl ? "هاتف التواصل" : "Contact Phone"}
+                    </span>
+                    <span className={styles.branchSummaryValue} dir="ltr" style={{ justifyContent: isRtl ? "flex-end" : "flex-start" }}>
+                      {selectedBranch?.phone || (isRtl ? "غير محدد" : "Not specified")}
+                    </span>
+                  </div>
                 </div>
-              </form>
+              </div>
             </section>
 
             <section className={styles.sectionCard}>
@@ -410,6 +391,105 @@ export default function BranchSettingsPage() {
                 }
               />
             </section>
+
+            {/* Card 3: Customer Reviews & Google Maps Integration */}
+            <section className={styles.sectionCard}>
+              <div className={styles.cardHead}>
+                <div className={styles.cardHeadIcon}>
+                  <Star size={20} className="text-amber-400" />
+                </div>
+                <div>
+                  <h2>{t("customerReviewsTitle")}</h2>
+                  <p>{t("customerReviewsDesc")}</p>
+                </div>
+              </div>
+
+              <div className={styles.formGrid}>
+                {/* Toggle switch for enabling customer reviews */}
+                <div className={styles.inputGroup} style={{ gridColumn: "1 / -1" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "16px",
+                      background: "rgba(255, 255, 255, 0.03)",
+                      borderRadius: "14px",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: "0.95rem", display: "block" }}>
+                        {t("enableReviewsLabel")}
+                      </span>
+                      <span style={{ fontSize: "0.8rem", color: "#a89eb0", display: "block", marginTop: "4px" }}>
+                        {t("enableReviewsDesc")}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={formData.enableReviews}
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          enableReviews: !formData.enableReviews,
+                        })
+                      }
+                      style={{
+                        width: "48px",
+                        height: "28px",
+                        borderRadius: "9999px",
+                        backgroundColor: formData.enableReviews ? "#10b981" : "rgba(255, 255, 255, 0.2)",
+                        position: "relative",
+                        transition: "background-color 0.2s ease",
+                        cursor: "pointer",
+                        border: "none",
+                        padding: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "block",
+                          width: "22px",
+                          height: "22px",
+                          borderRadius: "9999px",
+                          backgroundColor: "#ffffff",
+                          position: "absolute",
+                          top: "3px",
+                          left: formData.enableReviews ? (isRtl ? "4px" : "22px") : (isRtl ? "22px" : "4px"),
+                          transition: "left 0.2s ease",
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                        }}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Google Reviews Link */}
+                <div className={styles.inputGroup} style={{ gridColumn: "1 / -1" }}>
+                  <label htmlFor="google-review-url">
+                    {t("googleReviewUrlLabel")}
+                  </label>
+                  <input
+                    id="google-review-url"
+                    type="url"
+                    dir="ltr"
+                    placeholder={t("googleReviewUrlPlaceholder")}
+                    value={formData.googleReviewUrl}
+                    onChange={(e) =>
+                      setFormData({ ...formData, googleReviewUrl: e.target.value })
+                    }
+                  />
+                  <p style={{ fontSize: "0.78rem", color: "#a89eb0", marginTop: "6px", lineHeight: 1.5 }}>
+                    {t("googleReviewUrlHelp")}
+                  </p>
+                </div>
+              </div>
+            </section>
+
             {/* Card 2: Visual Identity & Brand Color */}
             <section className={styles.sectionCard}>
               <div className={styles.cardHead}>

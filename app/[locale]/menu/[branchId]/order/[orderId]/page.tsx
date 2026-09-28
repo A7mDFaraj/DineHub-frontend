@@ -36,6 +36,14 @@ interface OrderData {
   table?: { number?: number };
   tableId?: string;
   items?: { nameEn?: string; nameAr?: string; quantity: number }[];
+  branch?: {
+    publicCode?: string;
+    name?: string;
+    nameAr?: string;
+    nameEn?: string;
+    googleReviewUrl?: string | null;
+    enableReviews?: boolean;
+  };
 }
 
 const statusOrder: OrderStatus[] = [
@@ -75,34 +83,34 @@ export default function OrderTrackingPage({
     pending: {
       label: t("statusPending"),
       sublabel: t("statusPendingSub"),
-      icon: <Clock className="w-9 h-9" />,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      borderColor: "border-blue-200",
+      icon: <Clock className="w-10 h-10 text-sky-600 animate-pulse" />,
+      color: "text-sky-900",
+      bgColor: "bg-gradient-to-br from-sky-50 via-white to-blue-50/70",
+      borderColor: "border-sky-200/80",
     },
     preparing: {
       label: t("statusPreparing"),
       sublabel: t("statusPreparingSub"),
-      icon: <Radio className="w-9 h-9 text-amber-500" />,
-      color: "text-amber-600",
-      bgColor: "bg-amber-50",
-      borderColor: "border-amber-200",
+      icon: <Radio className="w-10 h-10 text-amber-500 animate-pulse" />,
+      color: "text-amber-950",
+      bgColor: "bg-gradient-to-br from-amber-50 via-white to-orange-50/70",
+      borderColor: "border-amber-200/80",
     },
     ready: {
       label: t("statusReady"),
       sublabel: t("statusReadySub"),
-      icon: <Sparkles className="w-9 h-9 text-emerald-500" />,
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
-      borderColor: "border-emerald-200",
+      icon: <Sparkles className="w-10 h-10 text-emerald-500 animate-bounce" />,
+      color: "text-emerald-950",
+      bgColor: "bg-gradient-to-br from-emerald-50 via-white to-teal-50/80",
+      borderColor: "border-emerald-300/80",
     },
     delivered: {
       label: t("statusDelivered"),
       sublabel: t("statusDeliveredSub"),
-      icon: <CheckCircle2 className="w-9 h-9 text-stone-600" />,
-      color: "text-stone-800",
-      bgColor: "bg-stone-100",
-      borderColor: "border-stone-200",
+      icon: <CheckCircle2 className="w-10 h-10 text-emerald-600" />,
+      color: "text-stone-900",
+      bgColor: "bg-gradient-to-br from-stone-50 via-white to-emerald-50/40",
+      borderColor: "border-stone-200/90",
     },
   };
 
@@ -113,7 +121,10 @@ export default function OrderTrackingPage({
     const controller = new AbortController();
     const fetchOrder = async () => {
       if (!active) return;
-      if (inFlight) { queued = true; return; }
+      if (inFlight) {
+        queued = true;
+        return;
+      }
       queued = false;
       inFlight = true;
       try {
@@ -122,10 +133,24 @@ export default function OrderTrackingPage({
         });
         if (!active) return;
         const raw: OrderData = res.data.data || res.data;
-        if (!statusOrder.includes(raw.status) || typeof raw.publicToken !== 'string' || !Number.isInteger(raw.orderNumber)) throw new Error('Invalid order response');
-        setOrder(previous => previous?.publicToken === raw.publicToken && statusOrder.indexOf(previous.status) > statusOrder.indexOf(raw.status) ? previous : raw);
+        if (
+          !statusOrder.includes(raw.status) ||
+          typeof raw.publicToken !== "string" ||
+          !Number.isInteger(raw.orderNumber)
+        )
+          throw new Error("Invalid order response");
+        setOrder((previous) =>
+          previous?.publicToken === raw.publicToken &&
+          statusOrder.indexOf(previous.status) >
+            statusOrder.indexOf(raw.status)
+            ? previous
+            : raw,
+        );
         setError("");
-        const currentPathWithoutLocale = window.location.pathname.replace(/^\/(en|ar)/, "");
+        const currentPathWithoutLocale = window.location.pathname.replace(
+          /^\/(en|ar)/,
+          "",
+        );
         if (
           raw.trackingPath &&
           raw.trackingPath !== currentPathWithoutLocale &&
@@ -147,7 +172,8 @@ export default function OrderTrackingPage({
     const closeStream = subscribeToEvents(
       `/orders/${encodeURIComponent(resolvedParams.orderId)}/stream`,
       (event) => {
-        if (event.type === "connected" || event.type.startsWith("order.")) void fetchOrder();
+        if (event.type === "connected" || event.type.startsWith("order."))
+          void fetchOrder();
       },
     );
     const reconciliation = window.setInterval(() => void fetchOrder(), 60_000);
@@ -166,28 +192,30 @@ export default function OrderTrackingPage({
 
   if (!loading && !order) {
     return (
-      <div
-        dir={isRtl ? "rtl" : "ltr"}
-        role="alert"
-        className="p-6 rounded-2xl bg-red-50 text-red-800 text-center space-y-4"
-      >
-        <p>{error || t("loadError")}</p>
-        <button
-          className="min-h-11 px-5 rounded-xl border focus-visible:outline-2"
-          onClick={() => {
-            setLoading(true);
-            setRetry((value) => value + 1);
-          }}
+      <div className="min-h-screen bg-[#fcfbfa] flex items-center justify-center p-4">
+        <div
+          dir={isRtl ? "rtl" : "ltr"}
+          role="alert"
+          className="max-w-md w-full p-6 rounded-3xl bg-red-50/90 border border-red-200 text-red-800 text-center space-y-4 shadow-sm"
         >
-          {isRtl ? "إعادة المحاولة" : "Try Again"}
-        </button>
+          <p className="font-bold">{error || t("loadError")}</p>
+          <button
+            className="min-h-11 px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-xs transition-transform active:scale-[0.96]"
+            onClick={() => {
+              setLoading(true);
+              setRetry((value) => value + 1);
+            }}
+          >
+            {isRtl ? "إعادة المحاولة" : "Try Again"}
+          </button>
+        </div>
       </div>
     );
   }
 
   if (loading || !order) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-3 text-stone-700">
+      <div className="min-h-screen bg-[#fcfbfa] flex flex-col items-center justify-center gap-3 text-stone-700">
         <LoadingSpinner size={36} />
         <p className="text-xs text-stone-500 font-bold animate-pulse">
           {isRtl ? "جارٍ العثور على تفاصيل طلبك…" : "Finding your order details…"}
@@ -203,7 +231,7 @@ export default function OrderTrackingPage({
 
   return (
     <div
-      className="py-6 max-w-md mx-auto space-y-5"
+      className="min-h-screen bg-gradient-to-b from-[#fbf9f5] via-[#f7f4ec] to-[#f0ebde] text-stone-900 py-6 sm:py-10 px-4"
       dir={isRtl ? "rtl" : "ltr"}
       style={{
         fontFamily: isRtl
@@ -211,173 +239,211 @@ export default function OrderTrackingPage({
           : "var(--font-outfit), sans-serif",
       }}
     >
-      {/* Top Header with Language Switcher */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-stone-200 text-xs font-mono font-bold text-stone-600 shadow-sm">
-          <span>{t("orderNumber")}{shortId}</span>
-          {tableNum && (
-            <span className="text-stone-800 font-bold">• {t("table")} {tableNum}</span>
+      <div className="max-w-md mx-auto space-y-5">
+        {/* Top Header with Language Switcher */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-stone-200/90 text-xs font-mono font-bold text-stone-700 shadow-xs">
+            <span>
+              {t("orderNumber")}
+              {shortId}
+            </span>
+            {tableNum && (
+              <span className="text-stone-900 font-extrabold">
+                • {t("table")} {tableNum}
+              </span>
+            )}
+          </div>
+
+          <AdminLanguageSwitcher variant="light" />
+        </div>
+
+        {/* Page Title & Status Header */}
+        <div className="text-center space-y-1.5 pt-1">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-800 text-[11px] font-bold">
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>
+              {isRtl ? "تحديث مباشر وتفاعلي" : "Live Realtime Tracking"}
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-stone-950 tracking-tight">
+            {isRtl ? "متابعة حالة الطلب" : "Live Order Status"}
+          </h1>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-2xl bg-red-50 border border-red-200 p-3.5 text-sm font-semibold text-red-800 shadow-xs"
+          >
+            {error}
+          </p>
+        )}
+
+        {/* VIP Order Pass Card */}
+        <div className="rounded-3xl border border-stone-200/90 bg-white/95 backdrop-blur-md p-5 sm:p-6 text-center space-y-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.03)] relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-400 via-emerald-400 to-amber-400" />
+          <p className="text-xs font-bold text-stone-500 tracking-wide uppercase">
+            {isRtl
+              ? "أظهر هذا الرمز للموظف عند استلام الطلب"
+              : "Show this code to staff upon receiving your order"}
+          </p>
+          <p
+            dir="ltr"
+            className="font-mono text-4xl sm:text-5xl font-black tracking-wider text-stone-950 select-all"
+          >
+            #{shortId}
+          </p>
+          {order.createdAt && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-100/90 text-xs text-stone-600 font-semibold tabular-nums">
+              <Clock size={12} className="text-stone-400" />
+              <OrderElapsed
+                createdAt={order.createdAt}
+                deliveredAt={order.deliveredAt}
+                completed={order.status === "delivered"}
+              />
+            </div>
           )}
         </div>
 
-        <AdminLanguageSwitcher variant="light" />
-      </div>
+        {/* Audio / Screen Wake Alert */}
+        <ReadyAlert status={order.status} token={order.publicToken} />
 
-      <div className="text-center space-y-1">
-        <h1 className="text-xl sm:text-2xl font-black text-stone-900">
-          {isRtl ? "متابعة حالة الطلب المباشرة" : "Live Order Tracking"}
-        </h1>
-      </div>
-
-      {error && (
-        <p
-          role="alert"
-          className="rounded-xl bg-red-50 p-3 text-sm text-red-800"
-        >
-          {error}
-        </p>
-      )}
-
-      <div className="rounded-2xl border border-stone-200 bg-white p-4 text-center space-y-2">
-        <p className="text-sm font-bold">
-          {isRtl ? "أظهر هذا الرمز للموظف عند استلام الطلب" : "Show this code to staff upon receiving your order"}
-        </p>
-        <p dir="ltr" className="font-mono text-3xl font-black tracking-wider">
-          #{shortId}
-        </p>
-        {order.createdAt && (
-          <p className="text-xs text-stone-600">
-            <OrderElapsed
-              createdAt={order.createdAt}
-              deliveredAt={order.deliveredAt}
-              completed={order.status === "delivered"}
+        {/* Review & Google Review Prompts (Optional via Settings) */}
+        {order.status === "delivered" &&
+          order.branch?.enableReviews !== false && (
+            <OrderRating
+              token={order.publicToken}
+              initialRating={order.rating}
+              googleReviewUrl={order.branch?.googleReviewUrl}
             />
-          </p>
-        )}
-      </div>
+          )}
 
-      <ReadyAlert status={order.status} token={order.publicToken} />
-      {order.status === "delivered" && (
-        <OrderRating token={order.publicToken} initialRating={order.rating} />
-      )}
-
-      {/* Main Status Display Card */}
-      <motion.div
-        key={order.status}
-        initial={false}
-        animate={{ scale: 1, opacity: 1 }}
-        aria-live="polite"
-        className={`p-6 rounded-3xl ${currentStatusConfig.bgColor} border ${currentStatusConfig.borderColor} flex flex-col items-center justify-center text-center shadow-[0_8px_30px_rgba(0,0,0,0.04)] relative overflow-hidden`}
-      >
-        <div className="w-18 h-18 rounded-2xl bg-white border border-stone-200 flex items-center justify-center mb-3.5 shadow-sm">
-          {currentStatusConfig.icon}
-        </div>
-
-        <h2
-          className={`text-lg sm:text-xl font-black mb-1 ${currentStatusConfig.color}`}
+        {/* Main Status Display Card */}
+        <motion.div
+          key={order.status}
+          initial={false}
+          animate={{ scale: 1, opacity: 1 }}
+          aria-live="polite"
+          className={`p-6 rounded-3xl ${currentStatusConfig.bgColor} border ${currentStatusConfig.borderColor} flex flex-col items-center justify-center text-center shadow-[0_12px_36px_rgba(0,0,0,0.04)] relative overflow-hidden`}
         >
-          {currentStatusConfig.label}
-        </h2>
-        <p className="text-xs text-stone-600 max-w-xs leading-relaxed font-medium">
-          {currentStatusConfig.sublabel}
-        </p>
-      </motion.div>
+          <div className="w-18 h-18 rounded-2xl bg-white border border-stone-200/90 flex items-center justify-center mb-3.5 shadow-sm">
+            {currentStatusConfig.icon}
+          </div>
 
-      {/* Step Progress Timeline Card */}
-      <div className="p-5 rounded-3xl bg-white border border-stone-200 shadow-sm space-y-4">
-        <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-          {isRtl ? "مراحل تجهيز وتوصيل الطلب" : "Order Preparation Steps"}
-        </h3>
+          <h2
+            className={`text-xl sm:text-2xl font-black mb-1.5 ${currentStatusConfig.color}`}
+          >
+            {currentStatusConfig.label}
+          </h2>
+          <p className="text-xs sm:text-sm text-stone-600 max-w-xs leading-relaxed font-medium">
+            {currentStatusConfig.sublabel}
+          </p>
+        </motion.div>
 
-        <div className="space-y-4">
-          {statusOrder.map((step, index) => {
-            const isActive = index <= currentStepIndex;
-            const isCurrent = index === currentStepIndex;
-            const config = statusMap[step];
-            const time =
-              step === "pending"
-                ? order.createdAt
-                : step === "preparing"
-                  ? order.acceptedAt
-                  : step === "ready"
-                    ? order.readyAt
-                    : order.deliveredAt;
+        {/* Step Progress Timeline Card */}
+        <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-md border border-stone-200/90 shadow-sm space-y-4">
+          <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">
+            {isRtl ? "مراحل تجهيز وتوصيل الطلب" : "Order Preparation Steps"}
+          </h3>
 
-            return (
-              <div key={step} className="flex items-center gap-3.5 relative">
-                {/* Connecting line */}
-                {index < statusOrder.length - 1 && (
-                  <div
-                    className={`absolute ${isRtl ? "right-[11px]" : "left-[11px]"} top-7 w-0.5 h-6 transition-colors ${
-                      index < currentStepIndex
-                        ? "bg-emerald-500"
-                        : "bg-stone-200"
-                    }`}
-                  />
-                )}
+          <div className="space-y-4">
+            {statusOrder.map((step, index) => {
+              const isActive = index <= currentStepIndex;
+              const isCurrent = index === currentStepIndex;
+              const config = statusMap[step];
+              const time =
+                step === "pending"
+                  ? order.createdAt
+                  : step === "preparing"
+                    ? order.acceptedAt
+                    : step === "ready"
+                      ? order.readyAt
+                      : order.deliveredAt;
 
-                {/* Node */}
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 border-2 transition-colors ${
-                    isActive
-                      ? "border-emerald-500 bg-emerald-50 text-emerald-600"
-                      : "border-stone-200 bg-stone-50 text-transparent"
-                  }`}
-                >
-                  {isActive && (
-                    <CheckCircle2
-                      size={13}
-                      className="fill-emerald-500 text-white"
+              return (
+                <div key={step} className="flex items-center gap-3.5 relative">
+                  {/* Connecting line */}
+                  {index < statusOrder.length - 1 && (
+                    <div
+                      className={`absolute ${isRtl ? "right-[11px]" : "left-[11px]"} top-7 w-0.5 h-6 transition-colors ${
+                        index < currentStepIndex
+                          ? "bg-emerald-500"
+                          : "bg-stone-200"
+                      }`}
                     />
                   )}
-                </div>
 
-                {/* Label */}
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-xs font-bold transition-colors ${
+                  {/* Node */}
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 border-2 transition-all ${
                       isActive
-                        ? "text-stone-900 font-extrabold"
-                        : "text-stone-400 font-medium"
+                        ? "border-emerald-500 bg-emerald-500 text-white shadow-xs"
+                        : "border-stone-300 bg-stone-50 text-transparent"
                     }`}
                   >
-                    {config.label}
-                  </p>
-                  {time && (
-                    <time
-                      dateTime={time}
-                      className="text-xs text-stone-500 tabular-nums"
-                    >
-                      {new Date(time).toLocaleTimeString(isRtl ? "ar-SA" : "en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </time>
-                  )}
-                  {isCurrent && step !== "delivered" && (
-                    <p className="text-[10px] text-amber-600 font-bold mt-0.5 animate-pulse">
-                      {isRtl ? "جاري التنفيذ حالياً…" : "In progress right now…"}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                    {isActive && (
+                      <CheckCircle2
+                        size={14}
+                        className="text-white"
+                        strokeWidth={2.5}
+                      />
+                    )}
+                  </div>
 
-      {/* Return to Menu Button */}
-      {order.menuPath && (
-        <div className="text-center pt-2">
-          <Link
-            href={order.menuPath}
-            className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200 text-xs sm:text-sm font-bold text-stone-800 transition-all active:scale-[0.96] shadow-sm"
-          >
-            <ShoppingBag size={16} />
-            <span>{isRtl ? "طلب المزيد أو العودة إلى قائمة الطعام" : "Order more or return to menu"}</span>
-          </Link>
+                  {/* Label */}
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-xs font-bold transition-colors ${
+                        isActive
+                          ? "text-stone-900 font-extrabold"
+                          : "text-stone-400 font-medium"
+                      }`}
+                    >
+                      {config.label}
+                    </p>
+                    {time && (
+                      <time
+                        dateTime={time}
+                        className="text-xs text-stone-500 tabular-nums font-mono"
+                      >
+                        {new Date(time).toLocaleTimeString(
+                          isRtl ? "ar-SA" : "en-US",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
+                      </time>
+                    )}
+                    {isCurrent && step !== "delivered" && (
+                      <p className="text-[11px] text-amber-600 font-bold mt-0.5 animate-pulse">
+                        {isRtl ? "جاري التنفيذ حالياً…" : "In progress right now…"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      )}
+
+        {/* Return to Menu Button */}
+        {order.menuPath && (
+          <div className="text-center pt-2">
+            <Link
+              href={order.menuPath}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-stone-900 hover:bg-stone-800 text-white text-xs sm:text-sm font-bold shadow-md transition-all active:scale-[0.96]"
+            >
+              <ShoppingBag size={16} />
+              <span>
+                {isRtl
+                  ? "طلب المزيد أو العودة إلى قائمة الطعام"
+                  : "Order more or return to menu"}
+              </span>
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

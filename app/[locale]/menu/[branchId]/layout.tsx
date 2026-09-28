@@ -12,7 +12,7 @@ export default async function BranchLayout({
   const ar = (await getLocale()) === "ar";
   return (
     <main
-      className="min-h-screen antialiased"
+      className="min-h-screen antialiased bg-[#fbf9f5] text-stone-900"
       dir={ar ? "rtl" : "ltr"}
       style={{
         fontFamily: ar

@@ -7,8 +7,12 @@ export interface MenuBranch extends MenuAppearance {
   nameAr?: string;
   nameEn?: string;
   address?: string;
+  addressAr?: string;
+  addressEn?: string;
   phone?: string;
   logoUrl?: string;
+  googleReviewUrl?: string;
+  enableReviews?: boolean;
 }
 export interface MenuProduct extends ModalProduct {
   originalPrice?: number | string;

@@ -486,10 +486,6 @@ export default function MenuManagementPage() {
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>
-            <span aria-hidden="true" />
-            DineHub • {t("pageTitle")}
-          </p>
           <h1>{t("pageTitle")}</h1>
           <p className={styles.pageLead}>{t("pageDesc")}</p>
         </div>

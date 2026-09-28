@@ -136,6 +136,8 @@
     "badge": "صُمّم للعمل بالعربية ومن الهاتف أولًا."
   },
   "AdminCommon": {
+    "admin": "الإدارة",
+    "refresh": "تحديث",
     "save": "حفظ",
     "cancel": "إلغاء",
     "delete": "حذف",
@@ -306,7 +308,15 @@
     "emptyTitle": "لا توجد فروع مسجلة حتى الآن",
     "emptyDesc": "أضف أول فرع لنشاطك لبدء توزيع القوائم واستقبال الطلبات.",
     "deleteConfirm": "هل أنت متأكد من حذف هذا الفرع؟",
-    "deleteWarning": "سيتم إيقاف رموز QR المرتبطة به فوراً."
+    "deleteWarning": "سيتم إيقاف رموز QR المرتبطة به فوراً.",
+    "branchNameArLabel": "اسم الفرع (بالعربية)",
+    "branchNameArPlaceholder": "مثال: فرع التحلية",
+    "branchNameEnLabel": "اسم الفرع (بالإنجليزية)",
+    "branchNameEnPlaceholder": "e.g. Tahlia Branch",
+    "addressArLabel": "الشارع / العنوان (بالعربية)",
+    "addressArPlaceholder": "مثال: طريق الأمير محمد بن عبد العزيز، الرياض",
+    "addressEnLabel": "الشارع / العنوان (بالإنجليزية)",
+    "addressEnPlaceholder": "e.g. Prince Muhammad Ibn Abdulaziz Rd, Riyadh"
   },
   "AdminCategories": {
     "pageTitle": "التصنيفات",
@@ -523,7 +533,16 @@
       "sapphire": "أزرق ياقوتي",
       "velvet": "وردي مخملي",
       "amber": "عنبري دافئ"
-    }
+    },
+    "customerReviewsTitle": "تقييمات العملاء ومراجعات Google",
+    "customerReviewsDesc": "التحكم في ظهور طلب التقييم للعميل بعد استلام الطلب وتوجيهه لكتابة مراجعة في Google.",
+    "enableReviewsLabel": "تفعيل طلب التقييم بعد استلام الطلب",
+    "enableReviewsDesc": "عند التفعيل، سيتمكن العميل من تقييم تجربته (من ١ إلى ٥ نجوم) فور استلام طلبه بنجاح.",
+    "googleReviewUrlLabel": "رابط تقييم خرائط Google (Google Reviews)",
+    "googleReviewUrlPlaceholder": "https://g.page/r/.../review أو https://maps.app.goo.gl/...",
+    "googleReviewUrlHelp": "سيظهر للعميل بطاقة مميزة وزر مباشر لتشجيعه على كتابة مراجعته على صفحتك في خرائط Google.",
+    "branchNotice": "يمكنك إدارة بيانات وتفاصيل الفروع بالكامل من صفحة الفروع.",
+    "goToBranches": "إدارة في صفحة الفروع"
   },
   "AdminLogs": {
     "pageTitle": "سجل النظام والعمليات",
@@ -620,7 +639,7 @@
     "prev": "السابق",
     "getStarted": "ابدأ العمل",
     "close": "إغلاق الدليل",
-    "reopenHint": "يمكنك إعادة فتح هذا الدليل في أي وقت من القائمة الجانبية."
+    "reopenHint": "يمكنك إعادة فتح هذا الدليل في أي وقت من الشريط العلوي."
   },
   "Staff": {
     "headerTitle": "شاشة الطلبات المباشرة",
@@ -795,6 +814,9 @@
     "screenTip": "للتنبيه الصوتي، أبقِ هذه الصفحة مفتوحة والشاشة نشطة.",
     "pageReadyTitle": "طلبك جاهز للاستلام!",
     "unmuteAria": "تشغيل صوت التنبيه",
-    "muteAria": "كتم صوت التنبيه"
+    "muteAria": "كتم صوت التنبيه",
+    "leaveGoogleReview": "شاركنا تقييمك على Google",
+    "googleReviewPrompt": "سعداء بخدمتك! رأيك على خرائط Google يساعدنا ويدعم فريقنا كثيراً.",
+    "googleReviewButton": "كتابة تقييم على Google"
   }
 }

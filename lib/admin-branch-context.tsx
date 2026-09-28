@@ -26,6 +26,8 @@ export interface Branch {
   phone?: string;
   logoUrl?: string;
   themeColor?: string;
+  googleReviewUrl?: string;
+  enableReviews?: boolean;
 }
 
 interface AdminBranchContextType {

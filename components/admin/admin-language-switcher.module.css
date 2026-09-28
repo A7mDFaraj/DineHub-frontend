@@ -58,15 +58,15 @@
   line-height: 1;
 }
 
-/* Compact Container (Login Screen, Navigation Header) */
+/* Compact Container (Top Navigation Header, Login Screen) */
 .compactContainer {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 44px;
-  min-height: 44px;
-  padding-inline-start: 10px;
-  padding-inline-end: 4px;
+  gap: 6px;
+  height: 38px;
+  min-height: 38px;
+  padding-inline-start: 8px;
+  padding-inline-end: 3px;
   border-radius: 12px;
   box-sizing: border-box;
   user-select: none;
@@ -196,14 +196,14 @@
 
 /* Dark Variant - For Navigation Header / Dark Surfaces */
 .darkContainer {
-  background: rgba(223, 210, 235, 0.08);
+  background: rgba(223, 210, 235, 0.07);
   border: 1px solid rgba(223, 210, 235, 0.16);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   color: #dfd2eb;
 }
 
 .darkContainer:hover {
-  background: rgba(223, 210, 235, 0.14);
+  background: rgba(223, 210, 235, 0.12);
   border-color: rgba(223, 210, 235, 0.32);
   transform: translateY(-1px);
 }
@@ -213,31 +213,35 @@
 }
 
 .darkContainer .switcherTrack {
-  background: rgba(0, 0, 0, 0.28);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 2.5px;
+  padding: 2px;
+  border-radius: 8px;
 }
 
 .darkContainer .switcherOption {
-  min-width: 27px;
-  height: 23px;
-  padding: 0 6px;
+  min-width: 30px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 0.74rem;
 }
 
 .darkContainer .switcherActive {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  font-weight: 750;
   cursor: default;
 }
 
 .darkContainer .switcherInactive {
-  color: rgba(223, 210, 235, 0.52);
+  color: rgba(223, 210, 235, 0.62);
 }
 
 .darkContainer .switcherInactive:hover {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .darkContainer .switcherDivider {
