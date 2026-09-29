@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Loader2,
   MessageSquare,
+  Package,
 } from "lucide-react";
 import {
   prepareCheckout,
@@ -289,6 +290,12 @@ export function CartDrawer({
                             )
                             .join(" · ")}
                         </p>
+                      )}
+                      {item.isTakeaway && (
+                        <span className="mt-2 inline-flex min-h-7 items-center gap-1.5 rounded-full bg-stone-900 px-2.5 text-xs font-bold text-white">
+                          <Package size={13} strokeWidth={2} aria-hidden="true" />
+                          {t("takeaway")}
+                        </span>
                       )}
                       {item.unavailable && (
                         <p role="status" className="mt-2 text-sm text-red-800">

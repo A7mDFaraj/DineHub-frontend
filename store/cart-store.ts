@@ -77,6 +77,7 @@ function configId(item: AddCartItemInput) {
       ...new Set((item.selectedAttributes ?? []).map((option) => option.id)),
     ].sort(),
     item.itemNote?.trim() ?? "",
+    item.isTakeaway === true,
   ]);
 }
 function validItem(value: unknown): value is CartItem {
@@ -93,6 +94,7 @@ function validItem(value: unknown): value is CartItem {
     item.quantity <= 99 &&
     (item.itemNote === undefined ||
       (typeof item.itemNote === "string" && item.itemNote.length <= 500)) &&
+    (item.isTakeaway === undefined || typeof item.isTakeaway === "boolean") &&
     (item.selectedAttributes === undefined ||
       (Array.isArray(item.selectedAttributes) &&
         item.selectedAttributes.every(

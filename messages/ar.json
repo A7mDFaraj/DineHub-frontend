@@ -764,6 +764,7 @@
     "notePrefix": "ملاحظة",
     "optionsPrefix": "خيارات الطلبات",
     "generalNotePrefix": "ملاحظة عامة",
+    "takeaway": "سفري",
     "tableNotSpecified": "رقم الطاولة غير محدد",
     "orderFailed": "فشل إرسال الطلب، يرجى المحاولة مجدداً."
   },
@@ -772,6 +773,7 @@
     "quantity": "الكمية",
     "specialNote": "ملاحظات خاصة بهذا الطبق",
     "notePlaceholder": "مثال: بدون بصل، صوص جانبي…",
+    "takeaway": "سفري",
     "addToCart": "إضافة إلى السلة",
     "updateCart": "تحديث السلة"
   },

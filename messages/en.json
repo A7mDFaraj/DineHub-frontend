@@ -764,6 +764,7 @@
     "notePrefix": "Note",
     "optionsPrefix": "Order Options",
     "generalNotePrefix": "General Note",
+    "takeaway": "Takeaway",
     "tableNotSpecified": "Table number not specified",
     "orderFailed": "Order failed to send. Please try again."
   },
@@ -772,6 +773,7 @@
     "quantity": "Quantity",
     "specialNote": "Special instructions for this dish",
     "notePlaceholder": "e.g., no onions, sauce on the side…",
+    "takeaway": "Takeaway",
     "addToCart": "Add to Cart",
     "updateCart": "Update Cart"
   },

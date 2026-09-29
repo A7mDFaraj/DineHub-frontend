@@ -30,6 +30,32 @@ assert.match(prepared.note, /1× Burger: No onion/);
 assert.match(prepared.note, /2× Burger: Extra sauce/);
 assert.match(prepared.note, /1× Burger: Standard preparation/);
 assert.match(prepared.note, /General notes: Water please/);
+assert(store.getState().addItem({ ...item, isTakeaway: true }));
+prepared = prepareCheckout(store.getState().items, "Water please", false);
+assert.deepEqual(prepared.items, [
+  { productId, quantity: 5, expectedUnitPrice: 99.75 },
+]);
+assert.match(prepared.note, /1× Burger: Takeaway/);
+assert.equal(
+  store.getState().items.filter((line) => line.productId === productId).length,
+  4,
+);
+const takeawayId = store.getState().items.find((line) => line.isTakeaway).id;
+store.getState().setContext("takeaway-persistence-check");
+store.getState().setContext(context);
+assert.equal(
+  store.getState().items.find((line) => line.id === takeawayId).isTakeaway,
+  true,
+);
+assert.match(
+  prepareCheckout(
+    [store.getState().items.find((line) => line.id === takeawayId)],
+    "",
+    true,
+  ).note,
+  /1× برجر: سفري/,
+);
+store.getState().removeItem(takeawayId);
 assert.equal(store.getState().totalAmount(), 399);
 assert.equal(store.getState().addItem({ ...item, quantity: 96 }), false);
 assert.equal(store.getState().totalItems(), 4);

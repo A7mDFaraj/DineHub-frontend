@@ -204,13 +204,26 @@ async function fixture(page: Page) {
   );
   return state;
 }
-async function add(page: Page, ar: boolean, note: string) {
+async function add(
+  page: Page,
+  ar: boolean,
+  note: string,
+  takeaway = false,
+) {
   await page
     .getByRole("button", {
       name: ar ? "إضافة برجر" : "Add Burger",
       exact: true,
     })
     .click();
+  if (takeaway) {
+    await page
+      .getByRole("button", {
+        name: ar ? "سفري" : "Takeaway",
+        exact: true,
+      })
+      .click();
+  }
   await page.locator("#product-note").fill(note);
   await page
     .getByRole("button", { name: ar ? /إضافة إلى السلة/ : /Add to Cart/ })
@@ -228,10 +241,13 @@ for (const ar of [true, false]) {
     const state = await fixture(page);
     await page.goto(`${ar ? "" : "/en"}/menu/test-menu/7`);
     await add(page, ar, "No onion");
-    await add(page, ar, "Extra sauce");
+    await add(page, ar, "Extra sauce", true);
     await page.reload();
     await cart(page, ar);
     await expect(page.getByText("No onion", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(ar ? "سفري" : "Takeaway", { exact: true }),
+    ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath("cart.png"),
       fullPage: true,
@@ -263,6 +279,7 @@ for (const ar of [true, false]) {
     ]);
     expect(state.posts[0].payload.note).toContain("No onion");
     expect(state.posts[0].payload.note).toContain("Extra sauce");
+    expect(state.posts[0].payload.note).toContain(ar ? "سفري" : "Takeaway");
   });
 }
 for (const mode of ["lost", "malformed", "server"] as const) {
@@ -367,15 +384,21 @@ test("kitchen sees combined quantity and all instructions through handoff", asyn
   const state = await fixture(page);
   await page.goto("/en/menu/test-menu/7");
   await add(page, false, "No onion");
-  await add(page, false, "Extra sauce");
+  await add(page, false, "Extra sauce", true);
   await cart(page, false);
+  await expect(page.getByText("Takeaway", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "Send Order to Kitchen", exact: true })
     .click();
   await expect(page).toHaveURL(new RegExp(`/order/${token}$`));
   await page.goto("/en/staff");
   await expect(page.getByText(/1× Burger: No onion/)).toBeVisible();
-  await expect(page.getByText(/1× Burger: Extra sauce/)).toBeVisible();
+  await expect(
+    page.getByText(/1× Burger: Takeaway — Extra sauce/),
+  ).toBeVisible();
+  expect(state.posts[0].payload.items).toEqual([
+    { productId, quantity: 2, expectedUnitPrice: 99.75 },
+  ]);
   await page.getByRole("button", { name: "Accept & Start Prep" }).click();
   await page
     .getByRole("button", { name: "Ready for Pickup", exact: true })

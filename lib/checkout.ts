@@ -12,6 +12,7 @@ export interface CheckoutLine {
   quantity: number;
   selectedAttributes?: CartOption[];
   itemNote?: string;
+  isTakeaway?: boolean;
   unavailable?: boolean;
   previousPrice?: number;
 }
@@ -55,7 +56,10 @@ export function prepareCheckout(
   const customized = new Set(
     lines
       .filter(
-        (line) => line.itemNote?.trim() || line.selectedAttributes?.length,
+        (line) =>
+          line.isTakeaway ||
+          line.itemNote?.trim() ||
+          line.selectedAttributes?.length,
       )
       .map((line) => line.productId),
   );
@@ -89,6 +93,7 @@ export function prepareCheckout(
       const details = (line.selectedAttributes ?? []).map((option) =>
         optionLabel(option, ar),
       );
+      if (line.isTakeaway) details.unshift(ar ? "سفري" : "Takeaway");
       if (line.itemNote?.trim()) details.push(line.itemNote.trim());
       instructions.push(
         `• ${line.quantity}× ${name}: ${details.join(" — ") || (ar ? "بدون تخصيص" : "Standard preparation")}`,

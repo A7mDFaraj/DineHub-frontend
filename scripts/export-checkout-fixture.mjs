@@ -15,6 +15,7 @@ const { items, note, issues } = prepareCheckout(
       ...base,
       id: "custom",
       quantity: 2,
+      isTakeaway: true,
       itemNote: "No onion",
       selectedAttributes: [{ id: "sauce", labelAr: "صلصة", labelEn: "Sauce" }],
     },

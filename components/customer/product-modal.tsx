@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Plus, Minus, Check } from "lucide-react";
+import { X, Plus, Minus, Check, Package } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { FoodLabels } from "./food-labels";
 import { contrastInk } from "@/lib/menu-themes";
@@ -47,6 +47,7 @@ interface ProductModalProps {
     imageUrl?: string;
     selectedAttributes: CartOption[];
     itemNote?: string;
+    isTakeaway?: boolean;
   }) => boolean;
 }
 
@@ -66,6 +67,9 @@ export function ProductModal({
   const issue = useCartStore((state) => state.issue);
   const pending = useCartStore((state) => state.pending);
   const [itemNote, setItemNote] = useState(initialItem?.itemNote ?? "");
+  const [isTakeaway, setIsTakeaway] = useState(
+    initialItem?.isTakeaway ?? false,
+  );
   const [quantity, setQuantity] = useState(initialItem?.quantity ?? 1);
   const [previous, setPrevious] = useState({ isOpen, product });
   if (previous.isOpen !== isOpen || previous.product !== product) {
@@ -73,6 +77,7 @@ export function ProductModal({
     if (isOpen) {
       setSelectedAttributes(initialItem?.selectedAttributes ?? []);
       setItemNote(initialItem?.itemNote ?? "");
+      setIsTakeaway(initialItem?.isTakeaway ?? false);
       setQuantity(initialItem?.quantity ?? 1);
     }
   }
@@ -96,6 +101,7 @@ export function ProductModal({
       imageUrl: product.imageUrl,
       selectedAttributes,
       itemNote: itemNote.trim() || undefined,
+      isTakeaway,
     });
     if (accepted) onClose();
   };
@@ -217,15 +223,30 @@ export function ProductModal({
               >
                 {t("specialNote")}
               </label>
-              <textarea
-                id="product-note"
-                rows={2}
-                maxLength={500}
-                value={itemNote}
-                onChange={(e) => setItemNote(e.target.value)}
-                placeholder={t("notePlaceholder")}
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"
-              />
+              <div className="relative">
+                <textarea
+                  id="product-note"
+                  rows={3}
+                  maxLength={500}
+                  value={itemNote}
+                  onChange={(e) => setItemNote(e.target.value)}
+                  placeholder={t("notePlaceholder")}
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 p-3 pe-32 text-sm"
+                />
+                <button
+                  type="button"
+                  aria-pressed={isTakeaway}
+                  onClick={() => setIsTakeaway((current) => !current)}
+                  className={`absolute end-2 top-2 flex min-h-11 items-center gap-2 rounded-lg border px-3 text-xs font-bold shadow-sm transition-[background-color,border-color,color,scale] duration-150 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 ${
+                    isTakeaway
+                      ? "border-stone-900 bg-stone-900 text-white"
+                      : "border-stone-200 bg-white text-stone-700"
+                  }`}
+                >
+                  <Package size={16} strokeWidth={2} aria-hidden="true" />
+                  <span>{t("takeaway")}</span>
+                </button>
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 bg-stone-50 p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
