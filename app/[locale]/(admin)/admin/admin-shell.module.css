@@ -33,11 +33,17 @@
   transform: translateY(0);
 }
 
-.sidebar {
+.sidebarFrame {
   position: sticky;
   inset-block-start: 14px;
-  display: flex;
   height: calc(100svh - 28px);
+  min-width: 0;
+  z-index: 60;
+}
+
+.sidebar {
+  display: flex;
+  height: 100%;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -46,6 +52,113 @@
     radial-gradient(circle at 50% 0%, rgba(75, 47, 81, 0.32), transparent 45%),
     var(--admin-night);
   box-shadow: 0 26px 70px rgba(0, 0, 0, 0.25);
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 112px;
+  flex-shrink: 0;
+  padding: 20px 14px;
+}
+.sidebarHeader .brand {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+}
+.sidebarHeader .brand img {
+  width: 48px;
+  height: 48px;
+}
+.sidebarToggle {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 34px;
+  inset-inline-end: -22px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--admin-lilac);
+  cursor: pointer;
+}
+.sidebarToggle::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(223, 210, 235, 0.16);
+  border-radius: 50%;
+  background: rgba(223, 210, 235, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: background-color 140ms ease-out;
+}
+.sidebarToggle svg {
+  position: relative;
+}
+.sidebarToggle:hover::before {
+  background: var(--admin-plum);
+}
+.sidebarToggle:focus-visible {
+  outline: 3px solid var(--admin-coral);
+  outline-offset: 0;
+}
+
+@media (min-width: 861px) {
+  .shell[data-sidebar-collapsed="true"] {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+  .shell[data-sidebar-collapsed="true"] .sidebar .brand {
+    justify-content: center;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    flex: 0 0 auto;
+  }
+  .shell[data-sidebar-collapsed="true"] .sidebarHeader {
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 10px 16px;
+  }
+  .shell[data-sidebar-collapsed="true"] .sidebar .brand img {
+    width: 48px;
+    height: 48px;
+  }
+  .shell[data-sidebar-collapsed="true"] .sidebar .brand > span,
+  .shell[data-sidebar-collapsed="true"] .sidebar .navLabel,
+  .shell[data-sidebar-collapsed="true"] .sidebar .userCard > div,
+  .shell[data-sidebar-collapsed="true"] .sidebar .logoutButton > span {
+    display: none;
+  }
+  .shell[data-sidebar-collapsed="true"] .navigation {
+    padding-inline: 10px;
+  }
+  .shell[data-sidebar-collapsed="true"] .navLink {
+    grid-template-columns: 38px;
+    justify-content: center;
+    gap: 0;
+    padding: 6px 0;
+  }
+  .shell[data-sidebar-collapsed="true"] .navLink i {
+    position: absolute;
+    inset-inline-end: 3px;
+  }
+  .shell[data-sidebar-collapsed="true"] .sidebarFoot {
+    padding: 14px 10px;
+  }
+  .shell[data-sidebar-collapsed="true"] .userCard {
+    grid-template-columns: 40px;
+    justify-content: center;
+    gap: 0;
+    padding: 4px 0;
+  }
 }
 
 .brand {
@@ -129,7 +242,11 @@
   font-size: 0.94rem;
   font-weight: 500;
   line-height: 1.5;
-  transition: color 140ms ease-out, background-color 140ms ease-out, border-color 140ms ease-out, transform 150ms ease-out;
+  transition:
+    color 140ms ease-out,
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    transform 150ms ease-out;
 }
 
 .navLink:hover {
@@ -237,7 +354,11 @@
 }
 
 .guideQuestionMark {
-  font-family: var(--font-outfit), system-ui, -apple-system, sans-serif;
+  font-family:
+    var(--font-outfit),
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 1.15rem;
   font-weight: 750;
   line-height: 1;
@@ -260,7 +381,11 @@
   font-weight: 600;
   cursor: pointer;
   padding: 0 12px;
-  transition: background-color 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out, transform 150ms ease-out;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out,
+    transform 150ms ease-out;
 }
 
 .guideButton:hover {
@@ -323,7 +448,11 @@
   font-size: 0.8rem;
   font-weight: 650;
   cursor: pointer;
-  transition: background-color 140ms ease-out, border-color 140ms ease-out, color 140ms ease-out, transform 150ms ease-out;
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out,
+    transform 150ms ease-out;
 }
 
 .logoutButton:hover:not(:disabled) {
@@ -620,7 +749,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 860px) {
@@ -630,7 +761,7 @@
     overflow-x: hidden;
   }
 
-  .sidebar {
+  .sidebarFrame {
     display: none;
   }
 
@@ -700,6 +831,10 @@
   .logoutButton,
   .skipLink {
     transition-duration: 0.01ms;
+  }
+
+  .sidebarToggle::before {
+    transition: none;
   }
 
   .loadingSignal svg,

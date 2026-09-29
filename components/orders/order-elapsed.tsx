@@ -7,10 +7,12 @@ export function OrderElapsed({
   createdAt,
   deliveredAt,
   completed = false,
+  highlightDelayed = false,
 }: {
   createdAt: string;
   deliveredAt?: string | null;
   completed?: boolean;
+  highlightDelayed?: boolean;
 }) {
   const t = useTranslations("Staff.orderCard");
   const [now, setNow] = useState<number | null>(null);
@@ -44,6 +46,9 @@ export function OrderElapsed({
   return (
     <span className="tabular-nums">
       {completed ? t("totalTime") : t("elapsedTime")}: <bdi>{value}</bdi>
+      {highlightDelayed && !completed && seconds !== null && seconds > 900 && (
+        <strong className="staff-delayed">{t("delayed")}</strong>
+      )}
     </span>
   );
 }

@@ -392,10 +392,10 @@ test("kitchen sees combined quantity and all instructions through handoff", asyn
     .click();
   await expect(page).toHaveURL(new RegExp(`/order/${token}$`));
   await page.goto("/en/staff");
-  await expect(page.getByText(/1× Burger: No onion/)).toBeVisible();
-  await expect(
-    page.getByText(/1× Burger: Takeaway — Extra sauce/),
-  ).toBeVisible();
+  await expect(page.getByText("1× Burger", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("Takeaway", { exact: true })).toBeVisible();
+  await expect(page.getByText("No onion", { exact: true })).toBeVisible();
+  await expect(page.getByText("Extra sauce", { exact: true })).toBeVisible();
   expect(state.posts[0].payload.items).toEqual([
     { productId, quantity: 2, expectedUnitPrice: 99.75 },
   ]);

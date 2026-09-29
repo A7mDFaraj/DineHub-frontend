@@ -7,8 +7,15 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
+  ShoppingBag,
+  Check,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  parseOrderNote,
+  preparationSubject,
+  type PreparationLine,
+} from "@/lib/staff-order-note";
+export { parseOrderNote } from "@/lib/staff-order-note";
 import { useLocale, useTranslations } from "next-intl";
 
 import { OrderElapsed } from "@/components/orders/order-elapsed";
@@ -46,68 +53,72 @@ interface OrderCardProps {
   onStatusChange: (id: string, newStatus: OrderStatus) => void;
 }
 
-const statusConfig: Record<
-  OrderStatus,
-  {
-    statusKey: "statusPending" | "statusPreparing" | "statusReady" | "statusDelivered";
-    statusColor: string;
-    nextStatus: OrderStatus | null;
-    actionKey?: "actionPrepare" | "actionReady" | "actionDeliver";
-    actionButtonClass: string;
-  }
-> = {
+const statusConfig = {
   pending: {
     statusKey: "statusPending",
-    statusColor: "text-red-400",
     nextStatus: "preparing",
     actionKey: "actionPrepare",
-    actionButtonClass:
-      "bg-[#f2644b] hover:bg-[#ff735c] text-white shadow-[0_4px_16px_rgba(242,100,75,0.35)] active:scale-[0.96]",
   },
   preparing: {
     statusKey: "statusPreparing",
-    statusColor: "text-amber-400",
     nextStatus: "ready",
     actionKey: "actionReady",
-    actionButtonClass:
-      "bg-[#47aaa1] hover:bg-[#58bdb4] text-white shadow-[0_4px_16px_rgba(71,170,161,0.35)] active:scale-[0.96]",
   },
   ready: {
     statusKey: "statusReady",
-    statusColor: "text-emerald-400",
     nextStatus: "delivered",
     actionKey: "actionDeliver",
-    actionButtonClass:
-      "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_4px_16px_rgba(16,185,129,0.35)] active:scale-[0.96]",
   },
   delivered: {
     statusKey: "statusDelivered",
-    statusColor: "text-zinc-400",
     nextStatus: null,
-    actionButtonClass: "",
+    actionKey: null,
   },
-};
+} as const;
 
-function formatElapsedTime(
-  createdAt: string,
-  t: (key: string, values?: Record<string, string | number>) => string
-): {
-  label: string;
-  isDelayed: boolean;
-} {
-  const diffMs = Date.now() - new Date(createdAt).getTime();
-  const diffMins = Math.floor(diffMs / 60000);
+function Modifiers({ values }: { values: string[] }) {
+  const t = useTranslations("Staff.orderCard");
+  if (!values.length) return null;
+  return (
+    <section className="staff-modifiers" aria-label={t("modifiers")}>
+      <h4>{t("modifiers")}</h4>
+      <ul>
+        {values.map((value, index) => (
+          <li key={`${value}-${index}`}>
+            <Check size={16} aria-hidden="true" />
+            <span dir="auto">{value}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
-  if (diffMins < 1) return { label: t("timeNow"), isDelayed: false };
-  if (diffMins === 1) return { label: t("timeMin"), isDelayed: false };
-  if (diffMins === 2) return { label: t("time2Mins"), isDelayed: false };
-  if (diffMins <= 10)
-    return { label: t("timeFewMins", { count: diffMins }), isDelayed: false };
-  if (diffMins < 60)
-    return { label: t("timeManyMins", { count: diffMins }), isDelayed: diffMins > 15 };
-
-  const diffHours = Math.floor(diffMins / 60);
-  return { label: t("timeHours", { count: diffHours }), isDelayed: true };
+function PreparationDetails({ instruction }: { instruction: PreparationLine }) {
+  const t = useTranslations("Staff.orderCard");
+  return (
+    <>
+      {instruction.isTakeaway && (
+        <div className="staff-takeaway">
+          <ShoppingBag size={22} aria-hidden="true" />
+          <strong>{t("takeaway")}</strong>
+          <span>{t("packSeparately")}</span>
+        </div>
+      )}
+      <Modifiers values={instruction.modifiers} />
+      {!!instruction.details.length && (
+        <p className="staff-ticket-options" dir="auto">
+          {instruction.details.join(" — ")}
+        </p>
+      )}
+      {instruction.specialNote && (
+        <div className="staff-special-note">
+          <strong>{t("specialNote")}</strong>
+          <p dir="auto">{instruction.specialNote}</p>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function OrderCard({
@@ -119,159 +130,176 @@ export function OrderCard({
 }: OrderCardProps) {
   const locale = useLocale();
   const t = useTranslations("Staff.orderCard");
-  const isRtl = locale !== "en";
-
+  const isRtl = locale === "ar";
   const config = statusConfig[order.status];
-  const elapsed = formatElapsedTime(order.createdAt, t);
   const shortId = order.orderNumber?.toString().padStart(4, "0") ?? "—";
   const ChevronIcon = isRtl ? ChevronLeft : ChevronRight;
+  const parsedNote = parseOrderNote(order.note);
+  // Only merge when both the name and the entire portion count match.
+  // Ambiguous older notes remain visible in their original separate section.
+  const matched = new Set<PreparationLine>();
+  const portions = order.items.flatMap((item) => {
+    const names = [item.nameAr, item.nameEn].filter(Boolean);
+    const ambiguous = order.items.some(
+      (other) =>
+        other !== item &&
+        [other.nameAr, other.nameEn].some(
+          (name) => name && names.includes(name),
+        ),
+    );
+    const instructions = ambiguous
+      ? []
+      : parsedNote.preparation.filter((line) => {
+          const subject = preparationSubject(line.subject);
+          return subject && names.includes(subject.name);
+        });
+    const total = instructions.reduce(
+      (sum, line) => sum + preparationSubject(line.subject)!.quantity,
+      0,
+    );
+    if (instructions.length && total === item.quantity) {
+      return instructions.map((instruction) => {
+        matched.add(instruction);
+        return {
+          ...item,
+          quantity: preparationSubject(instruction.subject)!.quantity,
+          instruction,
+        };
+      });
+    }
+    return [{ ...item, instruction: undefined as PreparationLine | undefined }];
+  });
+  const unmatched = parsedNote.preparation.filter((line) => !matched.has(line));
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ duration: 0.2 }}
-      className="flex flex-col h-full rounded-2xl bg-[#1c1424] border border-white/[0.09] hover:border-white/[0.18] transition-colors shadow-[0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden"
-      style={{
-        fontFamily: isRtl
-          ? "var(--font-thmanyah), var(--font-arabic), sans-serif"
-          : "var(--font-outfit), sans-serif",
-      }}
+    <article
+      className="staff-ticket"
+      data-status={order.status}
+      aria-label={`${t("orderNumber")} ${shortId}`}
+      aria-busy={isUpdating}
     >
-      {/* Card Header: Table Number + Time */}
-      <div className="p-3.5 bg-white/[0.03] border-b border-white/[0.06] flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-[#f2644b]/20 border border-[#f2644b]/30 text-[#ff9d8c] flex items-center justify-center font-black text-base tabular-nums">
-            {order.tableId}
-          </div>
+      <header className="staff-ticket-header">
+        <div className="staff-ticket-identity">
           <div>
-            <div className="text-sm font-black text-white flex items-center gap-1.5">
-              <span>{t("table", { number: order.tableId })}</span>
-              <bdi className="text-base font-mono font-black text-white">
-                #{shortId}
-              </bdi>
-            </div>
-            <div className="text-[0.72rem] text-zinc-400 flex items-center gap-1 font-medium">
-              <Clock size={11} className="shrink-0" />
-              <OrderElapsed
-                createdAt={order.createdAt}
-                deliveredAt={order.deliveredAt}
-                completed={order.status === "delivered"}
-              />
-              {elapsed.isDelayed && order.status !== "delivered" && (
-                <span className="text-red-400 font-bold mx-1">{t("delayed")}</span>
-              )}
-            </div>
+            <span className="staff-ticket-caption">{t("orderNumber")}</span>
+            <h2>
+              <bdi>#{shortId}</bdi>
+            </h2>
+          </div>
+          <div className="staff-ticket-table">
+            <span>{t("tableLabel")}</span>
+            <strong>
+              <bdi>{order.tableId}</bdi>
+            </strong>
           </div>
         </div>
-
-        <span className={`text-xs font-black ${config.statusColor}`}>
-          {t(config.statusKey)}
-        </span>
-      </div>
-
-      {/* Card Content & Items */}
-      <div className="p-4 flex-1 overflow-y-auto space-y-3">
-        {/* Customer Notes */}
-        {order.note && (
-          <div className="bg-[#f2644b]/10 border border-[#f2644b]/20 rounded-xl p-2.5 text-xs space-y-1">
-            <div className="font-bold text-[#ff9d8c] flex items-center gap-1.5 text-[0.72rem]">
-              <MessageSquare size={13} className="shrink-0" />
-              <span>{t("notes")}</span>
-            </div>
-            <div className="text-zinc-200 text-xs leading-relaxed whitespace-pre-line">
-              {order.note}
-            </div>
-          </div>
-        )}
-
-        {/* Items List */}
-        <ul className="space-y-2 divide-y divide-white/[0.04]">
-          {order.items.map((item, idx) => {
-            const hasAttrs =
-              item.selectedAttributes && item.selectedAttributes.length > 0;
-            const itemName = isRtl
-              ? item.nameAr || item.nameEn || "عنصر"
-              : item.nameEn || item.nameAr || "Item";
-
-            return (
-              <li key={idx} className="pt-1.5 first:pt-0 space-y-0.5">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-black text-[#ff9d8c] text-xs font-mono tabular-nums shrink-0">
-                    {item.quantity}×
-                  </span>
-                  <span className="text-white font-bold text-xs sm:text-sm leading-snug">
-                    {itemName}
-                  </span>
+        <div className="staff-ticket-meta">
+          <span className="staff-ticket-status">{t(config.statusKey)}</span>
+          <Clock size={16} aria-hidden="true" />
+          <OrderElapsed
+            createdAt={order.createdAt}
+            deliveredAt={order.deliveredAt}
+            completed={order.status === "delivered"}
+            highlightDelayed
+          />
+        </div>
+      </header>
+      <div className="staff-ticket-body">
+        <ul className="staff-ticket-items" aria-label={t("items")}>
+          {portions.map((item, index) => (
+            <li key={`${item.productId}-${index}`}>
+              <div className="staff-ticket-item">
+                <span className="staff-ticket-quantity">
+                  <bdi>{item.quantity}×</bdi>
+                </span>
+                <h3 dir="auto">
+                  {isRtl
+                    ? item.nameAr || item.nameEn
+                    : item.nameEn || item.nameAr}
+                </h3>
+              </div>
+              {item.instruction && (
+                <PreparationDetails instruction={item.instruction} />
+              )}
+              <Modifiers values={item.selectedAttributes ?? []} />
+              {item.note && (
+                <div className="staff-special-note">
+                  <strong>{t("specialNote")}</strong>
+                  <p dir="auto">{item.note}</p>
                 </div>
-
-                {hasAttrs && (
-                  <div className={`flex flex-wrap gap-1 ${isRtl ? "mr-6" : "ml-6"}`}>
-                    {item.selectedAttributes!.map((attr, aIdx) => (
-                      <span
-                        key={aIdx}
-                        className="text-[9px] bg-white/[0.06] text-zinc-300 px-1.5 py-0.5 rounded font-medium"
-                      >
-                        {attr}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {item.note && (
-                  <div className={`text-[11px] text-zinc-400 italic ${isRtl ? "mr-6" : "ml-6"}`}>
-                    {item.note}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+              )}
+            </li>
+          ))}
         </ul>
+        {unmatched.length > 0 && (
+          <section
+            className="staff-preparation"
+            aria-label={t("preparationDetails")}
+          >
+            <h3 className="staff-section-label">{t("preparationDetails")}</h3>
+            {unmatched.map((instruction, index) => (
+              <div
+                className="staff-preparation-line"
+                key={`${instruction.subject}-${index}`}
+              >
+                <h4 dir="auto">{instruction.subject}</h4>
+                <PreparationDetails instruction={instruction} />
+              </div>
+            ))}
+          </section>
+        )}
+        {parsedNote.generalNote && (
+          <section className="staff-general-note" aria-label={t("notes")}>
+            <h3>
+              <MessageSquare size={18} aria-hidden="true" />
+              {t("notes")}
+            </h3>
+            <p dir="auto">{parsedNote.generalNote}</p>
+          </section>
+        )}
       </div>
-
-      {error && (
-        <p role="alert" className="px-4 pb-3 text-xs text-red-300">
-          {error}
-        </p>
-      )}
-      {order.status === "ready" && (
-        <p className="px-4 pb-3 text-xs text-emerald-300">
-          {t("statusReadyHint", { code: shortId })}
-        </p>
-      )}
-
-      {/* Card Action Footer */}
-      <div className="p-3 bg-white/[0.02] border-t border-white/[0.06] mt-auto">
+      <footer className="staff-ticket-footer">
+        {error && (
+          <p role="alert" className="staff-action-error">
+            {error}
+          </p>
+        )}
+        {order.status === "ready" && (
+          <p className="staff-ready-hint">
+            {t("statusReadyHint", { code: shortId })}
+          </p>
+        )}
         {config.nextStatus && canUpdate ? (
           <button
             type="button"
             disabled={isUpdating}
-            aria-busy={isUpdating}
             onClick={() => onStatusChange(order.id, config.nextStatus!)}
-            className={`w-full min-h-[48px] rounded-xl font-black text-xs sm:text-sm px-4 flex items-center justify-between transition-all disabled:opacity-60 disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${config.actionButtonClass}`}
+            className="staff-ticket-action"
           >
-            <span>
-              {isUpdating ? t("updating") : config.actionKey ? t(config.actionKey) : ""}
-            </span>
+            <span>{isUpdating ? t("updating") : t(config.actionKey!)}</span>
             {isUpdating ? (
-              <Loader2 size={18} className="animate-spin" />
+              <Loader2
+                size={22}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
             ) : (
-              <ChevronIcon size={18} />
+              <ChevronIcon size={22} aria-hidden="true" />
             )}
           </button>
         ) : (
-          <div className="w-full min-h-[38px] rounded-xl bg-white/[0.03] text-zinc-400 flex items-center justify-center gap-1.5 text-xs font-bold">
-            <CheckCircle2 size={14} className="text-emerald-400" />
+          <p className="staff-ticket-complete">
+            {order.status === "delivered" && (
+              <CheckCircle2 size={20} aria-hidden="true" />
+            )}
             <span>
               {order.status === "delivered"
                 ? t("deliveredBadge")
                 : t("waitingBadge")}
             </span>
-          </div>
+          </p>
         )}
-      </div>
-    </motion.div>
+      </footer>
+    </article>
   );
 }

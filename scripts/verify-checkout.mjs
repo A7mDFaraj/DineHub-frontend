@@ -26,8 +26,8 @@ assert.deepEqual(prepared.issues, []);
 assert.deepEqual(prepared.items, [
   { productId, quantity: 4, expectedUnitPrice: 99.75 },
 ]);
-assert.match(prepared.note, /1× Burger: No onion/);
-assert.match(prepared.note, /2× Burger: Extra sauce/);
+assert.match(prepared.note, /1× Burger: Special note: No onion/);
+assert.match(prepared.note, /2× Burger: Special note: Extra sauce/);
 assert.match(prepared.note, /1× Burger: Standard preparation/);
 assert.match(prepared.note, /General notes: Water please/);
 assert(store.getState().addItem({ ...item, isTakeaway: true }));

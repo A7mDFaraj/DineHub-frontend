@@ -188,7 +188,10 @@
     "sessionErrorDesc": "Check your connection and try again.",
     "unauthorizedTitle": "Page Restricted",
     "unauthorizedDesc": "Please choose an authorized page from the menu.",
-    "adminRole": "Admin"
+    "adminRole": "Admin",
+    "accountSecurity": "Account Security",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar"
   },
   "AdminLogin": {
     "pageTitle": "Admin Portal",
@@ -287,7 +290,8 @@
     "trendDetails": "View daily breakdown",
     "trendOrdersCount": "{count} orders",
     "trendEmpty": "No orders in this period.",
-    "errorLoad": "Failed to load performance metrics. Please retry."
+    "errorLoad": "Failed to load performance metrics. Please retry.",
+    "openOrders": "Open live orders"
   },
   "AdminBranches": {
     "pageTitle": "Branches",
@@ -670,8 +674,10 @@
     "updateError": "Failed to confirm update. Checking order state; verify before retrying.",
     "orderCard": {
       "table": "Table {number}",
-      "delayed": "⚠️ Delayed",
-      "notes": "Order Notes:",
+      "delayed": "Over 15 min",
+      "notes": "General note",
+      "preparationDetails": "Item instructions",
+      "takeaway": "Takeaway",
       "statusPending": "New",
       "statusPreparing": "In Prep",
       "statusReady": "Ready",
@@ -690,8 +696,29 @@
       "timeManyMins": "{count} mins ago",
       "timeHours": "{count}h ago",
       "totalTime": "Total Time",
-      "elapsedTime": "Elapsed Time"
-    }
+      "elapsedTime": "Elapsed Time",
+      "specialNote": "Special note",
+      "orderNumber": "Order",
+      "tableLabel": "Table",
+      "items": "Ordered items",
+      "packSeparately": "Pack to go",
+      "modifiers": "Modifiers & add-ons"
+    },
+    "filterOrders": "Order status",
+    "searchOrders": "Search order, table or dish",
+    "clearSearch": "Clear search",
+    "oldestFirst": "Oldest first within each stage",
+    "retry": "Try again",
+    "noSearchResults": "No matching orders",
+    "tryAnotherSearch": "Try a different order number, table or dish.",
+    "loadOlder": "Load older orders",
+    "orderPages": "Order pages",
+    "showingOrders": "Showing {from}–{to} of {total} orders",
+    "pageOf": "{page} of {total}",
+    "previous": "Previous",
+    "next": "Next",
+    "previousOrders": "Previous orders",
+    "nextOrders": "Next orders"
   },
   "AccountPassword": {
     "pageTitle": "Account Security & Password Setup",

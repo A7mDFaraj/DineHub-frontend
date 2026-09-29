@@ -188,7 +188,10 @@
     "sessionErrorDesc": "تحقق من اتصالك، ثم أعد المحاولة.",
     "unauthorizedTitle": "هذه الصفحة غير متاحة لحسابك",
     "unauthorizedDesc": "اختر إحدى الصفحات المسموح بها من القائمة.",
-    "adminRole": "الإدارة"
+    "adminRole": "الإدارة",
+    "accountSecurity": "أمان الحساب",
+    "collapseSidebar": "تصغير القائمة الجانبية",
+    "expandSidebar": "توسيع القائمة الجانبية"
   },
   "AdminLogin": {
     "pageTitle": "دخول الإدارة",
@@ -287,7 +290,8 @@
     "trendDetails": "عرض الأرقام اليومية",
     "trendOrdersCount": "{count} طلب",
     "trendEmpty": "لا توجد طلبات في هذه الفترة.",
-    "errorLoad": "تعذر تحميل مؤشرات الأداء. حاول مجدداً."
+    "errorLoad": "تعذر تحميل مؤشرات الأداء. حاول مجدداً.",
+    "openOrders": "فتح الطلبات المباشرة"
   },
   "AdminBranches": {
     "pageTitle": "الفروع",
@@ -670,8 +674,10 @@
     "updateError": "تعذر تأكيد التحديث. سنحدّث حالة الطلب؛ تحقق منها قبل المحاولة مجدداً.",
     "orderCard": {
       "table": "طاولة {number}",
-      "delayed": "⚠️ تأخير",
-      "notes": "ملاحظات الطلب:",
+      "delayed": "أكثر من ١٥ دقيقة",
+      "notes": "ملاحظة عامة",
+      "preparationDetails": "تعليمات الأصناف",
+      "takeaway": "سفري",
       "statusPending": "جديد",
       "statusPreparing": "قيد التجهيز",
       "statusReady": "جاهز للتسليم",
@@ -690,8 +696,29 @@
       "timeManyMins": "منذ {count} دقيقة",
       "timeHours": "منذ {count} ساعة",
       "totalTime": "إجمالي الوقت",
-      "elapsedTime": "الوقت منذ الطلب"
-    }
+      "elapsedTime": "الوقت منذ الطلب",
+      "specialNote": "ملاحظة خاصة",
+      "orderNumber": "طلب",
+      "tableLabel": "الطاولة",
+      "items": "الأصناف المطلوبة",
+      "packSeparately": "يُجهّز للتغليف",
+      "modifiers": "الإضافات والخيارات المختارة"
+    },
+    "filterOrders": "حالة الطلب",
+    "searchOrders": "ابحث برقم الطلب أو الطاولة أو الطبق",
+    "clearSearch": "مسح البحث",
+    "oldestFirst": "الأقدم أولاً في كل مرحلة",
+    "retry": "إعادة المحاولة",
+    "noSearchResults": "لا توجد طلبات مطابقة",
+    "tryAnotherSearch": "جرّب رقم طلب أو طاولة أو طبق آخر.",
+    "loadOlder": "تحميل طلبات أقدم",
+    "orderPages": "صفحات الطلبات",
+    "showingOrders": "عرض {from}–{to} من {total} طلب",
+    "pageOf": "{page} من {total}",
+    "previous": "السابق",
+    "next": "التالي",
+    "previousOrders": "الطلبات السابقة",
+    "nextOrders": "الطلبات التالية"
   },
   "AccountPassword": {
     "pageTitle": "أمان الحساب وإعداد كلمة المرور",

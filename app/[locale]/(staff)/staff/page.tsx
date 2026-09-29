@@ -8,9 +8,13 @@ import { apiClient } from "@/lib/api-client";
 import { reconcileOrders } from "@/lib/order-reconciliation";
 import { subscribeToEvents } from "@/lib/event-stream";
 import { OrderCard, Order } from "@/components/staff/order-card";
+import {
+  OrderPagination,
+  ORDERS_PER_PAGE,
+} from "@/components/staff/order-pagination";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { AnimatePresence } from "framer-motion";
-import { Building2, ChevronDown, Inbox, RefreshCw } from "lucide-react";
+import "./staff.css";
+import { Building2, Inbox, RefreshCw, Search, X } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 
 interface Branch {
@@ -65,7 +69,11 @@ function readBranches(data: unknown): Branch[] {
 function readOrders(data: unknown): RawOrder[] {
   if (Array.isArray(data)) return data as RawOrder[];
   if (!data || typeof data !== "object") return [];
-  const envelope = data as { data?: unknown; orders?: unknown; items?: unknown };
+  const envelope = data as {
+    data?: unknown;
+    orders?: unknown;
+    items?: unknown;
+  };
   if (Array.isArray(envelope.data)) return envelope.data as RawOrder[];
   if (Array.isArray(envelope.orders)) return envelope.orders as RawOrder[];
   if (Array.isArray(envelope.items)) return envelope.items as RawOrder[];
@@ -87,8 +95,17 @@ function normalizeOrders(rawOrders: RawOrder[]): Order[] {
     items: Array.isArray(order.items)
       ? order.items.map((item) => ({
           productId: item.productId ?? item.id ?? "unknown-product",
-          nameAr: item.nameArAtOrder ?? item.product?.nameAr ?? item.nameAr ?? item.name,
-          nameEn: item.nameEnAtOrder ?? item.product?.nameEn ?? item.nameEn ?? item.name ?? "item",
+          nameAr:
+            item.nameArAtOrder ??
+            item.product?.nameAr ??
+            item.nameAr ??
+            item.name,
+          nameEn:
+            item.nameEnAtOrder ??
+            item.product?.nameEn ??
+            item.nameEn ??
+            item.name ??
+            "item",
           quantity: item.quantity ?? 1,
           note: item.note,
           selectedAttributes: item.selectedAttributes ?? [],
@@ -117,6 +134,9 @@ export default function StaffDashboard() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [requestedPage, setRequestedPage] = useState(0);
+  const boardTop = useRef<HTMLDivElement>(null);
 
   const fetchingBranches = useRef(new Set<string>());
   const queuedRefresh = useRef(new Set<string>());
@@ -136,6 +156,7 @@ export default function StaffDashboard() {
       const { data } = await apiClient.get("/staff/branches");
       const list = readBranches(data);
       setBranches(list);
+      setError("");
       setSelectedBranchId((current) =>
         list.some((branch) => branch.id === current)
           ? current
@@ -144,12 +165,7 @@ export default function StaffDashboard() {
       if (list.length === 0) setLoading(false);
     } catch (err: unknown) {
       console.error("Failed to load branches:", err);
-      setError(
-        requestMessage(
-          err,
-          t("loadBranchesError"),
-        ),
-      );
+      setError(requestMessage(err, t("loadBranchesError")));
       setLoading(false);
     }
   }, [t]);
@@ -172,24 +188,45 @@ export default function StaffDashboard() {
               apiClient.get(`/staff/orders/${branchId}`),
               apiClient.get(`/staff/orders/${branchId}/history`),
             ]);
-            if (version !== requestVersion.current || branchRef.current !== branchId) continue;
+            if (
+              version !== requestVersion.current ||
+              branchRef.current !== branchId
+            )
+              continue;
             const live = readOrders(liveRes.data);
-            const liveIds = new Set(live.map(order => order.id));
-            const received = [...live, ...readOrders(historyRes.data).filter(order => !liveIds.has(order.id))];
-            setOrders(previous => reconcileOrders(previous, normalizeOrders(received), pendingRef.current));
+            const liveIds = new Set(live.map((order) => order.id));
+            const received = [
+              ...live,
+              ...readOrders(historyRes.data).filter(
+                (order) => !liveIds.has(order.id),
+              ),
+            ];
+            setOrders((previous) =>
+              reconcileOrders(
+                previous,
+                normalizeOrders(received),
+                pendingRef.current,
+              ),
+            );
             if (historyCursor.current === undefined) {
               historyCursor.current = historyRes.data.nextCursor ?? null;
               setHasMoreHistory(!!historyCursor.current);
             }
             setError("");
           } catch (err: unknown) {
-            if (version === requestVersion.current && branchRef.current === branchId) {
+            if (
+              version === requestVersion.current &&
+              branchRef.current === branchId
+            ) {
               setError(requestMessage(err, t("loadOrdersError")));
             }
           } finally {
             if (version === requestVersion.current) setLoading(false);
           }
-        } while (queuedRefresh.current.has(branchId) && branchRef.current === branchId);
+        } while (
+          queuedRefresh.current.has(branchId) &&
+          branchRef.current === branchId
+        );
       } finally {
         fetchingBranches.current.delete(branchId);
         if (isManual) setIsRefreshing(false);
@@ -206,18 +243,23 @@ export default function StaffDashboard() {
     historyInFlight.current = true;
     setLoadingHistory(true);
     try {
-      const { data } = await apiClient.get(`/staff/orders/${branchId}/history`, { params: { cursor } });
-      if (epoch !== branchEpoch.current || branchRef.current !== branchId) return;
+      const { data } = await apiClient.get(
+        `/staff/orders/${branchId}/history`,
+        { params: { cursor } },
+      );
+      if (epoch !== branchEpoch.current || branchRef.current !== branchId)
+        return;
       const older = normalizeOrders(readOrders(data));
-      setOrders(previous => {
-        const ids = new Set(previous.map(order => order.id));
-        return [...previous, ...older.filter(order => !ids.has(order.id))];
+      setOrders((previous) => {
+        const ids = new Set(previous.map((order) => order.id));
+        return [...previous, ...older.filter((order) => !ids.has(order.id))];
       });
       historyCursor.current = data.nextCursor ?? null;
       setHasMoreHistory(!!historyCursor.current);
       setError("");
     } catch (err) {
-      if (epoch === branchEpoch.current) setError(requestMessage(err, t("loadOrdersError")));
+      if (epoch === branchEpoch.current)
+        setError(requestMessage(err, t("loadOrdersError")));
     } finally {
       historyInFlight.current = false;
       setLoadingHistory(false);
@@ -249,19 +291,21 @@ export default function StaffDashboard() {
     const closeStream = subscribeToEvents(
       `/staff/orders/${encodeURIComponent(selectedBranchId)}/stream`,
       (event) => {
-      if (event.type === "unavailable") {
-        ++requestVersion.current;
-        setOrders([]);
-        setError(t("loadOrdersError"));
-        return;
-      }
-      if (event.type !== "connected" && !event.type.startsWith("order.")) return;
-      if (event.id && seenEvents.has(event.id)) return;
-      if (event.id) {
-        seenEvents.add(event.id);
-        if (seenEvents.size > 500) seenEvents.delete(seenEvents.values().next().value!);
-      }
-      refreshOrders();
+        if (event.type === "unavailable") {
+          ++requestVersion.current;
+          setOrders([]);
+          setError(t("loadOrdersError"));
+          return;
+        }
+        if (event.type !== "connected" && !event.type.startsWith("order."))
+          return;
+        if (event.id && seenEvents.has(event.id)) return;
+        if (event.id) {
+          seenEvents.add(event.id);
+          if (seenEvents.size > 500)
+            seenEvents.delete(seenEvents.values().next().value!);
+        }
+        refreshOrders();
       },
     );
     const intervalId = window.setInterval(refreshOrders, 60_000);
@@ -321,7 +365,19 @@ export default function StaffDashboard() {
     all: orders.length,
   };
 
+  const query = search.trim().toLocaleLowerCase();
   const filteredOrders = orders
+    .filter(
+      (order) =>
+        !query ||
+        [
+          order.orderNumber?.toString().padStart(4, "0"),
+          order.tableId,
+          ...order.items.flatMap((item) => [item.nameAr, item.nameEn]),
+        ].some((value) =>
+          value?.toLocaleLowerCase().includes(query.replace(/^#/, "")),
+        ),
+    )
     .filter((o) => {
       if (statusFilter === "active") return o.status !== "delivered";
       if (statusFilter === "all") return true;
@@ -336,186 +392,230 @@ export default function StaffDashboard() {
     });
 
   const isAdmin = can("branches.all");
+  const page = Math.min(
+    requestedPage,
+    Math.max(0, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE) - 1),
+  );
+  const visibleOrders = filteredOrders.slice(
+    page * ORDERS_PER_PAGE,
+    (page + 1) * ORDERS_PER_PAGE,
+  );
+  const changePage = (next: number) => {
+    setRequestedPage(next);
+    boardTop.current?.focus({ preventScroll: true });
+    boardTop.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  };
 
   return (
-    <div className="space-y-4 pb-16">
-      {/* Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#181120] border border-white/[0.08] p-3 sm:p-4 rounded-2xl">
-        <h1 className="text-lg sm:text-xl font-black text-white">
-          {t("incomingOrders")}
-        </h1>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Admin Branch Selector / Fixed Assigned Branch */}
-          {isAdmin && branches.length > 1 ? (
-            <div className="relative flex items-center bg-white/[0.05] border border-white/[0.1] rounded-xl px-3 py-1.5">
-              <Building2 size={13} className={`text-[#8cd1ca] ${isRtl ? "ml-2" : "mr-2"} shrink-0`} />
-              <select
-                value={selectedBranchId}
-                onChange={(e) => {
-                  branchRef.current = e.target.value;
-                  ++requestVersion.current;
-                  historyCursor.current = undefined;
-                  setHasMoreHistory(false);
-                  ++branchEpoch.current;
-                  setOrders([]);
-                  setError("");
-                  setLoading(true);
-                  setSelectedBranchId(e.target.value);
-                }}
-                className={`bg-transparent text-xs sm:text-sm text-white font-bold focus:outline-none cursor-pointer appearance-none ${isRtl ? "pl-6 pr-1" : "pr-6 pl-1"}`}
-              >
-                {branches.map((b) => (
-                  <option
-                    key={b.id}
-                    value={b.id}
-                    className="bg-[#1a1222] text-white"
-                  >
-                    {isRtl
-                      ? b.nameAr || b.name || b.nameEn || "فرع"
-                      : b.nameEn || b.name || b.nameAr || "Branch"}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className={`text-zinc-400 absolute ${isRtl ? "left-2" : "right-2"} pointer-events-none`}
-              />
+    <div className="staff-board">
+      <section className="staff-board-heading">
+        <h1>{t("incomingOrders")}</h1>
+        <div className="staff-board-controls">
+          {branches.length > 0 && (
+            <div className="staff-branch">
+              <Building2 size={19} aria-hidden="true" />
+              {isAdmin && branches.length > 1 ? (
+                <select
+                  aria-label={t("assignedBranch")}
+                  value={selectedBranchId}
+                  onChange={(event) => {
+                    branchRef.current = event.target.value;
+                    ++requestVersion.current;
+                    historyCursor.current = undefined;
+                    setHasMoreHistory(false);
+                    ++branchEpoch.current;
+                    setOrders([]);
+                    setRequestedPage(0);
+                    setError("");
+                    setLoading(true);
+                    setSelectedBranchId(event.target.value);
+                  }}
+                >
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {isRtl
+                        ? branch.nameAr || branch.name || branch.nameEn
+                        : branch.nameEn || branch.name || branch.nameAr}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span>
+                  {isRtl
+                    ? branches[0].nameAr ||
+                      branches[0].name ||
+                      branches[0].nameEn
+                    : branches[0].nameEn ||
+                      branches[0].name ||
+                      branches[0].nameAr}
+                </span>
+              )}
             </div>
-          ) : branches[0] ? (
-            <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white font-bold">
-              <Building2 size={13} className="text-[#8cd1ca]" />
-              <span>
-                {isRtl
-                  ? branches[0].nameAr || branches[0].name || branches[0].nameEn || t("assignedBranch")
-                  : branches[0].nameEn || branches[0].name || branches[0].nameAr || t("assignedBranch")}
-              </span>
-            </div>
-          ) : null}
-
-          {/* Refresh Button */}
+          )}
           <button
+            className="staff-refresh"
             type="button"
             onClick={() =>
-              selectedBranchId && fetchOrders(selectedBranchId, true)
+              selectedBranchId
+                ? void fetchOrders(selectedBranchId, true)
+                : void fetchBranches()
             }
-            disabled={isRefreshing || !selectedBranchId}
-            className="h-9 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            title={t("refresh")}
+            disabled={isRefreshing || loading}
+            aria-busy={isRefreshing}
           >
             <RefreshCw
-              size={13}
-              className={isRefreshing ? "animate-spin text-[#8cd1ca]" : ""}
+              size={19}
+              className={
+                isRefreshing ? "animate-spin motion-reduce:animate-none" : ""
+              }
+              aria-hidden="true"
             />
             <span>{t("refresh")}</span>
           </button>
         </div>
+      </section>
+      <div
+        className="staff-filters"
+        role="group"
+        aria-label={t("filterOrders")}
+      >
+        {(
+          [
+            "active",
+            "pending",
+            "preparing",
+            "ready",
+            "delivered",
+            "all",
+          ] as const
+        ).map((status) => (
+          <button
+            type="button"
+            key={status}
+            aria-pressed={statusFilter === status}
+            data-status={status}
+            onClick={() => {
+              setStatusFilter(status);
+              setRequestedPage(0);
+            }}
+          >
+            <span>{t(`tabs.${status}`)}</span>
+            <strong>{loading ? "—" : counts[status]}</strong>
+          </button>
+        ))}
       </div>
-
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {[
-          { id: "active", label: t("tabs.active"), count: counts.active },
-          { id: "pending", label: t("tabs.pending"), count: counts.pending },
-          { id: "preparing", label: t("tabs.preparing"), count: counts.preparing },
-          { id: "ready", label: t("tabs.ready"), count: counts.ready },
-          { id: "delivered", label: t("tabs.delivered"), count: counts.delivered },
-          { id: "all", label: t("tabs.all"), count: counts.all },
-        ].map((tab) => {
-          const isActive = statusFilter === tab.id;
-          return (
+      <div className="staff-board-toolbar" ref={boardTop} tabIndex={-1}>
+        <label className="staff-search">
+          <Search size={20} aria-hidden="true" />
+          <span className="sr-only">{t("searchOrders")}</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setRequestedPage(0);
+            }}
+            placeholder={t("searchOrders")}
+          />
+          {search && (
             <button
-              key={tab.id}
-              onClick={() => setStatusFilter(tab.id as StatusFilter)}
-              className={`min-h-[38px] px-3.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all whitespace-nowrap shrink-0 ${
-                isActive
-                  ? "bg-[#f2644b] text-white border-transparent shadow-[0_4px_16px_rgba(242,100,75,0.35)]"
-                  : "bg-white/[0.04] text-zinc-400 border-white/[0.08] hover:bg-white/[0.08] hover:text-white"
-              }`}
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setRequestedPage(0);
+              }}
+              aria-label={t("clearSearch")}
             >
-              <span>{tab.label}</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-extrabold tabular-nums ${
-                  isActive
-                    ? "bg-black/25 text-white"
-                    : "bg-white/[0.08] text-zinc-300"
-                }`}
-              >
-                {tab.count}
-              </span>
+              <X size={18} aria-hidden="true" />
             </button>
-          );
-        })}
+          )}
+        </label>
+        <p className="staff-sort-label">{t("oldestFirst")}</p>
       </div>
-
-      {/* Error Alert */}
+      <OrderPagination
+        page={page}
+        total={filteredOrders.length}
+        onPageChange={changePage}
+      />
       {error && (
-        <div
-          role="alert"
-          className="bg-red-500/15 border border-red-500/30 text-red-300 px-4 py-3 rounded-2xl text-xs font-bold"
-        >
-          {error}
+        <div role="alert" className="staff-board-error">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() =>
+              selectedBranchId
+                ? void fetchOrders(selectedBranchId, true)
+                : void fetchBranches()
+            }
+            disabled={isRefreshing}
+          >
+            {t("retry")}
+          </button>
         </div>
       )}
-
-      {/* Main Grid or Loading / Empty States */}
       {loading && orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 gap-3 text-zinc-400">
+        <div className="staff-board-empty" role="status">
           <LoadingSpinner size={36} />
-          <p className="text-xs font-bold">{t("loadingOrders")}</p>
+          <p>{t("loadingOrders")}</p>
         </div>
       ) : branches.length === 0 ? (
-        <div className="bg-[#1c1424] border border-white/[0.08] p-12 text-center rounded-2xl">
-          <p className="text-zinc-400 text-sm">
+        <div className="staff-board-empty">
+          <Building2 size={32} aria-hidden="true" />
+          <p>
             {session?.user?.role === "cashier"
               ? t("noBranchesAssigned")
               : t("noBranchesCreated")}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4.5 items-start">
-          <AnimatePresence initial={false}>
-            {filteredOrders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                canUpdate={can(
-                  order.status === "pending"
-                    ? "orders.prepare"
-                    : order.status === "preparing"
-                      ? "orders.ready"
-                      : "orders.deliver",
-                )}
-                isUpdating={pendingIds.has(order.id)}
-                error={actionErrors[order.id]}
-                onStatusChange={handleStatusChange}
-              />
-            ))}
-          </AnimatePresence>
-
+        <div className="staff-ticket-grid">
+          {visibleOrders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              canUpdate={can(
+                order.status === "pending"
+                  ? "orders.prepare"
+                  : order.status === "preparing"
+                    ? "orders.ready"
+                    : "orders.deliver",
+              )}
+              isUpdating={pendingIds.has(order.id)}
+              error={actionErrors[order.id]}
+              onStatusChange={handleStatusChange}
+            />
+          ))}
           {filteredOrders.length === 0 && (
-            <div className="col-span-full py-16 text-center bg-[#1c1424] border border-white/[0.08] rounded-2xl flex flex-col items-center justify-center gap-2">
-              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-400 mb-1">
-                <Inbox size={22} />
-              </div>
-              <p className="text-base font-bold text-white">
-                {t("emptyTitle")}
-              </p>
-              <p className="text-xs text-zinc-400 max-w-sm">
-                {statusFilter === "delivered"
-                  ? t("emptyDelivered")
-                  : t("emptyLive")}
+            <div className="staff-board-empty">
+              <Inbox size={34} aria-hidden="true" />
+              <h2>{search ? t("noSearchResults") : t("emptyTitle")}</h2>
+              <p>
+                {search
+                  ? t("tryAnotherSearch")
+                  : statusFilter === "delivered"
+                    ? t("emptyDelivered")
+                    : t("emptyLive")}
               </p>
             </div>
           )}
         </div>
       )}
-      {hasMoreHistory && (statusFilter === "delivered" || statusFilter === "all") && (
-        <button type="button" onClick={() => void loadMoreHistory()} disabled={loadingHistory}
-          className="min-h-11 rounded-xl border border-white/10 px-5 text-sm font-bold text-white disabled:opacity-50">
-          {loadingHistory ? t("loadingOrders") : isRtl ? "تحميل طلبات أقدم" : "Load older orders"}
-        </button>
-      )}
+      <OrderPagination
+        page={page}
+        total={filteredOrders.length}
+        onPageChange={changePage}
+      />
+      {hasMoreHistory &&
+        (statusFilter === "delivered" || statusFilter === "all") && (
+          <button
+            type="button"
+            className="staff-refresh"
+            onClick={() => void loadMoreHistory()}
+            disabled={loadingHistory}
+          >
+            {loadingHistory ? t("loadingOrders") : t("loadOlder")}
+          </button>
+        )}
     </div>
   );
 }

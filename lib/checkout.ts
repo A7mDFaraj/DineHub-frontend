@@ -90,11 +90,15 @@ export function prepareCheckout(
       });
     if (customized.has(line.productId)) {
       const name = ar ? line.nameAr || line.nameEn : line.nameEn || line.nameAr;
-      const details = (line.selectedAttributes ?? []).map((option) =>
-        optionLabel(option, ar),
+      const details = (line.selectedAttributes ?? []).map(
+        (option) =>
+          `${ar ? "إضافة مختارة" : "Selected option"}: ${optionLabel(option, ar)}`,
       );
       if (line.isTakeaway) details.unshift(ar ? "سفري" : "Takeaway");
-      if (line.itemNote?.trim()) details.push(line.itemNote.trim());
+      if (line.itemNote?.trim())
+        details.push(
+          `${ar ? "ملاحظة خاصة" : "Special note"}: ${line.itemNote.trim()}`,
+        );
       instructions.push(
         `• ${line.quantity}× ${name}: ${details.join(" — ") || (ar ? "بدون تخصيص" : "Standard preparation")}`,
       );
