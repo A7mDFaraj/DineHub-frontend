@@ -1,6 +1,8 @@
 "use client";
 
 import { apiErrorMessage } from "@/lib/api-error";
+import dynamic from "next/dynamic";
+import { useAccess } from "@/lib/access-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
@@ -37,6 +39,11 @@ interface Category {
   nameEn?: string;
   nameAr?: string;
 }
+
+const MenuPhotoImport = dynamic(
+  () => import("@/components/admin/menu-photo-import"),
+  { ssr: false },
+);
 
 interface Attribute {
   id: string;
@@ -109,6 +116,8 @@ export default function MenuManagementPage() {
   const tCommon = useTranslations("AdminCommon");
 
   const { selectedBranchId } = useAdminBranch();
+  const { can } = useAccess();
+  const [photoImportBranch, setPhotoImportBranch] = useState<string | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -492,6 +501,16 @@ export default function MenuManagementPage() {
 
         <div className={styles.headerControls}>
           <AdminBranchSelector className={styles.branchSelectWrap} />
+          {can("menu.create") && (
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              disabled={!selectedBranchId}
+              onClick={() => setPhotoImportBranch(selectedBranchId)}
+            >
+              {isRtl ? "استيراد من صورة" : "Import photo"}
+            </button>
+          )}
           <button
             type="button"
             className={styles.createButton}
@@ -503,6 +522,16 @@ export default function MenuManagementPage() {
           </button>
         </div>
       </header>
+
+      {photoImportBranch && photoImportBranch === selectedBranchId && (
+        <MenuPhotoImport
+          key={photoImportBranch}
+          branchId={photoImportBranch}
+          isRtl={isRtl}
+          onClose={() => setPhotoImportBranch(null)}
+          onImported={() => { void fetchMenuData(photoImportBranch); }}
+        />
+      )}
 
       {successMsg && (
         <div className={styles.successBanner} role="status">

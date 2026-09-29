@@ -1,0 +1,32 @@
+diff --git a/src/createWorker.js b/src/createWorker.js
+index 89b53b89b27f6579155ed2a0ef372fa8c2a8b8e6..5186ea644a703b48132b6a4ee8711eb40efa0972 100644
+--- a/src/createWorker.js
++++ b/src/createWorker.js
+@@ -21,6 +21,7 @@ module.exports = async (langs = 'eng', oem = OEM.LSTM_ONLY, _options = {}, confi
+   const {
+     logger,
+     errorHandler,
++    onWorker,
+     ...options
+   } = resolvePaths({
+     ...defaultOptions,
+@@ -45,6 +46,7 @@ module.exports = async (langs = 'eng', oem = OEM.LSTM_ONLY, _options = {}, confi
+ 
+   let worker = spawnWorker(options);
+   worker.onerror = workerError;
++  if (onWorker) onWorker(worker);
+ 
+   workerCounter += 1;
+ 
+diff --git a/src/index.d.ts b/src/index.d.ts
+index 2c9689db387906b7ce272ae15005f8b9aa56a269..6c3c5e919b73308e75bb8d3e22eb059a768da42f 100644
+--- a/src/index.d.ts
++++ b/src/index.d.ts
+@@ -51,6 +51,7 @@ declare namespace Tesseract {
+   }
+ 
+   interface WorkerOptions {
++    onWorker?: (worker: { terminate: () => void }) => void;
+     corePath: string
+     langPath: string
+     cachePath: string

@@ -30,10 +30,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test:checkout
+      - run: pnpm test:ocr
       - run: node --experimental-strip-types scripts/verify-menu.mjs
       - run: node --experimental-strip-types scripts/verify-realtime.mjs
       - run: pnpm build:cf
       - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm test:ocr:browser --grep-invert "real "
       - run: pnpm test:customer
       - uses: actions/upload-artifact@v4
         if: failure()

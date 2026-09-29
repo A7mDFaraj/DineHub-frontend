@@ -3,8 +3,10 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   sharp: false
+  tesseract.js: false
   unrs-resolver: false
   workerd: true
 patchedDependencies:
   '@opennextjs/aws@4.1.2': patches/@opennextjs__aws@4.1.2.patch
   '@opennextjs/cloudflare@1.20.4': patches/@opennextjs__cloudflare@1.20.4.patch
+  tesseract.js@7.0.0: patches/tesseract.js@7.0.0.patch
