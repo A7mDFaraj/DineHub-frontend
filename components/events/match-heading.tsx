@@ -31,17 +31,18 @@ export function MatchHeading({
         )}
         <h2>{matchName(fixture, ar)}</h2>
 
-        {fixture.awayLogo?.startsWith("https://") && (
-          <Image
-            unoptimized
-            src={fixture.awayLogo}
-            alt=""
-            width={42}
-            height={42}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
-        )}
+        {fixture.awayLogo?.startsWith("https://") &&
+          fixture.awayLogo !== fixture.homeLogo && (
+            <Image
+              unoptimized
+              src={fixture.awayLogo}
+              alt=""
+              width={42}
+              height={42}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
+          )}
       </div>
       <p>
         <time dateTime={fixture.kickoff}>

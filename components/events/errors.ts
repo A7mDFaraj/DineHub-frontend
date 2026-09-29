@@ -1,8 +1,31 @@
 import axios from "axios";
+
 export function eventError(error: unknown, ar: boolean) {
-  const code = axios.isAxiosError(error) ? error.response?.data?.message : "";
-  return eventErrorCode(code, ar);
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (typeof data?.message === "string") {
+      return eventErrorCode(data.message, ar);
+    }
+    if (Array.isArray(data?.message) && data.message.length > 0) {
+      const first = data.message[0];
+      return typeof first === "string"
+        ? eventErrorCode(first, ar)
+        : ar
+          ? "بيانات غير صالحة. يرجى مراجعة الحقول."
+          : "Invalid submitted data. Please check the fields.";
+    }
+    if (data?.code === "VALIDATION") {
+      return ar
+        ? "يرجى التأكد من ملء جميع الحقول المطلوبة بشكل صحيح."
+        : "Please make sure all required fields are filled correctly.";
+    }
+    if (data?.error && typeof data.error === "string") {
+      return eventErrorCode(data.error, ar);
+    }
+  }
+  return eventErrorCode("", ar);
 }
+
 export function eventErrorCode(code: unknown, ar: boolean) {
   const messages: Record<string, [string, string]> = {
     FOOTBALL_INVALID_KEY: ["رفض المزود المفتاح. ضع المفتاح السري الكامل في إعدادات الخادم، وليس معرّف المفتاح.", "The provider rejected the key. Set the full secret key on the server, not its identifier."],
@@ -57,6 +80,38 @@ export function eventErrorCode(code: unknown, ar: boolean) {
     TABLE_INSTORE_ONLY: [
       "هذه الطاولة مخصصة للحجز المباشر في المحل عبر مسح رمز QR فقط.",
       "This table is reserved for in-store QR scan booking only.",
+    ],
+    INVALID_TABLE_CAPACITY: [
+      "عدد الضيوف يتجاوز سعة هذه الطاولة.",
+      "Number of guests exceeds the capacity of this table.",
+    ],
+    IDEMPOTENCY_CONFLICT: [
+      "تفاصيل الحجز لا تتطابق مع المحاولة السابقة. يرجى تحديث الصفحة والمحاولة مجددًا.",
+      "Reservation details do not match the previous attempt. Refresh and try again.",
+    ],
+    RESERVATION_NOT_PENDING: [
+      "هذا الحجز تمت معالجته بالفعل.",
+      "This reservation is no longer pending approval.",
+    ],
+    EVENT_NOT_FOUND: [
+      "لم يتم العثور على الفعالية.",
+      "Event not found.",
+    ],
+    EVENT_NOT_SHOWING: [
+      "الفعالية غير معروضة حاليًا للحجز.",
+      "Event is currently not open for bookings.",
+    ],
+    INVALID_RESERVATION_AMOUNT: [
+      "مبلغ الحجز غير صالح.",
+      "Invalid reservation amount.",
+    ],
+    BRANCH_NOT_FOUND: [
+      "الفرع غير موجود أو غير متاح.",
+      "Branch not found or inactive.",
+    ],
+    TABLE_NOT_FOUND: [
+      "الطاولة غير موجودة.",
+      "Table not found.",
     ],
   };
   return typeof code === "string" && messages[code]

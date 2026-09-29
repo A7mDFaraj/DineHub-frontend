@@ -69,6 +69,9 @@ export function MenuExperience({
       ? value.nameAr || value.name || value.nameEn || ""
       : value.nameEn || value.name || value.nameAr || "";
   const branchName = name(branch) || "DineHub";
+  const branchAddress = ar
+    ? branch.addressAr || branch.address || branch.addressEn
+    : branch.addressEn || branch.address || branch.addressAr;
   const theme = getMenuTheme(branch.menuTheme);
   const accent =
     /^#[0-9a-f]{6}$/i.test(branch.themeColor ?? "")
@@ -122,10 +125,10 @@ export function MenuExperience({
             )}
             <div>
               <h1>{branchName}</h1>
-              {branch.address && (
+              {branchAddress && (
                 <p>
                   <MapPin size={12} aria-hidden="true" />
-                  {branch.address}
+                  {branchAddress}
                 </p>
               )}
             </div>

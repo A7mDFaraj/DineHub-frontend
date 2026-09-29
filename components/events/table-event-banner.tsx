@@ -10,7 +10,6 @@ import {
   type TableStatusResponse,
 } from "./types";
 import {
-  Calendar,
   Clock,
   Lock,
   CheckCircle2,
@@ -19,7 +18,6 @@ import {
   X,
   Loader2,
   Ticket,
-  ChevronRight,
 } from "lucide-react";
 
 export function TableEventBanner({

@@ -6,6 +6,10 @@ import { eventError } from "./errors";
 import type { Fixture } from "./types";
 import styles from "./events.module.css";
 
+function getLocalDefault(offset: number) {
+  return new Date(Date.now() + offset + 3 * 3600000).toISOString().slice(0, 16);
+}
+
 export function ManualMatchForm({
   base,
   busy: parentBusy,
@@ -19,6 +23,7 @@ export function ManualMatchForm({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [defaultTime] = useState(() => getLocalDefault(86400000));
 
   if (!open)
     return (
@@ -31,9 +36,6 @@ export function ManualMatchForm({
         {ar ? "إضافة مباراة يدويًا" : "Add match manually"}
       </button>
     );
-
-  const local = (offset: number) =>
-    new Date(Date.now() + offset + 3 * 3600000).toISOString().slice(0, 16);
 
   return (
     <form
@@ -125,7 +127,7 @@ export function ManualMatchForm({
           name="kickoff"
           type="datetime-local"
           required
-          defaultValue={local(86400000)}
+          defaultValue={defaultTime}
         />
       </label>
       <div className={styles.grid}>

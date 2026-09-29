@@ -113,6 +113,9 @@ export interface Reservation {
   };
 }
 export function matchName(fixture: Fixture, ar: boolean) {
+  if (!fixture.awayEn || fixture.awayEn === "-" || fixture.awayEn === fixture.homeEn) {
+    return ar ? fixture.homeAr || fixture.homeEn : fixture.homeEn;
+  }
   return `${ar ? fixture.homeAr || fixture.homeEn : fixture.homeEn} × ${ar ? fixture.awayAr || fixture.awayEn : fixture.awayEn}`;
 }
 export function matchTime(date: string, locale: string) {
