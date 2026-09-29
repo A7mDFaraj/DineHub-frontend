@@ -51,6 +51,7 @@
   margin-bottom: 6px;
 }
 .body {
+  flex: 1;
   padding: 24px;
   overflow-y: auto;
   min-height: 0;
@@ -152,6 +153,31 @@
 .dialog legend {
   padding: 0 6px;
   font-weight: 650;
+}
+.item[data-reviewed="true"] {
+  border-color: #8cd1ca;
+}
+.item[data-selected="false"] {
+  opacity: 0.6;
+}
+.sourcePhoto {
+  display: block;
+  overflow: hidden;
+  border-radius: 9px;
+  background: #fff;
+  outline: 1px solid rgb(255 255 255 / 10%);
+}
+.sourcePhoto svg {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+}
+.reviewCount {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #8cd1ca;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 .crop,
 .categoryPanel,
@@ -285,6 +311,7 @@
   accent-color: #8cd1ca;
 }
 .footer {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
@@ -323,10 +350,13 @@
     padding-inline: 12px;
   }
   .footer .primary {
-    flex: 1 1 100%;
+    flex: 1;
   }
   .fields {
     gap: 8px;
+  }
+  .itemFields > label:nth-child(-n + 2) {
+    grid-column: 1 / -1;
   }
   .dialog fieldset {
     padding: 12px;

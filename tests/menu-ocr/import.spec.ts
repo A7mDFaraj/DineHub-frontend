@@ -124,7 +124,7 @@ test("review is required and failed requests reuse the identical batch after reo
 }) => {
   const { posts, state } = await setup(page);
   await manualItem(page);
-  await page.getByRole("button", { name: "Import 1 reviewed items" }).click();
+  await page.getByRole("button", { name: "Import 1 item" }).click();
   await expect(page.getByRole("alert")).toContainText(
     "Review each selected item",
   );
@@ -135,7 +135,7 @@ test("review is required and failed requests reuse the identical batch after reo
     )
     .check();
   state.fail = true;
-  await page.getByRole("button", { name: "Import 1 reviewed items" }).click();
+  await page.getByRole("button", { name: "Import 1 item" }).click();
   await expect(
     page.getByRole("button", { name: "Retry same import" }),
   ).toBeEnabled();
@@ -303,7 +303,7 @@ test("real Arabic OCR preserves the source and supports correcting misread numer
   // Keep an opt-in strict accuracy gate; assisted-flow success is not OCR accuracy.
   if (process.env.OCR_STRICT_ACCURACY === "1")
     expect(observed).toEqual(expected);
-  await page.getByRole("button", { name: "Import 1 reviewed items" }).click();
+  await page.getByRole("button", { name: "Import 1 item" }).click();
   await expect(page.getByRole("alert")).toContainText(
     "Review each selected item",
   );
@@ -318,7 +318,7 @@ test("real Arabic OCR preserves the source and supports correcting misread numer
       "I checked the name, price, calories and category against the photo.",
     )
     .check();
-  await page.getByRole("button", { name: "Import 1 reviewed items" }).click();
+  await page.getByRole("button", { name: "Import 1 item" }).click();
   await expect(page.getByRole("status")).toContainText(
     "1 items imported successfully",
   );
@@ -431,4 +431,50 @@ test("cancelling initialization immediately terminates its worker", async ({
   ).toBeEnabled();
   expect((await counts()).terminated).toBeGreaterThan(0);
   expect(posts).toHaveLength(0);
+});
+
+test("existing categories are immediately available without a mapping", async ({ page }) => {
+  await setup(page);
+  await page.getByRole("button", { name: "Add missed item", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Category *", exact: true })).toHaveValue(`existing-${categoryId}`);
+  await expect(page.getByRole("combobox", { name: "Category *", exact: true }).locator("option", { hasText: "Drinks" })).toHaveCount(1);
+  await expect(page.getByText("0 of 1 selected items checked", { exact: true })).toBeVisible();
+});
+
+test("empty categories explain how to create one from an item", async ({ page }) => {
+  await setup(page);
+  await page.route("**/api/admin/categories/**", (route) => route.fulfill({ json: [] }));
+  await page.getByRole("button", { name: "Refresh menu", exact: true }).click();
+  await expect(page.getByText("This branch has no categories yet.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Add missed item", exact: true }).click();
+  await page.getByRole("combobox", { name: "Category *", exact: true }).selectOption("__new__");
+  await page.getByLabel("Arabic category", { exact: true }).fill("ساندويتشات");
+  await page.getByLabel("English category", { exact: true }).fill("Sandwiches");
+  await expect(page.getByRole("combobox", { name: "Category *", exact: true }).locator("option:checked")).toHaveText("Sandwiches");
+});
+
+test("real supplied menu photo groups burger translations and decimal prices", async ({ page }, testInfo) => {
+  test.skip(!process.env.OCR_MENU_PHOTO, "Local opt-in restaurant photo fixture");
+  await setup(page);
+  await page.locator("input[type=file]").first().setInputFiles(process.env.OCR_MENU_PHOTO!);
+  await page.getByRole("button", { name: "Read menu", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Read again", exact: true })).toBeEnabled({ timeout: 170000 });
+  const rows = await page.locator('fieldset').filter({ has: page.getByLabel("Price (SAR) *", { exact: true }) }).evaluateAll((elements) => elements.map((el) => ({
+    source: el.querySelector("blockquote")?.textContent,
+    fields: [...el.querySelectorAll<HTMLInputElement>('input:not([type=checkbox])')].map((input) => input.value),
+  })));
+  await testInfo.attach("restaurant-photo-results", { body: JSON.stringify(rows, null, 2), contentType: "application/json" });
+  const burger = rows.find((row) => row.fields[1].includes("Grilled Beef Burger"));
+  expect(burger?.fields[0]).toContain("برجر");
+  expect(burger?.fields[2]).toBe("16.00");
+  expect(burger?.fields[3]).toBe("200");
+  for (const name of ["Grilled Chicken Burger", "Grilled Shrimp Burger", "Grilled Hammor Burger", "Chicken Quesadi with Potato", "Meat Quesadi with Potato"]) {
+    const item = rows.find((row) => row.fields[1].includes(name));
+    expect(item?.fields[0], `${name} has its Arabic name on the same item`).toMatch(/[\u0621-\u064a]/);
+    expect(item?.fields[2], `${name} has a decimal price`).toMatch(/^\d+\.\d{2}$/);
+  }
+  await page.setViewportSize({ width: 375, height: 900 });
+  const card = page.locator('fieldset').filter({ has: page.getByLabel("English name", { exact: true }).filter({ visible: true }) }).filter({ hasText: "Grilled Beef Burger" }).first();
+  await card.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/restaurant-photo-mobile.png" });
 });

@@ -12,6 +12,16 @@
 
 OCR is an assistive transcription tool, not a guarantee of correctness. Decorative fonts, glare, blur, columns, and bilingual layouts can cause missed or incorrect text. Compare every result against the photograph. Crop one column/section at a time for complicated layouts. Missing calories stay null, never zero by default. Multiple sizes/prices require separate manually reviewed rows. First use needs a network connection to download open-source recognition assets; processing then stays local. Translation generation is deferred: no paid API or additional model hosting is introduced.
 
+## Bilingual photo improvements
+
+- Wide photos are checked for sustained whitespace between columns before recognition. A manual one/two/three-column override is available; equal-column overrides should only be used for equally spaced columns. Crop irregular layouts when automatic separation is unsuitable.
+- Physical text positions associate nearby Arabic/English names, wrapped titles, and detached numeric rows. Explicit column boundaries prevent cross-column associations. Portion tables retain their source evidence and conflicting prices for manual resolution.
+- Decimal SAR prices and `كالوري` labels are parsed separately. In bilingual mode, a second English-model pass cross-checks Western decimal digits at the same image coordinates; the Arabic model can otherwise truncate `16.00` to `0`. Changed readings remain flagged for review. This extra pass increases reading time without uploading the photo.
+- Existing branch categories are selectable immediately. Empty branches explain how to create a category, category creation is available from an item, and unassigned selected items can receive a category together.
+- Review cards show a source-photo excerpt, full-width bilingual name fields on mobile, required-field feedback, and checked-item counts. Source text stays available in a disclosure. Manual merge and split controls help correct associations; neither confirms an item automatically.
+
+Run the optional real restaurant-photo check with `OCR_MENU_PHOTO` set to a local image path and `pnpm test:ocr:browser --grep "supplied"`. The fixture is not committed or uploaded. The regression checks the pictured beef burger's bilingual pairing, `16.00` price, and `200` calories; it is not an accuracy guarantee for every entry in the photograph.
+
 ## Release gate
 
 Do not release the frontend before the import receipt migration and compatible backend are verified. The new feature must report an unavailable import API rather than falling back to non-atomic individual writes. Never test imports against real production menus without explicit authorization.
