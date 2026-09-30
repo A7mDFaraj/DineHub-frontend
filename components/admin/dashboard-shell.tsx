@@ -116,18 +116,6 @@ function NavigationLinks({
             </Link>
           );
         })}
-      <Link
-        className={styles.navLink}
-        href="/account/password"
-        aria-label={t("accountSecurity")}
-        title={t("accountSecurity")}
-        onClick={onNavigate}
-      >
-        <span className={styles.navIcon}>
-          <ShieldCheck aria-hidden="true" size={19} strokeWidth={1.7} />
-        </span>
-        <span className={styles.navLabel}>{t("accountSecurity")}</span>
-      </Link>
     </nav>
   );
 }
@@ -317,7 +305,16 @@ function AuthenticatedAdminShell({
           <NavigationLinks pathname={pathname} />
 
           <div className={styles.sidebarFoot}>
-            <div className={styles.userCard} title={session.user.name}>
+            <Link
+              href="/account/password"
+              className={cn(
+                styles.userCard,
+                pathname.startsWith("/account/password") &&
+                  styles.userCardActive,
+              )}
+              title={t("accountSecurity")}
+              aria-label={`${session.user.name} - ${t("accountSecurity")}`}
+            >
               <span aria-hidden="true">
                 {session.user.name.slice(0, 1).toUpperCase()}
               </span>
@@ -325,7 +322,12 @@ function AuthenticatedAdminShell({
                 <strong>{session.user.name}</strong>
                 <small dir="ltr">{session.user.email}</small>
               </div>
-            </div>
+              <ShieldCheck
+                size={16}
+                className={styles.userCardIcon}
+                aria-hidden="true"
+              />
+            </Link>
             <button
               className={styles.logoutButton}
               type="button"
@@ -383,6 +385,29 @@ function AuthenticatedAdminShell({
                     onNavigate={() => setMobileNavOpen(false)}
                   />
                   <div className={styles.drawerFoot}>
+                    <Link
+                      href="/account/password"
+                      className={cn(
+                        styles.userCard,
+                        pathname.startsWith("/account/password") &&
+                          styles.userCardActive,
+                      )}
+                      onClick={() => setMobileNavOpen(false)}
+                      title={t("accountSecurity")}
+                    >
+                      <span aria-hidden="true">
+                        {session.user.name.slice(0, 1).toUpperCase()}
+                      </span>
+                      <div>
+                        <strong>{session.user.name}</strong>
+                        <small dir="ltr">{session.user.email}</small>
+                      </div>
+                      <ShieldCheck
+                        size={16}
+                        className={styles.userCardIcon}
+                        aria-hidden="true"
+                      />
+                    </Link>
                     {showGuide && (
                       <AdminGuideTrigger
                         className={styles.guideButton}
@@ -417,7 +442,12 @@ function AuthenticatedAdminShell({
                 size={13}
                 className={styles.contextStoreIcon}
               />
-              <span>{access?.businessName ?? t("adminRole")}</span>
+              <span>
+                {!access?.businessName?.trim() ||
+                access.businessName.trim() === "النشاط الحالي"
+                  ? t("currentBusiness")
+                  : access.businessName}
+              </span>
             </span>
             <span
               className={styles.contextBreadcrumbDivider}

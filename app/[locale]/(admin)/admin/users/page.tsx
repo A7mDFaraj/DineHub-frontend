@@ -32,6 +32,7 @@ interface Branch {
   nameEn?: string;
 }
 const defaultResources: Record<string, string> = {
+  events: "الفعاليات والمباريات",
   dashboard: "نظرة عامة",
   analytics: "تحليل الأداء",
   branches: "الفروع",
@@ -55,6 +56,43 @@ const defaultActions: Record<string, string> = {
   prepare: "قبول وبدء التنفيذ",
   ready: "تحديد جاهزية الطلب",
   deliver: "تأكيد التسليم",
+  checkin: "تسجيل الحضور",
+  cashier: "كاشير الفعاليات",
+};
+
+const ARABIC_TO_ENGLISH_ROLES: Record<string, string> = {
+  "مدير النظام": "System Admin",
+  "مدير العمليات": "Operations Manager",
+  "موظف الاستقبال": "Reception / Cashier",
+  "مشرف الإشغال": "Floor Supervisor",
+  "مدير الصالات": "Dining Area Manager",
+  "فريق الخدمة": "Service Team",
+  "فريق التنفيذ": "Service Team",
+  "غير معيّن": "Unassigned",
+  "مالك النشاط": "Business Owner",
+  "طاقم المطبخ": "Kitchen Staff",
+  "مدير فرع": "Branch Manager",
+  "كاشير / صالة": "Cashier / Front",
+  "موظف عام": "General Staff",
+};
+
+const ENGLISH_TO_ARABIC_ROLES: Record<string, string> = {
+  "system admin": "مدير النظام",
+  "admin": "مدير النظام",
+  "operations manager": "مدير العمليات",
+  "manager": "مدير العمليات",
+  "branch manager": "مدير العمليات",
+  "reception / cashier": "موظف الاستقبال",
+  "cashier": "موظف الاستقبال",
+  "cashier / front": "موظف الاستقبال",
+  "floor supervisor": "مشرف الإشغال",
+  "dining area manager": "مدير الصالات",
+  "service team": "فريق التنفيذ",
+  "staff": "فريق التنفيذ",
+  "general staff": "فريق التنفيذ",
+  "unassigned": "غير معيّن",
+  "business owner": "مالك النشاط",
+  "kitchen staff": "طاقم المطبخ",
 };
 function message(error: unknown, fallback: string) {
   return axios.isAxiosError(error) &&
@@ -169,6 +207,33 @@ export default function UsersPage() {
   const tCommon = useTranslations("AdminCommon");
   const locale = useLocale();
   const isRtl = locale !== "en";
+
+  const getRoleDisplayName = useCallback(
+    (roleKey: string, rawName?: string) => {
+      // 1. If in English and the raw name is Arabic standard name
+      if (!isRtl && rawName && ARABIC_TO_ENGLISH_ROLES[rawName.trim()]) {
+        return ARABIC_TO_ENGLISH_ROLES[rawName.trim()];
+      }
+
+      // 2. Try translation from AdminUsers.roles.<roleKey>
+      try {
+        const translated = t(`roles.${roleKey}`);
+        if (translated && !translated.startsWith("AdminUsers.roles.")) {
+          return translated;
+        }
+      } catch {
+        /* fallback */
+      }
+
+      // 3. If in Arabic and the raw name is English standard name
+      if (isRtl && rawName && ENGLISH_TO_ARABIC_ROLES[rawName.trim().toLowerCase()]) {
+        return ENGLISH_TO_ARABIC_ROLES[rawName.trim().toLowerCase()];
+      }
+
+      return rawName || roleKey;
+    },
+    [isRtl, t],
+  );
 
   const { can, access, refresh } = useAccess();
   const canManageAccess = can("access.manage");
@@ -381,13 +446,13 @@ export default function UsersPage() {
                 onClick={() => {
                   setRoleEdit(r);
                   setRoleKey(r.key);
-                  setRoleName(r.name);
+                  setRoleName(getRoleDisplayName(r.key, r.name));
                   setRolePermissions(r.permissions);
                   setDialogError("");
                 }}
               >
                 <ShieldCheck size={16} />
-                <span>{r.name}</span>
+                <span>{getRoleDisplayName(r.key, r.name)}</span>
                 <small>
                   {(r.key === "admin" || r.key === "unassigned") ? (isRtl ? "محمي" : "Protected") : r.permissions.length}
                 </small>
@@ -428,7 +493,7 @@ export default function UsersPage() {
                       : (assignedBranch.nameEn || assignedBranch.name || assignedBranch.nameAr))
                   : t("allBranches");
                 const roleObj = roles.find((r) => r.key === u.role);
-                const roleName = roleObj?.name || u.role;
+                const roleName = getRoleDisplayName(u.role, roleObj?.name);
 
                 return (
                   <li className={styles.row} key={u.id}>
@@ -571,7 +636,7 @@ export default function UsersPage() {
             >
               {roles.map((r) => (
                 <option key={r.key} value={r.key}>
-                  {r.name}
+                  {getRoleDisplayName(r.key, r.name)}
                 </option>
               ))}
             </select>
@@ -729,7 +794,7 @@ export default function UsersPage() {
                   ]
               ).map((r) => (
                 <option key={r.key} value={r.key}>
-                  {r.name}
+                  {getRoleDisplayName(r.key, r.name)}
                 </option>
               ))}
             </select>

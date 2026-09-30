@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  LayoutDashboard,
   Loader2,
   LockKeyhole,
   LogOut,
@@ -26,6 +27,7 @@ import axios from "axios";
 import { apiClient } from "@/lib/api-client";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useAccess } from "@/lib/access-context";
+import { AdminLanguageSwitcher } from "@/components/admin/admin-language-switcher";
 import logo from "@/public/brand/dinehub-logo-3d.png";
 import styles from "./password-change.module.css";
 
@@ -80,17 +82,17 @@ export function PasswordChangeScreen({
     if (lock.current) return;
 
     if (newPassword.length < 12) {
-      setError(isRtl ? "كلمة المرور الجديدة يجب ألا تقل عن 12 حرفًا." : "New password must be at least 12 characters long.");
+      setError(t("errMinLength"));
       return;
     }
 
     if (newPassword !== confirmation) {
-      setError(isRtl ? "كلمتا المرور غير متطابقتين. يرجى التحقق وإعادة المحاولة." : "Passwords do not match. Please verify and try again.");
+      setError(t("errMismatch"));
       return;
     }
 
     if (newPassword === currentPassword) {
-      setError(isRtl ? "اختر كلمة مرور جديدة مختلفة عن الحالية." : "Please choose a new password different from current password.");
+      setError(t("errSameAsCurrent"));
       return;
     }
 
@@ -113,7 +115,7 @@ export function PasswordChangeScreen({
       const serverMessage =
         axios.isAxiosError(err) && typeof err.response?.data?.message === "string"
           ? err.response.data.message
-          : (isRtl ? "تعذر تحديث كلمة المرور. تحقق من صحة كلمة المرور الحالية وحاول مجدداً." : "Failed to update password. Please check your current credentials.");
+          : t("errUpdateFailed");
       setError(serverMessage);
     } finally {
       lock.current = false;
@@ -133,6 +135,42 @@ export function PasswordChangeScreen({
 
   return (
     <main dir={isRtl ? "rtl" : "ltr"} className={styles.page}>
+      {/* Top Navigation Bar */}
+      <nav className={styles.navbar} aria-label={t("navAria")}>
+        <div className={styles.navBrandGroup}>
+          <Link href="/" className={styles.navBrand} aria-label={isRtl ? "DineHub، الصفحة الرئيسية" : "DineHub Homepage"}>
+            <Image src={logo} alt="DineHub" width={32} height={32} priority className={styles.navLogo} />
+            <span dir="ltr" className={styles.navBrandText}>DineHub</span>
+          </Link>
+          <span className={styles.navDivider} aria-hidden="true">/</span>
+          <span className={styles.navPageBadge}>
+            <LockKeyhole size={13} aria-hidden="true" />
+            <span>{forced ? t("initialSetup") : t("accountSecurity")}</span>
+          </span>
+        </div>
+
+        <div className={styles.navActions}>
+          {!forced && (
+            <Link href="/admin" className={styles.navDashboardLink}>
+              <LayoutDashboard size={15} aria-hidden="true" />
+              <span>{t("backToDashboard")}</span>
+            </Link>
+          )}
+          <AdminLanguageSwitcher variant="adaptive" />
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={busy}
+            className={styles.navLogoutBtn}
+            aria-label={t("logoutAndReturn")}
+            title={t("logoutAndReturn")}
+          >
+            <LogOut size={15} aria-hidden="true" />
+            <span className={styles.navLogoutText}>{t("logoutAndReturn")}</span>
+          </button>
+        </div>
+      </nav>
+
       <div className={styles.shell}>
         {/* Action / Form Section */}
         <section
@@ -151,13 +189,15 @@ export function PasswordChangeScreen({
           {resolvedBusinessName ? (
             <div className={styles.businessBadge}>
               <Building2 size={15} aria-hidden="true" />
-              <span>{isRtl ? `منشأة: ${resolvedBusinessName}` : `Business: ${resolvedBusinessName}`}</span>
+              <span>
+                {t("businessLabel")}: {resolvedBusinessName === "النشاط الحالي" && !isRtl ? "Current Business" : resolvedBusinessName}
+              </span>
               <span className={styles.businessBadgeDot} aria-hidden="true" />
             </div>
           ) : (
             <div className={styles.businessBadge}>
               <ShieldCheck size={15} aria-hidden="true" />
-              <span>{isRtl ? "مساحة عمل معزولة ومحمية" : "Protected Isolated Tenant"}</span>
+              <span>{t("featureIsolationTitle")}</span>
               <span className={styles.businessBadgeDot} aria-hidden="true" />
             </div>
           )}
@@ -367,7 +407,7 @@ export function PasswordChangeScreen({
 
               <footer className={styles.footerNote}>
                 <ShieldCheck size={16} aria-hidden="true" />
-                <span>{isRtl ? "جلسة مشفرة ومعزولة لحماية بيانات منشأتك" : "Encrypted isolated session protecting your business"}</span>
+                <span>{t("encryptedSession")}</span>
               </footer>
             </>
           )}
@@ -376,89 +416,72 @@ export function PasswordChangeScreen({
         {/* Story / Brand Isolation Showcase */}
         <aside
           className={styles.storyPanel}
-          aria-label={isRtl ? "مزايا أمان وعزل الأعمال في DineHub" : "DineHub Security & Business Isolation"}
+          aria-label={t("pageTitle")}
         >
-          <Link
-            className={styles.brand}
-            href="/"
-            aria-label={isRtl ? "DineHub، الصفحة الرئيسية" : "DineHub Homepage"}
-          >
-            <Image
-              className={styles.logo}
-              src={logo}
-              alt="DineHub 3D Logo"
-              width={76}
-              height={76}
-              priority
-            />
-            <span dir="ltr">DineHub</span>
-          </Link>
+          <div className={styles.storyHead}>
+            <Link
+              className={styles.brand}
+              href="/"
+              aria-label={isRtl ? "DineHub، الصفحة الرئيسية" : "DineHub Homepage"}
+            >
+              <Image
+                className={styles.logo}
+                src={logo}
+                alt="DineHub 3D Logo"
+                width={42}
+                height={42}
+                priority
+              />
+              <span dir="ltr">DineHub</span>
+            </Link>
 
-          <div className={styles.storyCopy}>
             <p className={styles.liveLabel}>
               <span aria-hidden="true" />
-              {isRtl ? "أمان وتشغيل موثوق" : "Enterprise-Grade Reliability"}
+              {t("storyBadge")}
             </p>
-            <h2>
-              {isRtl
-                ? "بيئة معزولة بالكامل. أمان يبدأ من أول خطوة."
-                : "Fully Isolated Workspaces. Security by Design."}
-            </h2>
-            <p>
-              {isRtl
-                ? "نظام مصمم للمنشآت الرائدة؛ نوفر عزلاً تاماً للبيانات، إدارة دقيقة للصلاحيات، وربطاً فورياً بين مسح العميل وعمليات الفريق."
-                : "Engineered for leading food & beverage brands; isolated multitenancy, granular access control, and instantaneous sync from guest QR scan to live kitchen."}
-            </p>
+          </div>
+
+          <div className={styles.storyCopy}>
+            <h2>{t("storyTitle")}</h2>
+            <p>{t("storyDesc")}</p>
           </div>
 
           <div className={styles.featuresGrid} aria-hidden="true">
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>
-                <Building2 size={20} />
+                <Building2 size={18} strokeWidth={1.8} />
               </div>
               <div className={styles.featureText}>
-                <h3>{isRtl ? "عزل رقمي مستقل لكل منشأة" : "Tenant Isolation"}</h3>
-                <p>
-                  {isRtl
-                    ? "قواعد بيانات وعمليات منفصلة تضمن أقصى درجات الخصوصية وحماية الأعمال."
-                    : "Independent operational scope ensuring complete business privacy and compliance."}
-                </p>
+                <h3>{t("featureIsolationTitle")}</h3>
+                <p>{t("featureIsolationDesc")}</p>
               </div>
             </div>
 
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>
-                <Users size={20} />
+                <Users size={18} strokeWidth={1.8} />
               </div>
               <div className={styles.featureText}>
-                <h3>{isRtl ? "صلاحيات دقيقة للملاك والفرق" : "Granular Team Access"}</h3>
-                <p>
-                  {isRtl
-                    ? "تحكم كامل في وصول طاقم الفروع والمدراء لحماية الإيرادات والقوائم."
-                    : "Role-based controls tailored for branch cashiers, kitchen crew, and owners."}
-                </p>
+                <h3>{t("featureAccessTitle")}</h3>
+                <p>{t("featureAccessDesc")}</p>
               </div>
             </div>
 
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>
-                <Sparkles size={20} />
+                <Sparkles size={18} strokeWidth={1.8} />
               </div>
               <div className={styles.featureText}>
-                <h3>{isRtl ? "إشارة طلب فائقة السرعة" : "Realtime Order Signals"}</h3>
-                <p>
-                  {isRtl
-                    ? "مسار مباشر من كاميرا العميل إلى شاشات التحضير دون انقطاع."
-                    : "Direct zero-friction pipeline from guest smartphone camera to kitchen display."}
-                </p>
+                <h3>{t("featureSignalsTitle")}</h3>
+                <p>{t("featureSignalsDesc")}</p>
               </div>
             </div>
           </div>
 
           <div className={styles.storyFoot}>
-            <span>DineHub Enterprise Security</span>
-            <span>{isRtl ? "تشفير معتمد 256-bit" : "256-bit Encryption"}</span>
-            <span>{isRtl ? "عزل متعدد المنشآت" : "Multitenant Isolation"}</span>
+            <span>{t("tagEnterprise")}</span>
+            <span>{t("tagEncryption")}</span>
+            <span>{t("tagMultitenant")}</span>
           </div>
         </aside>
       </div>

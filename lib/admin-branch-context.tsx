@@ -89,9 +89,13 @@ export function AdminBranchProvider({ children }: { children: ReactNode }) {
         setSelectedBranchIdState("");
       }
       return list;
-    } catch (err: unknown) {
-      console.error("Failed to fetch admin branches:", err);
-      setBranchError("تعذر جلب بيانات الفروع. يرجى المحاولة مرة أخرى.");
+    } catch {
+      const isEn = typeof document !== "undefined" && document.documentElement.lang === "en";
+      setBranchError(
+        isEn
+          ? "Failed to fetch branches. Please try again."
+          : "تعذر جلب بيانات الفروع. يرجى المحاولة مرة أخرى."
+      );
       return [];
     } finally {
       setIsLoadingBranches(false);

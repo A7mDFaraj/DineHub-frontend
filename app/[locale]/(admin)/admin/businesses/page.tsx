@@ -13,12 +13,14 @@ import {
   Loader2,
   Mail,
   Plus,
+  ShieldCheck,
   Store,
   UsersRound,
   X,
 } from "lucide-react";
 import axios from "axios";
 import { useLocale, useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
 import { apiClient } from "@/lib/api-client";
 import { useAccess } from "@/lib/access-context";
 import { cn } from "@/lib/utils";
@@ -41,6 +43,18 @@ interface Created {
   expiresAt: string;
 }
 
+function getBusinessDisplayName(
+  business: { name?: string; slug?: string } | null | undefined,
+  isRtl: boolean,
+) {
+  if (!business?.name) return isRtl ? "النشاط الحالي" : "Current Business";
+  const trimmed = business.name.trim();
+  if (trimmed === "النشاط الحالي" || business.slug === "legacy") {
+    return isRtl ? "النشاط الحالي" : "Current Business";
+  }
+  return business.name;
+}
+
 export default function BusinessesPage() {
   const locale = useLocale();
   const t = useTranslations("AdminBusinesses");
@@ -48,6 +62,7 @@ export default function BusinessesPage() {
   const isRtl = locale !== "en";
 
   const { access } = useAccess();
+  const router = useRouter();
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -112,10 +127,11 @@ export default function BusinessesPage() {
     const origin = typeof window !== "undefined" ? window.location.origin : "https://dinehub.app";
     const loginPath = isRtl ? `${origin}/admin/login` : `${origin}/en/admin/login`;
 
+    const bName = getBusinessDisplayName(created.business, isRtl);
     const text = isRtl
       ? [
           `بيانات الدخول إلى منصة DineHub:`,
-          `• المنشأة: ${created.business.name}`,
+          `• المنشأة: ${bName}`,
           `• البريد الإلكتروني للمالك: ${created.owner.email}`,
           `• كلمة المرور المؤقتة: ${created.temporaryPassword}`,
           `• رابط الدخول: ${loginPath}`,
@@ -124,7 +140,7 @@ export default function BusinessesPage() {
         ].join("\n")
       : [
           `DineHub Platform Login Credentials:`,
-          `• Business: ${created.business.name}`,
+          `• Business: ${bName}`,
           `• Owner Email: ${created.owner.email}`,
           `• Temporary Password: ${created.temporaryPassword}`,
           `• Login URL: ${loginPath}`,
@@ -168,6 +184,12 @@ export default function BusinessesPage() {
   async function resetOwner(business: Business) {
     const owner = business.users[0];
     if (!owner || busy) return;
+
+    if (owner.id === access?.id) {
+      router.push("/account/password");
+      return;
+    }
+
     setBusy(true);
     setError("");
     try {
@@ -185,6 +207,15 @@ export default function BusinessesPage() {
       setShowPassword(true);
       setResetOwnerId(null);
     } catch (e) {
+      if (
+        axios.isAxiosError(e) &&
+        (e.response?.status === 403 ||
+          (typeof e.response?.data?.message === "string" &&
+            e.response.data.message.includes("تغيير كلمة المرور")))
+      ) {
+        router.push("/account/password");
+        return;
+      }
       setError(
         axios.isAxiosError(e) && typeof e.response?.data?.message === "string"
           ? e.response.data.message
@@ -227,8 +258,8 @@ export default function BusinessesPage() {
                 </h2>
                 <p style={{ margin: 0, fontSize: "0.85rem", color: "#b9aebd" }}>
                   {isRtl
-                    ? `تم إصدار بيانات الدخول المؤقتة لـ ${created.business.name} (${created.owner.email}).`
-                    : `Temporary credentials issued for ${created.business.name} (${created.owner.email}).`}
+                    ? `تم إصدار بيانات الدخول المؤقتة لـ ${getBusinessDisplayName(created.business, true)} (${created.owner.email}).`
+                    : `Temporary credentials issued for ${getBusinessDisplayName(created.business, false)} (${created.owner.email}).`}
                 </p>
               </div>
             </div>
@@ -299,7 +330,7 @@ export default function BusinessesPage() {
                     <div className={styles.credentialBox}>
                       <Store size={17} className="text-zinc-400 shrink-0" />
                       <strong className={styles.credentialBoxValue}>
-                        {created.business.name}
+                        {getBusinessDisplayName(created.business, isRtl)}
                       </strong>
                     </div>
                   </div>
@@ -527,12 +558,16 @@ export default function BusinessesPage() {
               businesses.map((b) => (
                 <li className={styles.row} key={b.id}>
                   <div>
-                    <strong>{b.name}</strong>
+                    <strong>{getBusinessDisplayName(b, isRtl)}</strong>
                     <p className={styles.muted} dir="ltr">
                       {b.slug}
                     </p>
                     <small>
-                      {b.users[0]?.name ?? (isRtl ? "بلا مالك" : "No owner")} ·{" "}
+                      {b.users[0]?.name
+                        ? (b.users[0].name === "المالك"
+                            ? (isRtl ? "المالك" : "Business Owner")
+                            : b.users[0].name)
+                        : (isRtl ? "بلا مالك" : "No owner")} ·{" "}
                       {b.users[0]?.email ?? "—"}
                     </small>
                   </div>
@@ -560,7 +595,16 @@ export default function BusinessesPage() {
                     )}
 
                     {b.users[0] &&
-                      (resetOwnerId === b.users[0].id ? (
+                      (b.users[0].id === access?.id ? (
+                        <Link
+                          href="/account/password"
+                          className={styles.button}
+                          title={isRtl ? "تغيير كلمة المرور لحسابك" : "Change password for your account"}
+                        >
+                          <ShieldCheck size={14} />
+                          <span>{isRtl ? "تغيير كلمة المرور" : "Change Password"}</span>
+                        </Link>
+                      ) : resetOwnerId === b.users[0].id ? (
                         <>
                           <button
                             className={`${styles.button} ${styles.primary}`}

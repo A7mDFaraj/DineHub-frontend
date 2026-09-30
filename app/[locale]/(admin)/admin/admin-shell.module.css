@@ -134,6 +134,7 @@
   .shell[data-sidebar-collapsed="true"] .sidebar .brand > span,
   .shell[data-sidebar-collapsed="true"] .sidebar .navLabel,
   .shell[data-sidebar-collapsed="true"] .sidebar .userCard > div,
+  .shell[data-sidebar-collapsed="true"] .sidebar .userCardIcon,
   .shell[data-sidebar-collapsed="true"] .sidebar .logoutButton > span {
     display: none;
   }
@@ -405,10 +406,36 @@
 
 .userCard {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 4px 7px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+
+.userCard:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.userCardActive {
+  background: rgba(242, 100, 75, 0.1);
+  border-color: rgba(242, 100, 75, 0.25);
+}
+
+.userCardIcon {
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.userCard:hover .userCardIcon,
+.userCardActive .userCardIcon {
+  color: var(--admin-coral);
+  transform: scale(1.1);
 }
 
 .userCard > span {

@@ -189,6 +189,7 @@
     "unauthorizedTitle": "Page Restricted",
     "unauthorizedDesc": "Please choose an authorized page from the menu.",
     "adminRole": "Admin",
+    "currentBusiness": "Current Business",
     "accountSecurity": "Account Security",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar"
@@ -468,6 +469,7 @@
     "confirmResetDesc": "Are you sure you want to generate a new temporary password for {email}?",
     "resetAction": "Reset Now",
     "resources": {
+      "events": "Events & Matches",
       "dashboard": "Dashboard",
       "analytics": "Performance Analytics",
       "branches": "Branches",
@@ -490,14 +492,18 @@
       "manage": "Manage Roles & Access",
       "prepare": "Accept & Start Prep",
       "ready": "Mark Ready for Pickup",
-      "deliver": "Confirm Order Handoff"
+      "deliver": "Confirm Order Handoff",
+      "checkin": "Guest Check-in",
+      "cashier": "Event Cashier"
     },
     "roles": {
+      "admin": "System Admin",
       "owner": "Business Owner",
-      "manager": "Branch Manager",
-      "cashier": "Cashier / Front",
-      "kitchen": "Kitchen Staff",
-      "staff": "General Staff"
+      "manager": "Operations Manager",
+      "cashier": "Reception / Cashier",
+      "staff": "Service Team",
+      "unassigned": "Unassigned",
+      "kitchen": "Kitchen Staff"
     }
   },
   "AdminSettings": {
@@ -752,7 +758,27 @@
     "reqNotMatching": "Passwords do not match yet",
     "expiredTitle": "Temporary Password Expired",
     "expiredDesc": "The validity period for your temporary password has expired. If you are the owner, contact DineHub support or your administrator.",
-    "logoutAndReturn": "Sign Out & Return"
+    "logoutAndReturn": "Sign Out & Return",
+    "backToDashboard": "Dashboard",
+    "navAria": "Account security navigation",
+    "businessLabel": "Business",
+    "encryptedSession": "Encrypted isolated session protecting your business",
+    "storyBadge": "Enterprise-Grade Reliability",
+    "storyTitle": "Fully Isolated Workspaces. Security by Design.",
+    "storyDesc": "Engineered for leading food & beverage brands; isolated multitenancy, granular access control, and instantaneous sync from guest QR scan to live kitchen.",
+    "featureIsolationTitle": "Tenant Isolation",
+    "featureIsolationDesc": "Independent operational scope ensuring complete business privacy and compliance.",
+    "featureAccessTitle": "Granular Team Access",
+    "featureAccessDesc": "Role-based controls tailored for branch cashiers, kitchen crew, and owners.",
+    "featureSignalsTitle": "Realtime Order Signals",
+    "featureSignalsDesc": "Direct zero-friction pipeline from guest smartphone camera to kitchen display.",
+    "tagEnterprise": "DineHub Enterprise Security",
+    "tagEncryption": "256-bit Encryption",
+    "tagMultitenant": "Multitenant Isolation",
+    "errMinLength": "New password must be at least 12 characters long.",
+    "errMismatch": "Passwords do not match. Please verify and try again.",
+    "errSameAsCurrent": "Please choose a new password different from current password.",
+    "errUpdateFailed": "Failed to update password. Please check your current credentials and try again."
   },
   "CustomerMenu": {
     "loadingMenu": "Preparing the delicious menu…",
