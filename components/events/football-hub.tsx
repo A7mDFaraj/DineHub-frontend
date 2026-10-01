@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { Plus, Save, Settings, Trophy, Zap } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { eventError, eventErrorCode } from "./errors";
 import {
@@ -284,7 +285,8 @@ export function FootballHub({
                   void handleCreateSaudiMatch(d.home, d.away, kickoffTime);
                 }}
               >
-                ⚽ {ar ? d.titleAr : d.titleEn} ({ar ? `${d.home.nameAr} × ${d.away.nameAr}` : `${d.home.nameEn} vs ${d.away.nameEn}`})
+                <Trophy size={14} style={{ display: "inline", verticalAlign: "-2px", marginInlineEnd: 6 }} />
+                <span>{ar ? d.titleAr : d.titleEn} ({ar ? `${d.home.nameAr} × ${d.away.nameAr}` : `${d.home.nameEn} vs ${d.away.nameEn}`})</span>
               </button>
             ))}
           </div>
@@ -413,13 +415,18 @@ export function FootballHub({
           className={`${styles.primary} ${styles.largeActionBtn}`}
           onClick={() => handleCreateSaudiMatch(homeTeam, awayTeam, kickoffTime)}
         >
-          {busy
-            ? ar
-              ? "جارٍ إنشاء وتجهيز المباراة…"
-              : "Creating match…"
-            : ar
-              ? `⚡ إنشاء وتجهيز (${homeTeam.nameAr} × ${awayTeam.nameAr})`
-              : `⚡ Create & Setup (${homeTeam.nameEn} vs ${awayTeam.nameEn})`}
+          {busy ? (
+            ar ? "جارٍ إنشاء وتجهيز المباراة…" : "Creating match…"
+          ) : (
+            <>
+              <Zap size={17} />
+              <span>
+                {ar
+                  ? `إنشاء وتجهيز (${homeTeam.nameAr} × ${awayTeam.nameAr})`
+                  : `Create & Setup (${homeTeam.nameEn} vs ${awayTeam.nameEn})`}
+              </span>
+            </>
+          )}
         </button>
       </section>
 
@@ -527,9 +534,14 @@ export function FootballHub({
             className={styles.button}
             onClick={() => setShowCustomMatchForm((prev) => !prev)}
           >
-            {showCustomMatchForm
-              ? ar ? "إخفاء نموذج المباراة المخصصة" : "Hide custom match form"
-              : ar ? "➕ إضافة مباراة مخصصة أو بطولة عالمية أخرى" : "➕ Add any custom match manually"}
+            {showCustomMatchForm ? (
+              ar ? "إخفاء نموذج المباراة المخصصة" : "Hide custom match form"
+            ) : (
+              <>
+                <Plus size={15} />
+                <span>{ar ? "إضافة مباراة مخصصة أو بطولة أخرى" : "Add custom match manually"}</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -639,7 +651,9 @@ export function FootballHub({
       {selectedFixture && (
         <section className={styles.builderCard}>
           <div className={styles.builderHeader}>
-            <div className={styles.footballIconBadge}>⚙️</div>
+            <div className={styles.footballIconBadge}>
+              <Settings size={22} />
+            </div>
             <div>
               <h2>{ar ? "إعدادات العرض وحجز الطاولات للمباراة" : "Match Event & Table Settings"}</h2>
               <p className={styles.muted}>
@@ -722,9 +736,14 @@ export function FootballHub({
               className={`${styles.primary} ${styles.largeActionBtn}`}
               onClick={handleSaveEvent}
             >
-              {busy
-                ? ar ? "جارٍ حفظ الإعدادات…" : "Saving settings…"
-                : ar ? "💾 حفظ وتفعيل إعدادات المباراة" : "💾 Save Match Event Settings"}
+              {busy ? (
+                ar ? "جارٍ حفظ الإعدادات…" : "Saving settings…"
+              ) : (
+                <>
+                  <Save size={18} />
+                  <span>{ar ? "حفظ وتفعيل إعدادات المباراة" : "Save Match Event Settings"}</span>
+                </>
+              )}
             </button>
           </div>
         </section>

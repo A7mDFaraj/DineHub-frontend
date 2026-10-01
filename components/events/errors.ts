@@ -113,6 +113,18 @@ export function eventErrorCode(code: unknown, ar: boolean) {
       "الطاولة غير موجودة.",
       "Table not found.",
     ],
+    EVENT_MUST_BE_CANCELLED_FIRST: [
+      "يجب إلغاء الفعالية أولاً قبل حذفها.",
+      "The event must be cancelled before it can be deleted.",
+    ],
+    CANNOT_DELETE_EVENT_WITH_FINANCIAL_RECORDS: [
+      "لا يمكن حذف الفعالية لوجود سجلات مالية مقيدة بالكاشير. احتفظ بها للأرشفة المحاسبية.",
+      "Cannot delete event with recorded financial transactions. Kept for accounting records.",
+    ],
+    CANNOT_DELETE_EVENT_WITH_CHECKED_IN_GUESTS: [
+      "لا يمكن حذف فعالية بدأ ضيوفها بتسجيل الحضور بالفعل.",
+      "Cannot delete an event with checked-in guests.",
+    ],
   };
   return typeof code === "string" && messages[code]
     ? messages[code][ar ? 0 : 1]

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { Check, Globe, QrCode } from "lucide-react";
 import type { EventTable } from "./types";
 import styles from "./events.module.css";
 
@@ -215,7 +216,11 @@ export function TableChannelSelector({
                       if (isInStoreOnly) toggleInStoreOnly(table.id);
                     }}
                   >
-                    🌐 {ar ? "حجز أونلاين" : "Online & Walk-in"}
+                    <div className={styles.channelToggleIconTitle}>
+                      <Globe size={15} />
+                      <span>{ar ? "حجز أونلاين وحضوري" : "Online & Walk-in"}</span>
+                    </div>
+                    {!isInStoreOnly && <Check size={14} className={styles.channelActiveCheck} />}
                   </button>
                   <button
                     type="button"
@@ -225,7 +230,11 @@ export function TableChannelSelector({
                       if (!isInStoreOnly) toggleInStoreOnly(table.id);
                     }}
                   >
-                    📱 {ar ? "مسح QR بالمحل فقط" : "In-Store QR Only"}
+                    <div className={styles.channelToggleIconTitle}>
+                      <QrCode size={15} />
+                      <span>{ar ? "مسح QR بالمحل فقط" : "In-Store QR Only"}</span>
+                    </div>
+                    {isInStoreOnly && <Check size={14} className={styles.channelActiveCheck} />}
                   </button>
                 </div>
               )}

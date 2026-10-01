@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BookOpen, Music, PartyPopper, Rocket, Smile, Sparkles } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { eventError } from "./errors";
 import { TimeWindowPicker } from "./time-window-picker";
@@ -61,7 +62,7 @@ export function GeneralEventBuilder({
   const categories = [
     {
       id: "music" as const,
-      icon: "🎵",
+      Icon: Music,
       nameAr: "حفل أو أمسية موسيقية",
       nameEn: "Live Music & Concert",
       defaultAr: "أمسية عود وموسيقى حية",
@@ -73,7 +74,7 @@ export function GeneralEventBuilder({
     },
     {
       id: "comedy" as const,
-      icon: "🎭",
+      Icon: Smile,
       nameAr: "ستاند أب كوميدي وعروض",
       nameEn: "Standup Comedy & Show",
       defaultAr: "عرض ستاند أب كوميدي",
@@ -85,7 +86,7 @@ export function GeneralEventBuilder({
     },
     {
       id: "poetry" as const,
-      icon: "📖",
+      Icon: BookOpen,
       nameAr: "أمسية شعرية وثقافية",
       nameEn: "Poetry & Cultural Evening",
       defaultAr: "أمسية شعرية وأدبية",
@@ -97,7 +98,7 @@ export function GeneralEventBuilder({
     },
     {
       id: "celebration" as const,
-      icon: "🎂",
+      Icon: PartyPopper,
       nameAr: "احتفال أو مناسبة خاصة",
       nameEn: "Celebration & Gathering",
       defaultAr: "سهرة احتفالية خاصة",
@@ -109,7 +110,7 @@ export function GeneralEventBuilder({
     },
     {
       id: "custom" as const,
-      icon: "✨",
+      Icon: Sparkles,
       nameAr: "فعالية مخصصة",
       nameEn: "Custom Event",
       defaultAr: "فعالية حصرية في المقهى",
@@ -183,7 +184,9 @@ export function GeneralEventBuilder({
   return (
     <div className={styles.builderCard}>
       <header className={styles.builderHeader}>
-        <div className={styles.builderIconPill}>✨</div>
+        <div className={styles.builderIconPill}>
+          <Sparkles size={22} />
+        </div>
         <div>
           <h2>{ar ? "استضافة فعالية جديدة" : "Host a New Event"}</h2>
           <p className={styles.muted}>
@@ -209,6 +212,7 @@ export function GeneralEventBuilder({
         <div className={styles.categoryPillsGrid}>
           {categories.map((c) => {
             const isSelected = category === c.id;
+            const Icon = c.Icon;
             return (
               <button
                 key={c.id}
@@ -217,7 +221,9 @@ export function GeneralEventBuilder({
                 className={`${styles.categoryCard} ${isSelected ? styles.categoryCardActive : ""}`}
                 onClick={() => handleSelectCategory(c.id)}
               >
-                <span className={styles.categoryCardIcon}>{c.icon}</span>
+                <span className={styles.categoryCardIcon}>
+                  <Icon size={22} />
+                </span>
                 <span className={styles.categoryCardName}>{ar ? c.nameAr : c.nameEn}</span>
               </button>
             );
@@ -348,13 +354,16 @@ export function GeneralEventBuilder({
           className={`${styles.primary} ${styles.largeActionBtn}`}
           onClick={handleCreate}
         >
-          {busy
-            ? ar
-              ? "جارٍ إنشاء ونشر الفعالية…"
-              : "Creating event…"
-            : ar
-              ? "🚀 نشر الفعالية وفتح الحجوزات"
-              : "🚀 Launch Event & Open Bookings"}
+          <Rocket size={18} />
+          <span>
+            {busy
+              ? ar
+                ? "جارٍ إنشاء ونشر الفعالية…"
+                : "Creating event…"
+              : ar
+                ? "نشر الفعالية وفتح الحجوزات"
+                : "Launch Event & Open Bookings"}
+          </span>
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Coins, CreditCard, Ticket, Utensils } from "lucide-react";
 import styles from "./events.module.css";
 import type { VenueEvent } from "./types";
 
@@ -31,7 +32,7 @@ export function PaymentPolicySelector({
   const policies = [
     {
       id: "free" as const,
-      icon: "🎟️",
+      Icon: Ticket,
       titleAr: "حجز مجاني",
       titleEn: "Free Reservation",
       descAr: "لا يتطلب دفع مسبق. رائع للجلسات العائلية وعروض المباريات المعتادة.",
@@ -39,7 +40,7 @@ export function PaymentPolicySelector({
     },
     {
       id: "fee" as const,
-      icon: "💳",
+      Icon: CreditCard,
       titleAr: "رسوم دخول / تذكرة غير مستردة",
       titleEn: "Non-Refundable Fee",
       descAr: "رسم دخول ثابت للطاولة أو المقعد مقابل الفعالية، لا يُخصم من الأكل.",
@@ -47,7 +48,7 @@ export function PaymentPolicySelector({
     },
     {
       id: "deposit" as const,
-      icon: "💰",
+      Icon: Coins,
       titleAr: "عربون يُخصم من الفاتورة",
       titleEn: "Deposit Credited to Order",
       descAr: "مبلغ يُدفع لتأكيد الحجز، ويخصمه الكاشير تلقائيًا من حساب الوجبة عند الحضور.",
@@ -55,7 +56,7 @@ export function PaymentPolicySelector({
     },
     {
       id: "preorder" as const,
-      icon: "🍽️",
+      Icon: Utensils,
       titleAr: "حد أدنى للطلب المسبق",
       titleEn: "Pre-order Minimum Spend",
       descAr: "اشتراط حد أدنى من الطلبات لضمان الطاولة في الأوقات ذات الطلب العالي.",
@@ -78,6 +79,7 @@ export function PaymentPolicySelector({
       <div className={styles.policyCardsGrid}>
         {policies.map((p) => {
           const isSelected = mode === p.id;
+          const Icon = p.Icon;
           return (
             <button
               key={p.id}
@@ -91,12 +93,23 @@ export function PaymentPolicySelector({
                 if (p.id === "preorder" && amount === 0) onAmountChange(100);
               }}
             >
-              <div className={styles.policyCardHeader}>
-                <span className={styles.policyIcon}>{p.icon}</span>
-                <h4>{ar ? p.titleAr : p.titleEn}</h4>
+              <div className={styles.policyCardTopRow}>
+                <div className={styles.policyIconBadge}>
+                  <Icon size={20} />
+                </div>
+                {isSelected ? (
+                  <span className={styles.policySelectedTag}>
+                    <Check size={13} strokeWidth={2.5} />
+                    <span>{ar ? "مفعل" : "Active"}</span>
+                  </span>
+                ) : (
+                  <span className={styles.policyRadioCircle} />
+                )}
               </div>
-              <p className={styles.policyDesc}>{ar ? p.descAr : p.descEn}</p>
-              {isSelected && <span className={styles.policySelectedTag}>✓ {ar ? "مفعل" : "Active"}</span>}
+              <div className={styles.policyCardContent}>
+                <h4 className={styles.policyTitle}>{ar ? p.titleAr : p.titleEn}</h4>
+                <p className={styles.policyDesc}>{ar ? p.descAr : p.descEn}</p>
+              </div>
             </button>
           );
         })}
@@ -105,42 +118,44 @@ export function PaymentPolicySelector({
       {/* Mode Amount & Settings */}
       {mode !== "free" && (
         <div className={styles.pricingInputsRow}>
-          <label className={styles.field}>
-            <span>
-              {ar
-                ? mode === "preorder"
-                  ? "الحد الأدنى للطلب (ريال)"
-                  : mode === "deposit"
-                    ? "قيمة العربون المسترد من الطلب (ريال)"
-                    : "مبلغ الرسوم غير المستردة (ريال)"
-                : "Amount per table (SAR)"}
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={10000}
-              step="1"
-              value={amount}
-              onChange={(e) => onAmountChange(Number(e.target.value))}
-              disabled={disabled}
-              required
-              className="tabular-nums"
-            />
-          </label>
-
-          {/* Quick Amount Chips */}
-          <div className={styles.chipRow} style={{ alignSelf: "flex-end" }}>
-            {[25, 50, 75, 100, 150].map((sar) => (
-              <button
-                key={sar}
-                type="button"
-                disabled={disabled}
-                className={`${styles.presetChip} ${amount === sar ? styles.presetChipActive : ""}`}
-                onClick={() => onAmountChange(sar)}
-              >
-                {sar} {ar ? "ريال" : "SAR"}
-              </button>
-            ))}
+          <div className={styles.pricingAmountGroup}>
+            <label className={styles.field}>
+              <span>
+                {ar
+                  ? mode === "preorder"
+                    ? "الحد الأدنى للطلب (ريال)"
+                    : mode === "deposit"
+                      ? "قيمة العربون المسترد من الطلب (ريال)"
+                      : "مبلغ الرسوم غير المستردة (ريال)"
+                  : "Amount per table (SAR)"}
+              </span>
+              <div className={styles.amountInputWithChips}>
+                <input
+                  type="number"
+                  min={1}
+                  max={10000}
+                  step="1"
+                  value={amount}
+                  onChange={(e) => onAmountChange(Number(e.target.value))}
+                  disabled={disabled}
+                  required
+                  className="tabular-nums"
+                />
+                <div className={styles.chipRow}>
+                  {[25, 50, 75, 100, 150].map((sar) => (
+                    <button
+                      key={sar}
+                      type="button"
+                      disabled={disabled}
+                      className={`${styles.presetChip} ${amount === sar ? styles.presetChipActive : ""}`}
+                      onClick={() => onAmountChange(sar)}
+                    >
+                      {sar} {ar ? "ريال" : "SAR"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </label>
           </div>
 
           <label className={styles.field}>
