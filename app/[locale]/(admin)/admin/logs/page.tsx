@@ -226,6 +226,14 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
           : "No account found matching this address. Likely an external probe or typo.",
       };
     }
+    if (reason === "invalid_credentials_format") {
+      return {
+        title: isRtl ? `فشل الدخول — صيغة غير صالحة (${email})` : `Sign In Failed — Invalid Format (${email})`,
+        explanation: isRtl
+          ? "المدخلات غير مطابقة لصيغة البريد المعتمدة (اسم مستخدم، تجربة عشوائية، أو نص غير صالح)."
+          : "Input does not match standard email format (username, random string, or malformed probe).",
+      };
+    }
     if (reason === "rate_limited") {
       return {
         title: isRtl ? `حظر المحاولات — تجاوز معدل الطلبات (${email})` : `Throttled — Too Many Attempts (${email})`,
@@ -239,6 +247,16 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
       explanation: isRtl
         ? "رُفضت بيانات الدخول. راجع التفاصيل لمعرفة رمز الحالة."
         : "Credentials rejected by authentication service.",
+    };
+  }
+
+  if (log.event.startsWith("auth.probe")) {
+    const email = meta?.attemptedEmail || log.userId || "—";
+    return {
+      title: isRtl ? `فحص مسار مصادقة خارجي (${email})` : `External Auth Endpoint Probe (${email})`,
+      explanation: isRtl
+        ? "محاولة وصول خارجية أو استكشاف أمني لمسارات المصادقة."
+        : "External security probe or scanner targeting authentication endpoints.",
     };
   }
 
@@ -473,13 +491,13 @@ export default function LogsPage() {
   );
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("audit");
-  const [scope, setScope] = useState<ScopeMode>("business");
+  const [scope, setScope] = useState<ScopeMode>("global");
   const [logs, setLogs] = useState<OperationalLog[]>([]);
   const [summary, setSummary] = useState<LogSummary>(EMPTY_SUMMARY);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [filters, setFilters] = useState<LogFilters>({
     tab: "audit",
-    scope: "business",
+    scope: "global",
     auditType: "all",
     level: "all",
     source: "all",
@@ -1038,6 +1056,13 @@ export default function LogsPage() {
 
                       {/* Forensic Origin Badges (IP, Location, Device) */}
                       <div className={styles.forensicOrigin}>
+                        {meta?.attemptedEmail && (
+                          <span className={styles.ipBadge} title={t("attemptedEmail")}>
+                            <User size={12} />
+                            <code>{meta.attemptedEmail}</code>
+                          </span>
+                        )}
+
                         {meta?.country && (
                           <span className={styles.countryBadge}>
                             <MapPin size={12} />

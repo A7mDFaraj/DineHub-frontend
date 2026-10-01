@@ -159,8 +159,8 @@ function SignInForm() {
   const [requestError, setRequestError] = useState<string | null>(null);
 
   const signInSchema = z.object({
-    email: z.string().email(t("valEmail")),
-    password: z.string().min(8, t("valPassword")),
+    email: z.string().trim().min(1, t("valEmail")),
+    password: z.string().min(1, t("valPassword")),
   });
 
   type SignInValues = z.infer<typeof signInSchema>;
@@ -186,7 +186,7 @@ function SignInForm() {
           level: "warn",
           event: "auth.sign_in_rejected",
           message: error.message ?? "Sign-in was rejected",
-          metadata: { errorCode: error.code ?? "unknown" },
+          metadata: { errorCode: error.code ?? "unknown", attemptedEmail: values.email },
         });
         setRequestError(getAuthError(error, t));
         return;
