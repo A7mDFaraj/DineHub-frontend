@@ -11,6 +11,7 @@
     "test:customer": "playwright test",
     "test:ocr": "node --experimental-strip-types scripts/verify-menu-ocr.mjs",
     "test:ocr:browser": "playwright test --config=playwright.ocr.config.ts",
+    "test:images": "playwright test --config=playwright.images.config.ts",
     "build:cf": "opennextjs-cloudflare build",
     "deploy": "pnpm run build:cf && opennextjs-cloudflare deploy",
     "preview": "pnpm run build:cf && opennextjs-cloudflare preview"

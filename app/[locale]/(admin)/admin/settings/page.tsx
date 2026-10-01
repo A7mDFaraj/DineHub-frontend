@@ -21,6 +21,7 @@ import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
 import { ImageUploader } from "@/components/ui/image-uploader";
+import { isValidImageUrl } from "@/lib/image-url";
 import styles from "./settings.module.css";
 import {
   MenuThemeSettings,
@@ -52,6 +53,7 @@ export default function BranchSettingsPage() {
   } = useAdminBranch();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -93,8 +95,14 @@ export default function BranchSettingsPage() {
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isSaving || isUploadingImage) return;
     if (!selectedBranchId) {
       setErrorMsg(t("selectBranchFirst"));
+      return;
+    }
+
+    if (!isValidImageUrl(formData.logoUrl)) {
+      setErrorMsg(isRtl ? "أدخل رابط صورة صالحاً يبدأ بـ https://" : "Enter a valid HTTPS image URL.");
       return;
     }
 
@@ -118,7 +126,7 @@ export default function BranchSettingsPage() {
       setSuccessMsg("");
 
       await apiClient.patch(`/admin/branches/${selectedBranchId}`, {
-        logoUrl: formData.logoUrl.trim() || undefined,
+        logoUrl: formData.logoUrl.trim(),
         themeColor: formData.themeColor.trim() || "#f2644b",
         menuTheme: formData.menuTheme,
         showSpecialDiscount: formData.showSpecialDiscount,
@@ -127,8 +135,8 @@ export default function BranchSettingsPage() {
         enableReviews: formData.enableReviews,
       });
 
-      setSuccessMsg(t("successSaved"));
       await refreshBranches();
+      setSuccessMsg(t("successSaved"));
       setTimeout(() => setSuccessMsg(""), 4500);
     } catch (err: unknown) {
       console.error("Save settings error:", err);
@@ -187,7 +195,7 @@ export default function BranchSettingsPage() {
             type="button"
             className={styles.primaryButton}
             onClick={() => handleSave()}
-            disabled={isSaving || !selectedBranchId}
+            disabled={isSaving || isUploadingImage || !selectedBranchId}
           >
             {isSaving ? (
               <>
@@ -506,9 +514,12 @@ export default function BranchSettingsPage() {
                 <div className={styles.inputGroup}>
                   <label>{t("logoLabel")}</label>
                   <ImageUploader
+                    key={selectedBranchId}
+                    disabled={isSaving}
+                    onUploadingChange={setIsUploadingImage}
                     value={formData.logoUrl}
                     onChange={(url) =>
-                      setFormData({ ...formData, logoUrl: url })
+                      setFormData((current) => ({ ...current, logoUrl: url }))
                     }
                     label={isRtl ? "رفع شعار المتجر" : "Upload Brand Logo"}
                     description={

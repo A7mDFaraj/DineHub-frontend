@@ -2,12 +2,13 @@
 
 import { apiErrorMessage } from "@/lib/api-error";
 
-import { useState, useRef, ChangeEvent, DragEvent } from "react"
+import { useState, useRef, useEffect, useId, ChangeEvent, DragEvent } from "react"
 import { useLocale } from "next-intl"
 import { Upload, Link as LinkIcon, X, Loader2, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import Image from "@/components/ui/menu-image"
+import { isValidImageUrl } from "@/lib/image-url"
 
 interface ImageUploaderProps {
   value?: string
@@ -16,6 +17,8 @@ interface ImageUploaderProps {
   description?: string
   aspectRatio?: "square" | "banner" | "auto"
   className?: string
+  disabled?: boolean
+  onUploadingChange?: (uploading: boolean) => void
 }
 
 export function ImageUploader({
@@ -25,6 +28,8 @@ export function ImageUploader({
   description,
   aspectRatio = "square",
   className,
+  disabled = false,
+  onUploadingChange,
 }: ImageUploaderProps) {
   const locale = useLocale()
   const isRtl = locale === "ar"
@@ -32,12 +37,27 @@ export function ImageUploader({
   const [activeTab, setActiveTab] = useState<"file" | "url">("file")
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState("")
-  const [urlInput, setUrlInput] = useState(value || "")
+  const [failedPreview, setFailedPreview] = useState("")
+  const urlInput = value || ""
+  const inputId = useId()
+  const mounted = useRef(false)
+  const uploading = useRef(false)
+  const uploadCallback = useRef(onUploadingChange)
+  useEffect(() => { uploadCallback.current = onUploadingChange }, [onUploadingChange])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      uploadCallback.current?.(false)
+    }
+  }, [])
+  const locked = disabled || isUploading
+  const validUrl = isValidImageUrl(urlInput)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileUpload = async (file: File) => {
-    if (!file) return
+    if (!file || disabled || uploading.current) return
 
     // 5MB limit check
     if (file.size > 5 * 1024 * 1024) {
@@ -62,29 +82,33 @@ export function ImageUploader({
 
     try {
       setIsUploading(true)
+      uploading.current = true
+      onUploadingChange?.(true)
       setError("")
 
       const formData = new FormData()
       formData.append("file", file)
 
-      const res = await apiClient.post("/admin/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
+      const res = await apiClient.post("/admin/upload", formData)
+      if (!mounted.current) return
 
       const uploadedUrl = res.data?.url || res.data?.data?.url
-      if (uploadedUrl) {
-        onChange(uploadedUrl)
-        setUrlInput(uploadedUrl)
+      if (typeof uploadedUrl === "string" && uploadedUrl.trim() && isValidImageUrl(uploadedUrl)) {
+        onChange(uploadedUrl.trim())
       } else {
         throw new Error(isRtl ? "لم يتم استلام رابط الصورة من الخادم." : "No image URL returned from server.")
       }
     } catch (err: unknown) {
+      if (!mounted.current) return
       console.error("Upload error:", err)
       setError(apiErrorMessage(err) || (isRtl ? "تعذر رفع الصورة. يرجى المحاولة مرة أخرى." : "Failed to upload image. Please try again."))
     } finally {
-      setIsUploading(false)
+      uploading.current = false
+      if (mounted.current) {
+        setIsUploading(false)
+        onUploadingChange?.(false)
+        if (fileInputRef.current) fileInputRef.current.value = ""
+      }
     }
   }
 
@@ -116,7 +140,7 @@ export function ImageUploader({
 
   const handleUrlApply = () => {
     const trimmed = urlInput.trim()
-    if (trimmed) {
+    if (isValidImageUrl(trimmed)) {
       onChange(trimmed)
       setError("")
     }
@@ -124,7 +148,6 @@ export function ImageUploader({
 
   const handleClear = () => {
     onChange("")
-    setUrlInput("")
     setError("")
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
@@ -143,7 +166,7 @@ export function ImageUploader({
       )}
 
       {/* Existing Image Preview */}
-      {value ? (
+      {value?.trim() && validUrl ? (
         <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 p-2.5 flex items-center gap-3 group max-w-full shadow-inner">
           <div
             className={cn(
@@ -152,18 +175,22 @@ export function ImageUploader({
             )}
           >
             <Image
-              src={value}
+              src={value.trim()}
               alt={isRtl ? "معاينة صورة الصنف" : "Item image preview"}
               fill
               sizes="128px"
               className="object-cover"
+              onError={() => setFailedPreview(value.trim())}
+              onLoad={() => setFailedPreview("")}
             />
           </div>
 
           <div className="flex-1 min-w-0 pr-1 sm:pr-2">
             <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold mb-0.5">
               <CheckCircle2 size={14} />
-              <span>{isRtl ? "تم إرفاق الصورة" : "Image attached"}</span>
+              <span>{failedPreview === value.trim()
+                ? (isRtl ? "تعذر تحميل الصورة" : "Image could not load")
+                : (isRtl ? "تم إرفاق الصورة" : "Image attached")}</span>
             </div>
             <p className="text-xs text-zinc-400 truncate font-mono direction-ltr text-left" dir="ltr">{value}</p>
           </div>
@@ -171,6 +198,7 @@ export function ImageUploader({
           <button
             type="button"
             onClick={handleClear}
+            disabled={locked}
             className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all active:scale-[0.96] shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center"
             title={isRtl ? "حذف الصورة" : "Delete image"}
             aria-label={isRtl ? "حذف الصورة" : "Delete image"}
@@ -178,12 +206,13 @@ export function ImageUploader({
             <X size={16} />
           </button>
         </div>
-      ) : (
+      ) : null}
         <div className="space-y-2.5 w-full max-w-full min-w-0">
           {/* Tab buttons */}
           <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-1 rounded-xl w-full sm:w-fit max-w-full">
             <button
               type="button"
+              disabled={locked}
               onClick={() => {
                 setActiveTab("file")
                 setError("")
@@ -200,6 +229,7 @@ export function ImageUploader({
             </button>
             <button
               type="button"
+              disabled={locked}
               onClick={() => {
                 setActiveTab("url")
                 setError("")
@@ -222,7 +252,17 @@ export function ImageUploader({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !locked && fileInputRef.current?.click()}
+              role="button"
+              tabIndex={locked ? -1 : 0}
+              aria-disabled={locked}
+              aria-label={isRtl ? "رفع صورة" : "Upload image"}
+              onKeyDown={(e) => {
+                if (!locked && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault()
+                  fileInputRef.current?.click()
+                }
+              }}
               className={cn(
                 "border-2 border-dashed rounded-2xl p-5 sm:p-7 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 max-w-full box-border",
                 isDragging
@@ -233,7 +273,8 @@ export function ImageUploader({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/svg+xml,image/gif"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={locked}
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -271,17 +312,26 @@ export function ImageUploader({
           {activeTab === "url" && (
             <div className="flex flex-col sm:flex-row gap-2 w-full max-w-full">
               <input
+                id={inputId}
+                aria-label={isRtl ? "رابط الصورة" : "Image URL"}
+                aria-invalid={!validUrl}
+                aria-describedby={!validUrl || error ? `${inputId}-error` : undefined}
                 type="url"
+                disabled={locked}
                 dir="ltr"
                 value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
+                onChange={(e) => { onChange(e.target.value); setError("") }}
+                onBlur={handleUrlApply}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleUrlApply() }
+                }}
                 placeholder="https://example.com/item.jpg"
                 className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[rgba(71,170,161,0.6)] min-w-0"
               />
               <button
                 type="button"
                 onClick={handleUrlApply}
-                disabled={!urlInput.trim()}
+                disabled={locked || !urlInput.trim() || !validUrl}
                 className="px-4 py-2.5 bg-[var(--admin-teal,#47aaa1)] hover:bg-[#3d9890] disabled:opacity-40 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.96] shrink-0 w-full sm:w-auto shadow-sm"
               >
                 {isRtl ? "تطبيق" : "Apply"}
@@ -289,14 +339,13 @@ export function ImageUploader({
             </div>
           )}
 
-          {error && (
-            <div className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl">
+          {(error || !validUrl) && (
+            <div id={`${inputId}-error`} role="alert" className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl">
               <AlertCircle size={14} className="shrink-0" />
-              <span>{error}</span>
+              <span>{error || (isRtl ? "أدخل رابط صورة صالحاً يبدأ بـ https://" : "Enter a valid HTTPS image URL.")}</span>
             </div>
           )}
         </div>
-      )}
     </div>
   )
 }

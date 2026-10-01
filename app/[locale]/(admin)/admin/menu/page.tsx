@@ -26,6 +26,7 @@ import { apiClient } from "@/lib/api-client";
 import { useAdminBranch } from "@/lib/admin-branch-context";
 import { AdminBranchSelector } from "@/components/admin/admin-branch-selector";
 import { ImageUploader } from "@/components/ui/image-uploader";
+import { isValidImageUrl } from "@/lib/image-url";
 import NextImage from "@/components/ui/menu-image";
 import styles from "./menu.module.css";
 import {
@@ -141,6 +142,7 @@ export default function MenuManagementPage() {
 
   // Submissions
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingAttr, setIsSavingAttr] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -339,6 +341,7 @@ export default function MenuManagementPage() {
   };
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
+    if (isSubmitting || isUploadingImage) { e.preventDefault(); return; }
     e.preventDefault();
     if (isSubmitting) return;
     if (!selectedBranchId) {
@@ -370,7 +373,7 @@ export default function MenuManagementPage() {
       }
     }
     if (formData.descriptionAr.length > 1000 || formData.descriptionEn.length > 1000) errors.description = isRtl ? "الوصف يجب ألا يتجاوز 1000 حرف" : "Descriptions must be 1,000 characters or fewer";
-    if (formData.imageUrl && !/^https?:\/\//i.test(formData.imageUrl)) errors.imageUrl = isRtl ? "رابط الصورة غير صالح" : "Enter a valid image URL";
+    if (!isValidImageUrl(formData.imageUrl)) errors.imageUrl = isRtl ? "أدخل رابط صورة صالحاً يبدأ بـ https://" : "Enter a valid HTTPS image URL";
     setFormErrors(errors);
     if (Object.keys(errors).length) {
       setErrorMsg(isRtl ? "راجع الحقول المحددة أدناه." : "Review the highlighted fields below.");
@@ -398,7 +401,7 @@ export default function MenuManagementPage() {
         allergens: formData.allergens,
         dietaryTags: formData.dietaryTags,
         ingredientTags: formData.ingredientTags,
-        imageUrl: formData.imageUrl || undefined,
+        imageUrl: formData.imageUrl.trim(),
         isAvailable: formData.isAvailable,
       };
 
@@ -906,6 +909,9 @@ export default function MenuManagementPage() {
                 </div>
 
                 <ImageUploader
+                  key={`${selectedBranchId}:${editingProductId || "new"}`}
+                  disabled={isSubmitting}
+                  onUploadingChange={setIsUploadingImage}
                   value={formData.imageUrl}
                   onChange={(url) =>
                     setFormData((current) => ({ ...current, imageUrl: url }))
@@ -1205,7 +1211,7 @@ export default function MenuManagementPage() {
                 type="button"
                 className={styles.secondaryButton}
                 onClick={closeProductEditor}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingImage}
               >
                 {tCommon("cancel")}
               </button>
@@ -1213,7 +1219,7 @@ export default function MenuManagementPage() {
                 type="submit"
                 form="product-form"
                 className={styles.primaryButton}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingImage}
               >
                 {isSubmitting ? (
                   <>
