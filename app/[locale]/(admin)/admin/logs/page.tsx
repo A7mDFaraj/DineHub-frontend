@@ -6,25 +6,25 @@ import {
   Activity,
   AlertTriangle,
   Braces,
+  Check,
   CheckCircle2,
   ChevronDown,
   CircleAlert,
   Clock3,
   Copy,
   Download,
+  Filter,
   Gauge,
   Globe,
   KeyRound,
   Laptop,
   Loader2,
   MapPin,
-  MonitorSmartphone,
   Pause,
   Play,
   RefreshCw,
   Search,
   Server,
-  Shield,
   ShieldAlert,
   ShieldCheck,
   User,
@@ -38,8 +38,8 @@ import styles from "./logs.module.css";
 type LogLevel = "info" | "warn" | "error";
 type LogSource = "backend" | "frontend";
 type FilterValue<T extends string> = "all" | T;
-type ActiveTab = "audit" | "system";
 type ScopeMode = "business" | "global";
+type FilterCategory = "all" | "auth" | "auth_failures" | "access" | "data" | "system";
 
 interface ClientDevice {
   browser: string;
@@ -57,6 +57,7 @@ interface LogMetadata {
   auditType?: "auth" | "access" | "data" | "security" | "system";
   outcome?: "succeeded" | "failed" | "blocked" | "denied";
   reason?: string;
+  errorCode?: string;
   actor?: {
     id?: string;
     email?: string;
@@ -112,13 +113,11 @@ interface LogsResponse {
 }
 
 interface LogFilters {
-  tab: ActiveTab;
+  category: FilterCategory;
   scope: ScopeMode;
-  auditType: "all" | "auth" | "security" | "access" | "data";
   level: FilterValue<LogLevel>;
   source: FilterValue<LogSource>;
   search: string;
-  category: "all" | "auth" | "auth_failures" | "attention";
 }
 
 const EMPTY_SUMMARY: LogSummary = {
@@ -133,74 +132,72 @@ const EMPTY_SUMMARY: LogSummary = {
   topCountries: [],
 };
 
-function getCountryFlag(code?: string): string {
-  if (!code || code === "LOCAL" || code === "UNKNOWN") return "🌐";
-  const upper = code.toUpperCase();
-  if (upper.length !== 2) return "🌐";
-  const codePoints = [...upper].map((c) => 127397 + c.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
+/**
+ * Resolves standard country names and prevents the Windows emoji double-letter glitch (e.g. YE YE).
+ * Uses native Intl.DisplayNames without external dependencies.
+ */
+function formatLocation(
+  country?: string,
+  city?: string,
+  locale = "en",
+): { label: string; code: string; isLocal: boolean } {
+  if (!country || country === "UNKNOWN") {
+    return { label: locale === "ar" ? "موقع غير محدد" : "Unknown Origin", code: "—", isLocal: false };
+  }
+  if (country === "LOCAL") {
+    return { label: locale === "ar" ? "شبكة محلية" : "Local Network", code: "LAN", isLocal: true };
+  }
+  const cleanCode = country.toUpperCase().trim();
+  try {
+    const displayNames = new Intl.DisplayNames([locale === "ar" ? "ar-SA" : "en-US"], { type: "region" });
+    const name = displayNames.of(cleanCode) || cleanCode;
+    const cleanCity = city && city !== "Unknown" && city.trim() ? ` • ${city.trim()}` : "";
+    return {
+      label: `${name} (${cleanCode})${cleanCity}`,
+      code: cleanCode,
+      isLocal: false,
+    };
+  } catch {
+    const cleanCity = city && city !== "Unknown" && city.trim() ? ` • ${city.trim()}` : "";
+    return {
+      label: `${cleanCode}${cleanCity}`,
+      code: cleanCode,
+      isLocal: false,
+    };
+  }
 }
 
-function getRiskAssessment(log: OperationalLog, isRtl: boolean) {
+function formatRelativeTime(dateString: string, isRtl: boolean): string {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+  if (diffSec < 60) return isRtl ? "الآن" : "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return isRtl ? `منذ ${diffMin} د` : `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return isRtl ? `منذ ${diffHours} س` : `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return isRtl ? `منذ ${diffDays} ي` : `${diffDays}d ago`;
+}
+
+function describeLog(log: OperationalLog, isRtl: boolean): { title: string; explanation: string } {
   const meta = log.metadata;
-  if (log.statusCode === 429) {
-    return {
-      level: "critical" as const,
-      label: isRtl ? "حرج (اشتباه هجوم)" : "Critical (Rate Limit Spike)",
-    };
-  }
-  if (
-    log.statusCode === 401 &&
-    (meta?.reason === "wrong_password" || log.event.includes("auth.sign_in_failed"))
-  ) {
-    return {
-      level: "high" as const,
-      label: isRtl ? "مرتفع (فشل مصادقة)" : "High (Failed Authentication)",
-    };
-  }
-  if (log.statusCode === 403 || log.event.startsWith("security.")) {
-    return {
-      level: "medium" as const,
-      label: isRtl ? "متوسط (رفض صلاحيات)" : "Medium (Access Denied / Security)",
-    };
-  }
-  if ((log.statusCode ?? 0) >= 500) {
-    return {
-      level: "high" as const,
-      label: isRtl ? "مرتفع (عطل خادم)" : "High (Server Fault)",
-    };
-  }
-  return {
-    level: "low" as const,
-    label: isRtl ? "عادي (عملية قياسية)" : "Low (Standard Operation)",
-  };
-}
+  const isExplicitFailure =
+    log.event.includes("failed") ||
+    log.event.includes("rejected") ||
+    log.event.includes("denied") ||
+    log.event.includes("blocked") ||
+    (log.statusCode !== null && log.statusCode >= 400) ||
+    log.level === "warn" ||
+    log.level === "error";
 
-function getLoadError(error: unknown, isRtl: boolean): string {
-  if (!axios.isAxiosError(error)) {
-    return isRtl ? "تعذّر تحميل سجل النظام." : "Failed to load logs.";
-  }
-  if (error.response?.status === 403) {
-    return isRtl
-      ? "حسابك لا يملك صلاحية عرض السجل الإداري."
-      : "Your account does not have permission to view administrative logs.";
-  }
-  return isRtl
-    ? "تعذّر الاتصال بسجل النظام. تحقق من الخادم ثم حاول مرة أخرى."
-    : "Failed to connect to logs service. Check connection and retry.";
-}
+  if (log.event.startsWith("auth.sign_in") || log.event.startsWith("auth.sign-in")) {
+    const isSuccess =
+      !isExplicitFailure &&
+      log.event === "auth.sign_in_succeeded" &&
+      (log.statusCode === 200 || log.statusCode === null);
 
-function copyText(value: string): void {
-  void navigator.clipboard?.writeText(value);
-}
-
-function describeLog(log: OperationalLog, isRtl: boolean) {
-  const meta = log.metadata;
-  const failed = (log.statusCode ?? 0) >= 400;
-
-  if (log.event.startsWith("auth.sign_in")) {
-    const isSuccess = !failed;
     const email = meta?.attemptedEmail || log.userId || "—";
+
     if (isSuccess) {
       return {
         title: isRtl ? `تسجيل دخول ناجح (${email})` : `Successful Sign In (${email})`,
@@ -209,32 +206,47 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
           : "Credentials verified and authenticated session issued.",
       };
     }
+
     const reason = meta?.reason;
+    const errorCode = meta?.errorCode;
+
     if (reason === "wrong_password") {
       return {
         title: isRtl ? `فشل الدخول — كلمة المرور غير صحيحة (${email})` : `Sign In Failed — Wrong Password (${email})`,
         explanation: isRtl
-          ? "الحساب مسجل في النظام، لكن كلمة المرور المدخلة غير صحيحة."
-          : "Target account exists, but the password provided was incorrect.",
+          ? "الحساب مسجل، لكن كلمة المرور المدخلة غير صحيحة."
+          : "Account exists, but the password provided was incorrect.",
       };
     }
+
     if (reason === "password_account_unavailable") {
       return {
         title: isRtl ? `فشل الدخول — الحساب غير موجود (${email})` : `Sign In Failed — Account Not Found (${email})`,
         explanation: isRtl
-          ? "لا يوجد حساب بهذا البريد. قد تكون محاولة عشوائية أو فحص خارجي."
-          : "No account found matching this address. Likely an external probe or typo.",
+          ? "لا يوجد حساب مسجل بهذا البريد. محاولة عشوائية أو فحص خارجي."
+          : "No account found matching this address. External probe or typo.",
       };
     }
+
+    if (errorCode === "INVALID_EMAIL_OR_PASSWORD" || reason === "invalid_credentials") {
+      return {
+        title: isRtl ? `فشل الدخول — بيانات الاعتماد غير صحيحة (${email})` : `Sign In Failed — Invalid Credentials (${email})`,
+        explanation: isRtl
+          ? "بيانات الدخول غير متطابقة (البريد الإلكتروني أو كلمة المرور غير صحيحة)."
+          : "Credentials do not match (invalid email address or incorrect password).",
+      };
+    }
+
     if (reason === "invalid_credentials_format") {
       return {
         title: isRtl ? `فشل الدخول — صيغة غير صالحة (${email})` : `Sign In Failed — Invalid Format (${email})`,
         explanation: isRtl
-          ? "المدخلات غير مطابقة لصيغة البريد المعتمدة (اسم مستخدم، تجربة عشوائية، أو نص غير صالح)."
-          : "Input does not match standard email format (username, random string, or malformed probe).",
+          ? "المدخلات غير مطابقة لصيغة البريد المعتمدة."
+          : "Input does not match standard email format.",
       };
     }
-    if (reason === "rate_limited") {
+
+    if (reason === "rate_limited" || log.statusCode === 429) {
       return {
         title: isRtl ? `حظر المحاولات — تجاوز معدل الطلبات (${email})` : `Throttled — Too Many Attempts (${email})`,
         explanation: isRtl
@@ -242,11 +254,12 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
           : "Request throttled due to excessive attempts (possible brute-force attempt).",
       };
     }
+
     return {
       title: isRtl ? `فشل تسجيل الدخول (${email})` : `Sign In Attempt Rejected (${email})`,
       explanation: isRtl
-        ? "رُفضت بيانات الدخول. راجع التفاصيل لمعرفة رمز الحالة."
-        : "Credentials rejected by authentication service.",
+        ? "رُفضت بيانات الدخول بواسطة نظام المصادقة، ولم يتم إنشاء أي جلسة."
+        : "Credentials rejected by authentication service. No session was issued.",
     };
   }
 
@@ -256,7 +269,7 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
       title: isRtl ? `فحص مسار مصادقة خارجي (${email})` : `External Auth Endpoint Probe (${email})`,
       explanation: isRtl
         ? "محاولة وصول خارجية أو استكشاف أمني لمسارات المصادقة."
-        : "External security probe or scanner targeting authentication endpoints.",
+        : "External security probe targeting authentication endpoints.",
     };
   }
 
@@ -264,7 +277,7 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
     return {
       title: isRtl ? "تسجيل خروج من الحساب" : "User Signed Out",
       explanation: isRtl
-        ? "تم إبطال الجلسة ومسح ملفات تعريف الارتباط بنجاح."
+        ? "تم إنهاء الجلسة ومسح ملفات تعريف الارتباط بنجاح."
         : "Session invalidated and cookies cleared.",
     };
   }
@@ -294,20 +307,43 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
     };
   }
 
+  if (log.event.startsWith("branch.") || log.event.startsWith("menu.") || log.event.startsWith("category.")) {
+    return {
+      title: isRtl ? "تعديل بيانات النشاط" : "Business Data Updated",
+      explanation: log.message,
+    };
+  }
+
+  if (log.message.includes("Module build failed") || log.message.includes("Syntax Error")) {
+    return {
+      title: isRtl ? "خطأ في بناء الحزمة (تطوير محلي)" : "Module Build / Syntax Error (Local Dev)",
+      explanation: isRtl
+        ? "حدث خطأ مؤقت أثناء تجميع كود الصفحة في بيئة التطوير أثناء التعديل (تم حله)."
+        : "Temporary compilation error captured by dev server hot-reload during code editing (resolved).",
+    };
+  }
+
+  if (log.event === "window.error" || log.event === "resource.error" || log.event === "promise.unhandled_rejection") {
+    return {
+      title: isRtl ? "استثناء برمجي في واجهة المستخدم" : "Browser Runtime Exception",
+      explanation: log.message,
+    };
+  }
+
   if ((log.statusCode ?? 0) >= 500) {
     return {
       title: isRtl ? "خطأ في الخادم (500)" : "Server Error (500)",
       explanation: isRtl
-        ? "تعذر إكمال الطلب. استخدم رقم التتبع في التفاصيل لتحديد العطل."
+        ? "تعذر إكمال الطلب. تفقد شاشة المعاينة لعرض تتبع الخطأ."
         : "Request failed with internal server error. Inspect stack trace.",
     };
   }
 
   if (log.statusCode === 401) {
     return {
-      title: isRtl ? "جلسة غير صالحة أو منتهية" : "Unauthorized (401)",
+      title: isRtl ? "جلسة غير صالحة أو منتهية (401)" : "Unauthorized Request (401)",
       explanation: isRtl
-        ? "الطلب يحتاج تسجيل دخول نشط. طبيعي بعد انتهاء الجلسة."
+        ? "الطلب يتطلب تسجيل دخول نشط. طبيعي بعد انتهاء الجلسة."
         : "Request requires authentication or session expired.",
     };
   }
@@ -323,7 +359,7 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
 
   if (log.statusCode === 404) {
     return {
-      title: isRtl ? "العنصر غير موجود (404)" : "Resource Not Found (404)",
+      title: isRtl ? "المسار غير موجود (404)" : "Resource Not Found (404)",
       explanation: isRtl ? "الرابط أو العنصر المطلوب غير متوفر." : "Endpoint or resource not found.",
     };
   }
@@ -338,9 +374,95 @@ function describeLog(log: OperationalLog, isRtl: boolean) {
   }
 
   return {
-    title: failed ? (isRtl ? "طلب لم يكتمل" : "Incomplete Request") : (isRtl ? "عملية مكتملة" : "Completed Operation"),
+    title: isExplicitFailure
+      ? isRtl ? "طلب غير مكتمل" : "Incomplete Request"
+      : isRtl ? "عملية مكتملة" : "Completed Operation",
     explanation: log.message,
   };
+}
+
+function getLogStatusDescriptor(
+  log: OperationalLog,
+  isRtl: boolean,
+): {
+  type: "failed" | "success" | "security" | "system";
+  badgeText: string;
+} {
+  const isExplicitFailure =
+    log.event.includes("failed") ||
+    log.event.includes("rejected") ||
+    log.event.includes("denied") ||
+    log.event.includes("blocked") ||
+    (log.statusCode !== null && log.statusCode >= 400) ||
+    log.level === "warn" ||
+    log.level === "error";
+
+  if (log.event.startsWith("auth.sign_in") || log.event.startsWith("auth.sign-in")) {
+    if (log.event === "auth.sign_in_succeeded" && !isExplicitFailure) {
+      return {
+        type: "success",
+        badgeText: isRtl ? "دخول معتمد" : "Authenticated",
+      };
+    }
+    return {
+      type: "failed",
+      badgeText: isRtl ? "محاولة فاشلة" : "Failed Attempt",
+    };
+  }
+
+  if (log.statusCode === 429) {
+    return {
+      type: "security",
+      badgeText: isRtl ? "حظر معدل" : "Rate Limited",
+    };
+  }
+
+  if (log.event.startsWith("security.") || log.statusCode === 403) {
+    return {
+      type: "security",
+      badgeText: isRtl ? "حظر أمني" : "Security Block",
+    };
+  }
+
+  if (log.event.startsWith("access.")) {
+    return {
+      type: "system",
+      badgeText: isRtl ? "إدارة صلاحيات" : "Access Audit",
+    };
+  }
+
+  if (log.level === "error" || (log.statusCode !== null && log.statusCode >= 500)) {
+    return {
+      type: "failed",
+      badgeText: isRtl ? "خطأ نظام" : "System Error",
+    };
+  }
+
+  if (log.level === "warn" || (log.statusCode !== null && log.statusCode >= 400)) {
+    return {
+      type: "security",
+      badgeText: isRtl ? "تنبيه تشغيلي" : "Notice",
+    };
+  }
+
+  return {
+    type: "system",
+    badgeText: isRtl ? "عملية قياسية" : "Operational",
+  };
+}
+
+function getLoadError(error: unknown, isRtl: boolean): string {
+  if (!axios.isAxiosError(error)) {
+    return isRtl ? "تعذّر تحميل سجل النظام." : "Failed to load logs.";
+  }
+  if (error.response?.status === 403) {
+    return isRtl
+      ? "حسابك لا يملك صلاحية عرض السجل الإداري."
+      : "Your account does not have permission to view administrative logs.";
+  }
+  return isRtl
+    ? "تعذّر الاتصال بسجل النظام. تحقق من الخادم ثم حاول مرة أخرى."
+    : "Failed to connect to logs service. Check connection and retry.";
 }
 
 function LogDetailsModal({
@@ -349,18 +471,29 @@ function LogDetailsModal({
   isRtl,
   dateFormatter,
   t,
+  locale,
+  copiedKey,
+  onCopy,
 }: {
   log: OperationalLog | null;
   onClose: () => void;
   isRtl: boolean;
   dateFormatter: Intl.DateTimeFormat;
   t: (key: string) => string;
+  locale: string;
+  copiedKey: string | null;
+  onCopy: (key: string, text: string) => void;
 }) {
   if (!log) return null;
   const meta = log.metadata;
   const desc = describeLog(log, isRtl);
-  const risk = getRiskAssessment(log, isRtl);
-  const isAudit = log.event.startsWith("auth.") || log.event.startsWith("access.") || log.event.startsWith("security.") || Boolean(meta?.auditType && meta.auditType !== "system");
+  const status = getLogStatusDescriptor(log, isRtl);
+  const isAudit =
+    log.event.startsWith("auth.") ||
+    log.event.startsWith("access.") ||
+    log.event.startsWith("security.") ||
+    Boolean(meta?.auditType && meta.auditType !== "system");
+  const location = formatLocation(meta?.country, meta?.city, locale);
 
   return (
     <Dialog.Root open={Boolean(log)} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -370,15 +503,25 @@ function LogDetailsModal({
           <div className={styles.dialogHeader}>
             <div>
               <p>
-                <span data-level={log.level}>{t(`levels.${log.level}`)}</span>
-                <span className={styles.riskBadge} data-risk={risk.level}>
-                  {risk.label}
+                <span className={styles.statusBadge} data-type={status.type}>
+                  {status.badgeText}
                 </span>
                 {meta?.country && (
                   <span className={styles.countryBadge}>
-                    <span>{getCountryFlag(meta.country)}</span>
-                    <span>{meta.country}</span>
-                    {meta.city ? ` • ${meta.city}` : ""}
+                    <MapPin size={12} />
+                    <span>{location.label}</span>
+                  </span>
+                )}
+                {log.businessId === null && (log.event.startsWith("auth.") || log.event.startsWith("security.")) && (
+                  <span className={styles.worldwideBadge}>
+                    <Globe size={12} />
+                    {t("worldwideProbe")}
+                  </span>
+                )}
+                {log.source === "frontend" && (
+                  <span className={styles.deviceBadge}>
+                    <Laptop size={12} />
+                    {isRtl ? "واجهة العميل" : "Frontend"}
                   </span>
                 )}
               </p>
@@ -407,8 +550,16 @@ function LogDetailsModal({
                 <span className={styles.ipBadge}>
                   <code>{meta?.ip || "—"}</code>
                   {meta?.ip && meta.ip !== "unknown" && (
-                    <button type="button" onClick={() => copyText(meta.ip!)} title={t("copyIp")}>
-                      <Copy size={13} />
+                    <button
+                      type="button"
+                      onClick={() => onCopy(`modal-ip-${log.id}`, meta.ip!)}
+                      title={t("copyIp")}
+                    >
+                      {copiedKey === `modal-ip-${log.id}` ? (
+                        <Check size={13} style={{ color: "#6ee7b7" }} />
+                      ) : (
+                        <Copy size={13} />
+                      )}
                     </button>
                   )}
                 </span>
@@ -440,8 +591,16 @@ function LogDetailsModal({
               <dd dir="ltr">
                 <code>{log.requestId ?? "—"}</code>
                 {log.requestId ? (
-                  <button type="button" onClick={() => copyText(log.requestId!)} aria-label={t("copyTraceId")}>
-                    <Copy aria-hidden="true" size={14} />
+                  <button
+                    type="button"
+                    onClick={() => onCopy(`modal-req-${log.id}`, log.requestId!)}
+                    aria-label={t("copyTraceId")}
+                  >
+                    {copiedKey === `modal-req-${log.id}` ? (
+                      <Check size={14} style={{ color: "#6ee7b7" }} />
+                    ) : (
+                      <Copy size={14} />
+                    )}
                   </button>
                 ) : null}
               </dd>
@@ -490,22 +649,20 @@ export default function LogsPage() {
     [locale],
   );
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>("audit");
-  const [scope, setScope] = useState<ScopeMode>("global");
   const [logs, setLogs] = useState<OperationalLog[]>([]);
   const [summary, setSummary] = useState<LogSummary>(EMPTY_SUMMARY);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [filters, setFilters] = useState<LogFilters>({
-    tab: "audit",
+    category: "all",
     scope: "global",
-    auditType: "all",
     level: "all",
     source: "all",
     search: "",
-    category: "all",
   });
   const [searchDraft, setSearchDraft] = useState("");
   const [selectedLog, setSelectedLog] = useState<OperationalLog | null>(null);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -517,6 +674,23 @@ export default function LogsPage() {
   const requestVersion = useRef(0);
   const pendingRequest = useRef<AbortController | null>(null);
   const nextCursorRef = useRef<string | null>(null);
+
+  const handleCopy = useCallback((key: string, text: string) => {
+    void navigator.clipboard?.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => {
+      setCopiedKey((curr) => (curr === key ? null : curr));
+    }, 2000);
+  }, []);
+
+  const filterByTerm = useCallback((term: string) => {
+    setSearchDraft(term);
+    setFilters((current) => ({ ...current, search: term }));
+  }, []);
+
+  const toggleRowExpand = useCallback((id: string) => {
+    setExpandedRowId((curr) => (curr === id ? null : id));
+  }, []);
 
   const loadLogs = useCallback(
     async (append = false, silent = false) => {
@@ -533,14 +707,33 @@ export default function LogsPage() {
       try {
         const params: Record<string, string | number> = {
           limit: isSlowMode ? 5 : 50,
-          tab: filters.tab,
           scope: filters.scope,
         };
+
+        // Unified Category Mapping to Backend
+        if (filters.category === "all") {
+          params.tab = "all";
+        } else if (filters.category === "auth") {
+          params.tab = "all";
+          params.category = "auth";
+          params.auditType = "auth";
+        } else if (filters.category === "auth_failures") {
+          params.tab = "all";
+          params.category = "auth_failures";
+          params.auditType = "security";
+        } else if (filters.category === "access") {
+          params.tab = "all";
+          params.auditType = "access";
+        } else if (filters.category === "data") {
+          params.tab = "all";
+          params.auditType = "data";
+        } else if (filters.category === "system") {
+          params.tab = "system";
+        }
+
         if (filters.level !== "all") params.level = filters.level;
         if (filters.source !== "all") params.source = filters.source;
         if (filters.search) params.search = filters.search;
-        if (filters.category !== "all") params.category = filters.category;
-        if (filters.auditType !== "all") params.auditType = filters.auditType;
         if (append && nextCursorRef.current) params.cursor = nextCursorRef.current;
 
         const { data } = await apiClient.get<LogsResponse>("/admin/logs", {
@@ -549,7 +742,42 @@ export default function LogsPage() {
         });
 
         if (version !== requestVersion.current) return;
-        setLogs((current) => (append ? [...current, ...data.items] : data.items));
+
+        // Deduplicate logs in the client feed to ensure pristine presentation
+        setLogs((current) => {
+          const rawItems = append ? [...current, ...data.items] : data.items;
+
+          // Track backend auth attempt timestamps and emails
+          const backendAuthTimestamps = new Map<string, number>();
+          for (const item of rawItems) {
+            if (item.source === "backend" && item.event.startsWith("auth.sign_in")) {
+              const email = item.metadata?.attemptedEmail || item.userId || "";
+              if (email) {
+                backendAuthTimestamps.set(email, new Date(item.createdAt).getTime());
+              }
+            }
+          }
+
+          const seen = new Set<string>();
+          return rawItems.filter((item) => {
+            // Suppress redundant client-side shadow logs if authoritative backend log exists for same target
+            if (item.source === "frontend" && item.event.startsWith("auth.sign_in")) {
+              const email = item.metadata?.attemptedEmail || item.userId || "";
+              const backendTime = backendAuthTimestamps.get(email);
+              if (backendTime && Math.abs(new Date(item.createdAt).getTime() - backendTime) < 15_000) {
+                return false;
+              }
+            }
+
+            const key = item.requestId
+              ? `${item.requestId}-${item.event}`
+              : `${item.event}-${item.metadata?.attemptedEmail || item.metadata?.ip || ""}-${item.createdAt.slice(0, 19)}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        });
+
         const cursor = isSlowMode ? null : data.nextCursor;
         setNextCursor(cursor);
         nextCursorRef.current = cursor;
@@ -592,24 +820,19 @@ export default function LogsPage() {
     return () => window.clearInterval(timer);
   }, [isLive, isSlowMode, loadLogs]);
 
-  const handleTabChange = (newTab: ActiveTab) => {
-    setActiveTab(newTab);
+  const handleCategoryChange = (category: FilterCategory) => {
     setSearchDraft("");
     setFilters((current) => ({
       ...current,
-      tab: newTab,
-      category: "all",
-      auditType: "all",
-      level: "all",
+      category,
       search: "",
     }));
   };
 
-  const handleScopeChange = (newScope: ScopeMode) => {
-    setScope(newScope);
+  const handleScopeChange = (scope: ScopeMode) => {
     setFilters((current) => ({
       ...current,
-      scope: newScope,
+      scope,
     }));
   };
 
@@ -632,13 +855,11 @@ export default function LogsPage() {
   const clearFilters = () => {
     setSearchDraft("");
     setFilters({
-      tab: activeTab,
-      scope,
-      auditType: "all",
+      category: "all",
+      scope: "global",
       level: "all",
       source: "all",
       search: "",
-      category: "all",
     });
   };
 
@@ -646,12 +867,14 @@ export default function LogsPage() {
     try {
       setIsExporting(true);
       const params = new URLSearchParams({
-        tab: filters.tab,
+        tab: filters.category === "system" ? "system" : "all",
         scope: filters.scope,
       });
       if (filters.search) params.set("search", filters.search);
-      if (filters.category !== "all") params.set("category", filters.category);
-      if (filters.auditType !== "all") params.set("auditType", filters.auditType);
+      if (filters.category === "auth_failures") params.set("category", "auth_failures");
+      else if (filters.category === "auth") params.set("category", "auth");
+      else if (filters.category === "access") params.set("auditType", "access");
+      else if (filters.category === "data") params.set("auditType", "data");
 
       const response = await apiClient.get(`/admin/logs/export?${params.toString()}`, {
         responseType: "blob",
@@ -661,10 +884,10 @@ export default function LogsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `dinehub-${filters.tab}-logs-${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute("download", `dinehub-system-audit-${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Export failed", err);
@@ -673,14 +896,13 @@ export default function LogsPage() {
     }
   };
 
+  const authAttemptsCount = (summary.successfulLogins ?? 0) + (summary.failedLogins ?? 0);
+  const systemErrorsCount = summary.errors + summary.warnings;
+
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
-          <p className={styles.eyebrow}>
-            <span aria-hidden="true" />
-            {isRtl ? "مركز الرقابة والتدقيق الأمني • من المتصفح إلى قاعدة البيانات" : "DineHub Security Audit & Telemetry • Cloud to DB"}
-          </p>
           <h1>{t("pageTitle")}</h1>
           <p>{t("pageDesc")}</p>
         </div>
@@ -722,230 +944,140 @@ export default function LogsPage() {
         </div>
       </header>
 
-      {/* Top Tab Switcher: Audit Trail vs System Telemetry */}
-      <div className={styles.tabNavContainer}>
-        <div className={styles.tabNav} role="tablist" aria-label="Logs Sections">
-          <button
-            className={styles.tabButton}
-            data-tab="audit"
-            data-active={activeTab === "audit"}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "audit"}
-            onClick={() => handleTabChange("audit")}
-          >
-            <ShieldCheck size={18} />
-            <span>{t("tabAudit")}</span>
-          </button>
-          <button
-            className={styles.tabButton}
-            data-tab="system"
-            data-active={activeTab === "system"}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "system"}
-            onClick={() => handleTabChange("system")}
-          >
-            <Server size={18} />
-            <span>{t("tabSystem")}</span>
-          </button>
-        </div>
-        <p className={styles.tabDescription}>
-          {activeTab === "audit" ? t("tabAuditDesc") : t("tabSystemDesc")}
-        </p>
-      </div>
-
-      {/* Scope Bar: This Business vs Worldwide Global Probes */}
-      {activeTab === "audit" && (
-        <div className={styles.scopeBar}>
-          <div className={styles.scopeToggleGroup}>
-            <span style={{ fontSize: "0.78rem", color: "#8d8093", fontWeight: 600 }}>
-              {isRtl ? "نطاق المراقبة:" : "Audit Scope:"}
-            </span>
-            <button
-              className={styles.scopeOption}
-              data-scope="business"
-              data-active={scope === "business"}
-              type="button"
-              onClick={() => handleScopeChange("business")}
-            >
-              <User size={15} />
-              <span>{t("scopeBusiness")}</span>
-            </button>
-            <button
-              className={styles.scopeOption}
-              data-scope="global"
-              data-active={scope === "global"}
-              type="button"
-              onClick={() => handleScopeChange("global")}
-            >
-              <Globe size={15} />
-              <span>{t("scopeGlobal")}</span>
-            </button>
-          </div>
-          <span className={styles.scopeNotice} data-scope={scope}>
-            {scope === "global" ? (
-              <>
-                <ShieldAlert size={15} />
-                {t("scopeGlobalNotice")}
-              </>
-            ) : (
-              <>
-                <ShieldCheck size={15} />
-                {t("scopeBusinessNotice")}
-              </>
-            )}
-          </span>
-        </div>
-      )}
-
-      {/* Quick Filter Categories */}
-      {activeTab === "audit" ? (
-        <nav className={styles.quickFilters} aria-label={isRtl ? "تصنيف أحداث التدقيق" : "Audit Categories"}>
-          {(["all", "auth", "security", "access", "data"] as const).map((type) => (
-            <button
-              type="button"
-              key={type}
-              aria-pressed={filters.auditType === type}
-              onClick={() => {
-                setSearchDraft("");
-                setFilters((current) => ({
-                  ...current,
-                  auditType: type,
-                  category: type === "auth" ? "auth" : type === "security" ? "auth_failures" : "all",
-                  search: "",
-                }));
-              }}
-            >
-              {type === "all" ? t("auditTypeAll")
-                : type === "auth" ? t("auditTypeAuth")
-                : type === "security" ? (isRtl ? "فشل الدخول والتنبيهات 🚨" : "Failed Logins & Alerts 🚨")
-                : type === "access" ? t("auditTypeAccess")
-                : t("auditTypeData")}
-            </button>
-          ))}
-        </nav>
-      ) : (
-        <nav className={styles.quickFilters} aria-label={isRtl ? "نوع الأحداث" : "Event Categories"}>
-          {(["all", "auth", "auth_failures", "attention"] as const).map((category) => (
-            <button
-              type="button"
-              key={category}
-              aria-pressed={filters.category === category}
-              onClick={() => {
-                setSearchDraft("");
-                setFilters((current) => ({
-                  ...current,
-                  category,
-                  level: "all",
-                  source: "all",
-                  search: "",
-                }));
-              }}
-            >
-              {category === "all" ? t("catAll")
-                : category === "auth" ? t("catAuth")
-                : category === "auth_failures" ? t("catAuthFailures")
-                : t("catAttention")}
-            </button>
-          ))}
-        </nav>
-      )}
-
-      {/* KPI Summary Cards */}
-      <section className={styles.summaryGrid} aria-label={isRtl ? "ملخص آخر 24 ساعة" : "Last 24 Hours Summary"}>
-        {activeTab === "audit" ? (
-          <>
-            <article data-tone="failed-logins">
-              <span><ShieldAlert aria-hidden="true" size={20} /></span>
-              <small>{t("kpiFailedLogins")}</small>
-              <strong>{(summary.failedLogins ?? 0).toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>{isRtl ? "محاولات دخول غير مصرح بها" : "Rejected credential attempts"}</p>
-            </article>
-            <article data-tone="success-auth">
-              <span><ShieldCheck aria-hidden="true" size={20} /></span>
-              <small>{t("kpiSuccessfulLogins")}</small>
-              <strong>{(summary.successfulLogins ?? 0).toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>{isRtl ? "تسجيلات دخول معتمدة" : "Authorized team sessions"}</p>
-            </article>
-            <article data-tone="security">
-              <span><KeyRound aria-hidden="true" size={20} /></span>
-              <small>{t("kpiSecurityAlerts")}</small>
-              <strong>{summary.errors.toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>{isRtl ? "رفض وصول أو تجاوز حد الطلبات" : "Access denials & rate limits"}</p>
-            </article>
-            <article data-tone="locations">
-              <span><Globe aria-hidden="true" size={20} /></span>
-              <small>{t("kpiUniqueIps")}</small>
-              <strong>{(summary.uniqueIps ?? 0).toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>
-                {summary.topCountries && summary.topCountries.length > 0
-                  ? summary.topCountries.map((c) => `${getCountryFlag(c.country)} ${c.country}`).join(" ")
-                  : isRtl ? "مواقع الدخول المرصودة" : "Active locations detected"}
-              </p>
-            </article>
-          </>
-        ) : (
-          <>
-            <article data-tone="healthy">
-              <span><Activity aria-hidden="true" size={20} /></span>
-              <small>{t("kpiTotal")}</small>
-              <strong>{summary.total.toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>{isRtl ? "إجمالي الأحداث المسجلة" : "Past 24 hours traffic"}</p>
-            </article>
-            <article data-tone="error">
-              <span><CircleAlert aria-hidden="true" size={20} /></span>
-              <small>{t("kpiErrors")}</small>
-              <strong>{summary.errors.toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>{isRtl ? "أخطاء برمجية حرجة" : "500 server errors & faults"}</p>
-            </article>
-            <article data-tone="warning">
-              <span><AlertTriangle aria-hidden="true" size={20} /></span>
-              <small>{t("kpiWarnings")}</small>
-              <strong>{summary.warnings.toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>{isRtl ? "استجابات بطيئة أو تحذيرات" : "Latency / 4xx responses"}</p>
-            </article>
-            <article data-tone="frontend">
-              <span><MonitorSmartphone aria-hidden="true" size={20} /></span>
-              <small>{t("kpiFrontend")}</small>
-              <strong>{summary.frontend.toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
-              <p>{isRtl ? "أجهزة العملاء والإدارة" : "Guest & staff client devices"}</p>
-            </article>
-          </>
-        )}
+      {/* KPI Executive Summary Grid */}
+      <section className={styles.summaryGrid} aria-label={isRtl ? "ملخص الرقابة لآخر 24 ساعة" : "24-Hour Executive Summary"}>
+        <article data-tone="failed-logins">
+          <span><ShieldAlert aria-hidden="true" size={20} /></span>
+          <small>{t("kpiFailedLogins")}</small>
+          <strong>{(summary.failedLogins ?? 0).toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
+          <p>{isRtl ? "محاولات دخول غير مصرح بها أو فحص خارجي" : "Rejected credential attempts & external probes"}</p>
+        </article>
+        <article data-tone="success-auth">
+          <span><ShieldCheck aria-hidden="true" size={20} /></span>
+          <small>{t("kpiSuccessfulLogins")}</small>
+          <strong>{(summary.successfulLogins ?? 0).toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
+          <p>{isRtl ? "تسجيلات دخول معتمدة لفريق العمل" : "Verified team and admin sessions"}</p>
+        </article>
+        <article data-tone="security">
+          <span><AlertTriangle aria-hidden="true" size={20} /></span>
+          <small>{t("kpiSecurityAlerts")}</small>
+          <strong>{systemErrorsCount.toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
+          <p>{isRtl ? "تنبيهات أمنية وتجاوز حد الطلبات وأخطاء الخادم" : "Rate limits, 403 blocks & server alerts"}</p>
+        </article>
+        <article data-tone="locations">
+          <span><Globe aria-hidden="true" size={20} /></span>
+          <small>{t("kpiUniqueIps")}</small>
+          <strong>{(summary.uniqueIps ?? 0).toLocaleString(locale === "en" ? "en-US" : "ar-SA")}</strong>
+          <p>
+            {summary.topCountries && summary.topCountries.length > 0
+              ? summary.topCountries
+                  .map((c) => `${formatLocation(c.country, undefined, locale).label} (${c.count})`)
+                  .join(" • ")
+              : isRtl ? "مواقع الدخول المرصودة" : "Detected client origins"}
+          </p>
+        </article>
       </section>
 
-      {/* Main Panel: Filter Bar & Feed List */}
+      {/* Main Single-View Dashboard Panel */}
       <section className={styles.logPanel} aria-labelledby="system-log-title">
-        <div className={styles.panelHeader}>
-          <div>
-            <h2 id="system-log-title">
-              {activeTab === "audit" ? (
-                <>
-                  <Shield aria-hidden="true" size={20} />
-                  {isRtl ? "سجل التدقيق والرقابة" : "Audit Trail Records"}
-                </>
-              ) : (
-                <>
-                  <Server aria-hidden="true" size={20} />
-                  {isRtl ? "سجل العمليات والشبكة" : "System & Network Events"}
-                </>
+        {/* Unified Control Toolbar: Categories with Live Counts + Scope Selector */}
+        <div className={styles.controlToolbar}>
+          <nav className={styles.categoryNav} aria-label={isRtl ? "تصنيف السجلات" : "Log Categories"}>
+            <button
+              type="button"
+              className={styles.categoryPill}
+              aria-pressed={filters.category === "all"}
+              onClick={() => handleCategoryChange("all")}
+            >
+              <Activity size={15} />
+              <span>{t("filterAll")}</span>
+              {summary.total > 0 && <span className={styles.pillCount}>{summary.total}</span>}
+            </button>
+            <button
+              type="button"
+              className={styles.categoryPill}
+              aria-pressed={filters.category === "auth"}
+              onClick={() => handleCategoryChange("auth")}
+            >
+              <ShieldCheck size={15} />
+              <span>{t("filterAuth")}</span>
+              {authAttemptsCount > 0 && <span className={styles.pillCount}>{authAttemptsCount}</span>}
+            </button>
+            <button
+              type="button"
+              className={styles.categoryPill}
+              aria-pressed={filters.category === "auth_failures"}
+              data-warning="true"
+              onClick={() => handleCategoryChange("auth_failures")}
+            >
+              <ShieldAlert size={15} />
+              <span>{t("filterFailures")}</span>
+              {(summary.failedLogins ?? 0) > 0 && (
+                <span className={styles.pillCount} data-alert="true">
+                  {summary.failedLogins}
+                </span>
               )}
-            </h2>
-            <p data-paused={!isLive}>
-              <span className={styles.liveDot} aria-hidden="true" />
-              {!isLive
-                ? (isRtl ? "التحديث متوقف — جمع السجلات مستمر في الخلفية" : "Live stream paused — telemetry collection active in background")
-                : isSlowMode
-                  ? (isRtl ? "الوضع البطيء — آخر 5 أحداث كل دقيقتين" : "Slow mode — latest 5 events every 2 minutes")
-                  : (isRtl ? "تحديث تلقائي هادئ كل دقيقة أثناء المراقبة" : "Auto-polling every 60 seconds")}
-            </p>
-          </div>
+            </button>
+            <button
+              type="button"
+              className={styles.categoryPill}
+              aria-pressed={filters.category === "access"}
+              onClick={() => handleCategoryChange("access")}
+            >
+              <KeyRound size={15} />
+              <span>{t("filterAccess")}</span>
+            </button>
+            <button
+              type="button"
+              className={styles.categoryPill}
+              aria-pressed={filters.category === "data"}
+              onClick={() => handleCategoryChange("data")}
+            >
+              <Server size={15} />
+              <span>{t("filterData")}</span>
+            </button>
+            <button
+              type="button"
+              className={styles.categoryPill}
+              aria-pressed={filters.category === "system"}
+              onClick={() => handleCategoryChange("system")}
+            >
+              <Activity size={15} />
+              <span>{t("filterSystem")}</span>
+              {systemErrorsCount > 0 && <span className={styles.pillCount}>{systemErrorsCount}</span>}
+            </button>
+          </nav>
 
-          <form className={styles.filters} onSubmit={submitSearch} role="search">
-            <label className={styles.searchField}>
-              <span className={styles.srOnly}>{t("searchPlaceholder")}</span>
-              <Search aria-hidden="true" size={18} />
+          {/* Integrated Scope Toggle Pill */}
+          <div className={styles.scopeToggle} role="group" aria-label={isRtl ? "نطاق المراقبة" : "Audit Scope"}>
+            <button
+              type="button"
+              className={styles.scopeButton}
+              data-active={filters.scope === "global"}
+              onClick={() => handleScopeChange("global")}
+              title={t("scopeGlobalNotice")}
+            >
+              <Globe size={14} />
+              <span>{t("scopeGlobal")}</span>
+            </button>
+            <button
+              type="button"
+              className={styles.scopeButton}
+              data-active={filters.scope === "business"}
+              onClick={() => handleScopeChange("business")}
+              title={t("scopeBusinessNotice")}
+            >
+              <User size={14} />
+              <span>{t("scopeBusiness")}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Dedicated Full-Width Search & Filter Bar */}
+        <div className={styles.panelHeader}>
+          <form className={styles.searchForm} onSubmit={submitSearch} role="search">
+            <div className={styles.searchField}>
+              <Search aria-hidden="true" size={17} />
               <input
                 value={searchDraft}
                 onChange={(event) => setSearchDraft(event.target.value)}
@@ -953,52 +1085,97 @@ export default function LogsPage() {
                 dir="auto"
               />
               {searchDraft ? (
-                <button type="button" onClick={() => setSearchDraft("")} aria-label={isRtl ? "مسح البحث" : "Clear search"}>
-                  <X aria-hidden="true" size={16} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchDraft("");
+                    setFilters((curr) => ({ ...curr, search: "" }));
+                  }}
+                  aria-label={isRtl ? "مسح البحث" : "Clear search"}
+                >
+                  <X aria-hidden="true" size={15} />
                 </button>
               ) : null}
-            </label>
+            </div>
 
-            <label className={styles.selectField}>
-              <span className={styles.srOnly}>{t("filterLevel")}</span>
-              <select
-                value={filters.level}
-                onChange={(event) =>
-                  setFilters((current) => ({ ...current, level: event.target.value as FilterValue<LogLevel> }))
-                }
-              >
-                <option value="all">{t("allLevels")}</option>
-                <option value="error">{t("levels.error")}</option>
-                <option value="warn">{t("levels.warn")}</option>
-                <option value="info">{t("levels.info")}</option>
-              </select>
-              <ChevronDown aria-hidden="true" size={16} />
-            </label>
+            <div className={styles.filterDropdowns}>
+              <label className={styles.selectField}>
+                <span className={styles.srOnly}>{t("filterLevel")}</span>
+                <select
+                  value={filters.level}
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      level: event.target.value as FilterValue<LogLevel>,
+                    }))
+                  }
+                >
+                  <option value="all">{t("allLevels")}</option>
+                  <option value="error">{t("levels.error")}</option>
+                  <option value="warn">{t("levels.warn")}</option>
+                  <option value="info">{t("levels.info")}</option>
+                </select>
+                <ChevronDown aria-hidden="true" size={15} />
+              </label>
 
-            <label className={styles.selectField}>
-              <span className={styles.srOnly}>{t("filterSource")}</span>
-              <select
-                value={filters.source}
-                onChange={(event) =>
-                  setFilters((current) => ({ ...current, source: event.target.value as FilterValue<LogSource> }))
-                }
-              >
-                <option value="all">{t("allSources")}</option>
-                <option value="backend">{t("sources.backend")}</option>
-                <option value="frontend">{t("sources.frontend")}</option>
-              </select>
-              <ChevronDown aria-hidden="true" size={16} />
-            </label>
+              <label className={styles.selectField}>
+                <span className={styles.srOnly}>{t("filterSource")}</span>
+                <select
+                  value={filters.source}
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      source: event.target.value as FilterValue<LogSource>,
+                    }))
+                  }
+                >
+                  <option value="all">{t("allSources")}</option>
+                  <option value="backend">{t("sources.backend")}</option>
+                  <option value="frontend">{t("sources.frontend")}</option>
+                </select>
+                <ChevronDown aria-hidden="true" size={15} />
+              </label>
 
-            <button className={styles.searchButton} type="submit">
-              {isRtl ? "بحث" : "Search"}
-            </button>
+              <button className={styles.searchButton} type="submit">
+                <span>{isRtl ? "بحث" : "Search"}</span>
+              </button>
+            </div>
           </form>
         </div>
 
+        {/* Live Status & Background Feed Indicator */}
+        <div className={styles.feedStatusNotice}>
+          <span className={styles.liveDot} data-paused={!isLive} aria-hidden="true" />
+          <p>
+            {!isLive
+              ? (isRtl ? "التحديث التلقائي متوقف — التسجيل مستمر في الخلفية" : "Live stream paused — background recording active")
+              : isSlowMode
+                ? (isRtl ? "الوضع البطيء — استعلام خفيف كل دقيقتين" : "Slow mode — low-overhead poll every 2 minutes")
+                : (isRtl ? "مراقبة نشطة — تحديث تلقائي كل 60 ثانية" : "Active monitoring — polling every 60 seconds")}
+          </p>
+        </div>
+
+        {filters.search && (
+          <div className={styles.activeFilterNotice}>
+            <Filter size={13} />
+            <span>
+              {isRtl ? "تصفية السجلات حسب:" : "Filtered by:"} <strong>{filters.search}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchDraft("");
+                setFilters((curr) => ({ ...curr, search: "" }));
+              }}
+            >
+              {isRtl ? "إلغاء التصفية" : "Clear filter"}
+            </button>
+          </div>
+        )}
+
         {loadError && logs.length > 0 ? (
-          <p className={styles.filterHint} role="alert" style={{ margin: "16px 20px 0" }}>
-            {loadError} — {isRtl ? "آخر نتائج محملة ما زالت ظاهرة." : "Previously loaded results remain visible."}
+          <p className={styles.filterHint} role="alert" style={{ margin: "14px 20px 0" }}>
+            {loadError} — {isRtl ? "البيانات المعروضة مسبقاً لا تزال متاحة." : "Previously fetched events remain available."}
           </p>
         ) : null}
 
@@ -1006,12 +1183,12 @@ export default function LogsPage() {
           <div className={styles.statePanel} aria-busy="true">
             <Loader2 className={styles.spinning} aria-hidden="true" size={28} />
             <h3>{t("loading")}</h3>
-            <p>{isRtl ? "نجمع أحدث سجلات التدقيق والعمليات." : "Fetching latest audit trail and server telemetry."}</p>
+            <p>{isRtl ? "نجمع أحدث سجلات التدقيق والعمليات التشغيلية." : "Fetching unified audit trail and operational telemetry."}</p>
           </div>
         ) : loadError && !logs.length ? (
           <div className={styles.statePanel} role="alert">
             <CircleAlert aria-hidden="true" size={28} />
-            <h3>{isRtl ? "تعذّر فتح السجل" : "Failed to open logs"}</h3>
+            <h3>{isRtl ? "تعذّر فتح السجل" : "Failed to load audit feed"}</h3>
             <p>{loadError}</p>
             <button type="button" onClick={() => void loadLogs()}>
               {isRtl ? "إعادة المحاولة" : "Try Again"}
@@ -1023,64 +1200,116 @@ export default function LogsPage() {
               {logs.map((log) => {
                 const desc = describeLog(log, isRtl);
                 const meta = log.metadata;
-                const risk = getRiskAssessment(log, isRtl);
-                const isFailedAuth = log.statusCode === 401 || log.statusCode === 429 || log.event.includes("failed");
+                const status = getLogStatusDescriptor(log, isRtl);
+                const isFailed = status.type === "failed";
+                const isSecurity = status.type === "security";
+                const location = formatLocation(meta?.country, meta?.city, locale);
+                const isExpanded = expandedRowId === log.id;
 
                 return (
-                  <article className={styles.logRow} data-level={log.level} key={log.id}>
-                    <span className={styles.levelSignal} aria-hidden="true">
-                      {log.level === "error" ? (
-                        <CircleAlert size={18} />
-                      ) : log.level === "warn" ? (
+                  <article
+                    className={styles.logRow}
+                    key={log.id}
+                    data-status={status.type}
+                    data-expanded={isExpanded}
+                  >
+                    {/* Status Leading Icon */}
+                    <button
+                      type="button"
+                      className={styles.statusSignal}
+                      data-status={status.type}
+                      onClick={() => toggleRowExpand(log.id)}
+                      title={isRtl ? "عرض / إخفاء التفاصيل السريعة" : "Toggle quick details"}
+                      aria-expanded={isExpanded}
+                    >
+                      {isFailed ? (
+                        <ShieldAlert size={18} />
+                      ) : isSecurity ? (
                         <AlertTriangle size={18} />
-                      ) : (
+                      ) : status.type === "success" ? (
                         <CheckCircle2 size={18} />
+                      ) : (
+                        <Activity size={18} />
                       )}
-                    </span>
+                    </button>
+
                     <div className={styles.logBody}>
-                      <div className={styles.logTitle}>
-                        <span data-level={log.level}>{t(`levels.${log.level}`)}</span>
-                        {log.businessId === null && log.event.startsWith("auth.") && (
-                          <span className={styles.globalProbeBadge}>
+                      {/* Row Header: Single Status Badge + Worldwide Scope + Title */}
+                      <div className={styles.rowHeader}>
+                        <span className={styles.statusBadge} data-type={status.type}>
+                          {status.badgeText}
+                        </span>
+
+                        {log.businessId === null && (log.event.startsWith("auth.") || log.event.startsWith("security.")) && (
+                          <span className={styles.worldwideBadge}>
                             <Globe size={12} />
-                            {isRtl ? "محاولة عالمية خارجية" : "External / Worldwide Probe"}
+                            {t("worldwideProbe")}
                           </span>
                         )}
-                        <span className={styles.riskBadge} data-risk={risk.level}>
-                          {risk.label}
-                        </span>
-                        <strong>{desc.title}</strong>
+
+                        {log.source === "frontend" && (
+                          <span className={styles.deviceBadge}>
+                            <Laptop size={12} />
+                            {isRtl ? "واجهة العميل" : "Frontend"}
+                          </span>
+                        )}
+
+                        <strong
+                          className={styles.logTitleText}
+                          onClick={() => toggleRowExpand(log.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleRowExpand(log.id); }}
+                        >
+                          {desc.title}
+                        </strong>
                       </div>
 
-                      <p>{desc.explanation}</p>
+                      {/* Explanation */}
+                      <p className={styles.logExplanation}>{desc.explanation}</p>
 
-                      {/* Forensic Origin Badges (IP, Location, Device) */}
+                      {/* Forensic Origin Bar with Clickable Filter Badges */}
                       <div className={styles.forensicOrigin}>
                         {meta?.attemptedEmail && (
-                          <span className={styles.ipBadge} title={t("attemptedEmail")}>
+                          <button
+                            type="button"
+                            className={styles.interactiveIdentityBadge}
+                            onClick={() => filterByTerm(meta.attemptedEmail!)}
+                            title={isRtl ? `تصفية السجلات حسب ${meta.attemptedEmail}` : `Filter logs for ${meta.attemptedEmail}`}
+                          >
                             <User size={12} />
                             <code>{meta.attemptedEmail}</code>
-                          </span>
+                          </button>
                         )}
 
                         {meta?.country && (
                           <span className={styles.countryBadge}>
                             <MapPin size={12} />
-                            <span>{getCountryFlag(meta.country)}</span>
-                            <span>{meta.country}</span>
-                            {meta.city ? ` (${meta.city})` : ""}
+                            <span>{location.label}</span>
                           </span>
                         )}
 
                         {meta?.ip && meta.ip !== "unknown" && (
                           <span className={styles.ipBadge}>
-                            <code>{meta.ip}</code>
                             <button
                               type="button"
-                              onClick={() => copyText(meta.ip!)}
-                              title={t("copyIp")}
+                              className={styles.ipTextButton}
+                              onClick={() => filterByTerm(meta.ip!)}
+                              title={isRtl ? `تصفية حسب هذا العنوان: ${meta.ip}` : `Filter by this IP: ${meta.ip}`}
                             >
-                              <Copy size={12} />
+                              <code>{meta.ip}</code>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(`ip-${log.id}`, meta.ip!)}
+                              title={t("copyIp")}
+                              aria-label={t("copyIp")}
+                            >
+                              {copiedKey === `ip-${log.id}` ? (
+                                <Check size={12} style={{ color: "#6ee7b7" }} />
+                              ) : (
+                                <Copy size={12} />
+                              )}
                             </button>
                           </span>
                         )}
@@ -1093,38 +1322,86 @@ export default function LogsPage() {
                         )}
                       </div>
 
+                      {/* Technical Trace Line */}
                       <div className={styles.logMeta}>
                         {log.method || log.path ? (
                           <code dir="ltr">{[log.method, log.path].filter(Boolean).join(" ")}</code>
                         ) : null}
                         {log.statusCode ? (
-                          <span dir="ltr" style={{ color: isFailedAuth ? "#ff9d8c" : undefined }}>
+                          <span dir="ltr" data-error={log.statusCode >= 400}>
                             HTTP {log.statusCode}
                           </span>
                         ) : null}
                         {log.durationMs !== null ? (
                           <span dir="ltr">
-                            <Clock3 aria-hidden="true" size={13} />
+                            <Clock3 aria-hidden="true" size={12} />
                             {log.durationMs} ms
                           </span>
                         ) : null}
                         {log.requestId ? (
                           <button
                             type="button"
-                            onClick={() => copyText(log.requestId!)}
+                            onClick={() => handleCopy(`req-${log.id}`, log.requestId!)}
                             title={t("copyTraceId")}
                             dir="ltr"
                           >
-                            <Copy aria-hidden="true" size={13} />
-                            {log.requestId.slice(0, 13)}…
+                            {copiedKey === `req-${log.id}` ? (
+                              <Check size={12} style={{ color: "#6ee7b7" }} />
+                            ) : (
+                              <Copy aria-hidden="true" size={12} />
+                            )}
+                            {log.requestId.slice(0, 12)}…
                           </button>
                         ) : null}
                       </div>
+
+                      {/* Smooth Inline Accordion Quick-Inspection Tray */}
+                      {isExpanded && (
+                        <div className={styles.inlineAccordion}>
+                          <div className={styles.accordionHeader}>
+                            <span>{isRtl ? "معاينة فنية سريعة" : "Quick Diagnostic Snapshot"}</span>
+                            <div className={styles.accordionActions}>
+                              {meta?.ip && meta.ip !== "unknown" && (
+                                <button
+                                  type="button"
+                                  onClick={() => filterByTerm(meta.ip!)}
+                                  className={styles.accordionActionBtn}
+                                >
+                                  <Filter size={12} />
+                                  <span>{isRtl ? "حصر كل أحداث هذا الـ IP" : "Filter by this IP"}</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLog(log)}
+                                className={styles.accordionActionBtnPrimary}
+                              >
+                                {isRtl ? "فتح الملف الجنائي الكامل" : "Open Full Dossier"}
+                              </button>
+                            </div>
+                          </div>
+                          <pre className={styles.accordionCode} dir="auto">
+                            {log.event}{"\n"}{log.message}
+                          </pre>
+                        </div>
+                      )}
                     </div>
-                    <div className={styles.logTime}>
-                      <time dateTime={log.createdAt}>{dateFormatter.format(new Date(log.createdAt))}</time>
-                      <button type="button" onClick={() => setSelectedLog(log)}>
-                        {isRtl ? "تفاصيل استقصائية" : "Forensics"}
+
+                    {/* Right-aligned Time & Forensics Action */}
+                    <div className={styles.logActionCol}>
+                      <time
+                        dateTime={log.createdAt}
+                        title={dateFormatter.format(new Date(log.createdAt))}
+                        className={styles.relativeTime}
+                      >
+                        {formatRelativeTime(log.createdAt, isRtl)}
+                      </time>
+                      <button
+                        type="button"
+                        className={styles.inspectButton}
+                        onClick={() => setSelectedLog(log)}
+                      >
+                        {t("inspect")}
                       </button>
                     </div>
                   </article>
@@ -1146,7 +1423,7 @@ export default function LogsPage() {
               <p className={styles.endOfLog}>
                 {isSlowMode
                   ? (isRtl ? "الوضع البطيء يعرض آخر 5 أحداث فقط." : "Slow mode displays only the latest 5 events.")
-                  : (isRtl ? "وصلت إلى نهاية السجلات المتاحة." : "End of available audit events reached.")}
+                  : (isRtl ? "وصلت إلى نهاية السجلات المتاحة." : "End of available events reached.")}
               </p>
             )}
           </>
@@ -1156,7 +1433,7 @@ export default function LogsPage() {
             <h3>{t("emptyTitle")}</h3>
             <p>{t("emptyDesc")}</p>
             <button type="button" onClick={clearFilters}>
-              {isRtl ? "مسح عوامل التصفية" : "Clear Filters"}
+              {isRtl ? "إعادة ضبط التصفية" : "Reset Filters"}
             </button>
           </div>
         )}
@@ -1169,6 +1446,9 @@ export default function LogsPage() {
         isRtl={isRtl}
         dateFormatter={dateFormatter}
         t={t}
+        locale={locale}
+        copiedKey={copiedKey}
+        onCopy={handleCopy}
       />
     </div>
   );

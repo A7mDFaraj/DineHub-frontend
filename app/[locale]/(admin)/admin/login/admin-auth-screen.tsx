@@ -182,12 +182,6 @@ function SignInForm() {
         password: values.password,
       });
       if (error) {
-        reportClientIncident({
-          level: "warn",
-          event: "auth.sign_in_rejected",
-          message: error.message ?? "Sign-in was rejected",
-          metadata: { errorCode: error.code ?? "unknown", attemptedEmail: values.email },
-        });
         setRequestError(getAuthError(error, t));
         return;
       }

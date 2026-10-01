@@ -157,6 +157,16 @@ export function installBrowserObservability(): void {
         ? target.src
         : undefined;
 
+    const msg = error.message || "";
+    if (
+      msg.includes("removeChild") ||
+      msg.includes("ResizeObserver loop") ||
+      msg.includes("chrome-extension://") ||
+      msg.includes("moz-extension://")
+    ) {
+      return;
+    }
+
     reportClientIncident({
       level: "error",
       event: event.error ? "window.error" : "resource.error",
