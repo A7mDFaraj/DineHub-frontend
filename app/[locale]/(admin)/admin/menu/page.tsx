@@ -10,11 +10,13 @@ import {
   CheckCircle2,
   CloudCheck,
   Edit3,
+  FileText,
   Image as ImageIcon,
   Loader2,
   Plus,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   UtensilsCrossed,
   X,
@@ -241,12 +243,26 @@ export default function MenuManagementPage() {
     return () => clearTimeout(timer);
   }, [selectedBranchId, fetchMenuData]);
 
+  // ponytail: sync categoryId when categories load after modal is already open
+  useEffect(() => {
+    if (!isProductModalOpen || !categories.length) return;
+    const timer = setTimeout(() => {
+      setFormData((current) => {
+        const valid = categories.some((c) => c.id === current.categoryId);
+        if (valid) return current;
+        return { ...current, categoryId: categories[0].id };
+      });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [categories, isProductModalOpen]);
+
   const handleOpenCreate = () => {
     setEditingProductId(null);
     const key = selectedBranchId
       ? `dinehub:product-draft:${selectedBranchId}:new`
       : "";
-    let next = { ...EMPTY_PRODUCT_FORM, categoryId: categories[0]?.id || "" };
+    const defaultCategoryId = categories[0]?.id || "";
+    let next = { ...EMPTY_PRODUCT_FORM, categoryId: defaultCategoryId };
     let nextAttributes: string[] = [];
     let restored = false;
     if (key) {
@@ -254,7 +270,14 @@ export default function MenuManagementPage() {
         const saved = sessionStorage.getItem(key);
         if (saved) {
           const parsed = JSON.parse(saved) as { formData?: ProductForm; selectedAttrIds?: string[] };
-          if (parsed.formData) next = { ...next, ...parsed.formData };
+          if (parsed.formData) {
+            const isCategoryValid = categories.some((c) => c.id === parsed.formData?.categoryId);
+            next = {
+              ...next,
+              ...parsed.formData,
+              categoryId: isCategoryValid ? parsed.formData.categoryId : defaultCategoryId,
+            };
+          }
           if (Array.isArray(parsed.selectedAttrIds)) nextAttributes = parsed.selectedAttrIds;
           restored = true;
         }
@@ -317,6 +340,7 @@ export default function MenuManagementPage() {
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!selectedBranchId) {
       setErrorMsg(tCommon("currentBranch"));
       return;
@@ -326,15 +350,36 @@ export default function MenuManagementPage() {
     if (formData.nameAr.trim().length > 120) errors.nameAr = isRtl ? "الحد الأقصى 120 حرفاً" : "Use 120 characters or fewer";
     if (formData.nameEn.trim().length > 120) errors.nameEn = isRtl ? "الحد الأقصى 120 حرفاً" : "Use 120 characters or fewer";
     const price = Number(formData.price);
-    if (!formData.price || !Number.isFinite(price) || price < 0 || price > 999999.99) errors.price = isRtl ? "أدخل سعراً صحيحاً بين 0 و999,999.99" : "Enter a valid price from 0 to 999,999.99";
-    if (!/^\d+(\.\d{1,2})?$/.test(formData.price)) errors.price = isRtl ? "استخدم منزلتين عشريتين كحد أقصى" : "Use no more than two decimal places";
+    if (!formData.price) {
+      errors.price = isRtl ? "السعر مطلوب" : "Price is required";
+    } else if (!/^\d+(\.\d{1,2})?$/.test(formData.price)) {
+      errors.price = isRtl ? "استخدم منزلتين عشريتين كحد أقصى" : "Use no more than two decimal places";
+    } else if (!Number.isFinite(price) || price < 0 || price > 999999.99) {
+      errors.price = isRtl ? "أدخل سعراً صحيحاً بين 0 و999,999.99" : "Enter a valid price from 0 to 999,999.99";
+    }
     if (formData.calories && (!Number.isInteger(Number(formData.calories)) || Number(formData.calories) < 0 || Number(formData.calories) > 100000)) errors.calories = isRtl ? "أدخل عدداً صحيحاً بين 0 و100,000" : "Enter a whole number from 0 to 100,000";
-    if (!formData.categoryId) errors.categoryId = isRtl ? "اختر تصنيفاً" : "Choose a category";
+    const categoryExists = categories.some((c) => c.id === formData.categoryId);
+    let resolvedCategoryId = formData.categoryId;
+    if (!formData.categoryId || !categoryExists) {
+      // ponytail: auto-fix if only one category exists (boss's exact scenario)
+      if (categories.length === 1) {
+        resolvedCategoryId = categories[0].id;
+        setFormData((current) => ({ ...current, categoryId: resolvedCategoryId }));
+      } else {
+        errors.categoryId = isRtl ? "اختر تصنيفاً" : "Choose a category";
+      }
+    }
     if (formData.descriptionAr.length > 1000 || formData.descriptionEn.length > 1000) errors.description = isRtl ? "الوصف يجب ألا يتجاوز 1000 حرف" : "Descriptions must be 1,000 characters or fewer";
     if (formData.imageUrl && !/^https?:\/\//i.test(formData.imageUrl)) errors.imageUrl = isRtl ? "رابط الصورة غير صالح" : "Enter a valid image URL";
     setFormErrors(errors);
     if (Object.keys(errors).length) {
       setErrorMsg(isRtl ? "راجع الحقول المحددة أدناه." : "Review the highlighted fields below.");
+      // ponytail: scroll to first invalid field so user sees the error
+      requestAnimationFrame(() => {
+        const firstInvalid = document.querySelector<HTMLElement>('#product-form [aria-invalid="true"]');
+        firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+        firstInvalid?.focus();
+      });
       return;
     }
 
@@ -343,7 +388,7 @@ export default function MenuManagementPage() {
       setErrorMsg("");
 
       const payload = {
-        categoryId: formData.categoryId,
+        categoryId: resolvedCategoryId,
         nameAr: formData.nameAr.trim() || formData.nameEn.trim(),
         nameEn: formData.nameEn.trim() || undefined,
         descriptionAr: formData.descriptionAr.trim() || undefined,
@@ -847,218 +892,288 @@ export default function MenuManagementPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmitProduct} className={styles.formGrid}>
-              <div className={styles.inputGroup}>
-                <label>{t("uploadImage")}</label>
+            <form id="product-form" onSubmit={handleSubmitProduct} className={styles.formGrid}>
+              {/* Section 1: Basic Information & Media */}
+              <div className={styles.formSection}>
+                <div className={styles.sectionHeader}>
+                  <h3 className={styles.sectionTitle}>
+                    <span className={styles.sectionIcon}><ImageIcon size={15} /></span>
+                    <span>{isRtl ? "المعلومات الأساسية والصورة" : "Basic Information & Media"}</span>
+                  </h3>
+                  <span className={styles.sectionBadge}>
+                    {isRtl ? "مطلوبة للطلب *" : "Required *"}
+                  </span>
+                </div>
+
                 <ImageUploader
                   value={formData.imageUrl}
                   onChange={(url) =>
                     setFormData((current) => ({ ...current, imageUrl: url }))
                   }
-                  label={t("uploadImage")}
                   description="JPG, PNG, WebP (max 5MB)"
                 />
-              </div>
 
-              <div className={styles.twoCol}>
-                <div className={styles.inputGroup}>
-                  <label htmlFor="prod-name-ar">{t("nameAr")} *</label>
-                  <input
-                    id="prod-name-ar"
-                    type="text"
-                    required
-                    placeholder={
-                      isRtl
-                        ? "مثال: فلات وايت كلاسيك"
-                        : "e.g. Classic Flat White"
-                    }
-                    value={formData.nameAr}
-                    onChange={(e) =>
-                      setFormData((current) => ({ ...current, nameAr: e.target.value }))
-                    }
-                    maxLength={120}
-                    aria-invalid={Boolean(formErrors.nameAr)}
-                  />
-                  {formErrors.nameAr && <small className={styles.fieldError}>{formErrors.nameAr}</small>}
+                <div className={styles.twoCol}>
+                  <div className={styles.inputGroup}>
+                    <label htmlFor="prod-name-ar">{t("nameAr")} *</label>
+                    <input
+                      id="prod-name-ar"
+                      type="text"
+                      required
+                      placeholder={
+                        isRtl
+                          ? "مثال: فلات وايت كلاسيك"
+                          : "e.g. Classic Flat White"
+                      }
+                      value={formData.nameAr}
+                      onChange={(e) =>
+                        setFormData((current) => ({ ...current, nameAr: e.target.value }))
+                      }
+                      maxLength={120}
+                      aria-invalid={Boolean(formErrors.nameAr)}
+                    />
+                    {formErrors.nameAr && <small className={styles.fieldError}>{formErrors.nameAr}</small>}
+                  </div>
+
+                  <div className={styles.inputGroup}>
+                    <label htmlFor="prod-name-en">{t("nameEn")}</label>
+                    <input
+                      id="prod-name-en"
+                      type="text"
+                      dir="ltr"
+                      placeholder="e.g. Classic Flat White"
+                      value={formData.nameEn}
+                      onChange={(e) =>
+                        setFormData((current) => ({ ...current, nameEn: e.target.value }))
+                      }
+                      maxLength={120}
+                      aria-invalid={Boolean(formErrors.nameEn)}
+                    />
+                    {formErrors.nameEn && <small className={styles.fieldError}>{formErrors.nameEn}</small>}
+                  </div>
+                </div>
+
+                <div className={styles.twoCol}>
+                  <div className={styles.inputGroup}>
+                    <label htmlFor="prod-price">
+                      {t("price")} ({tCommon("currency")}) *
+                    </label>
+                    <input
+                      id="prod-price"
+                      type="number"
+                      step="0.25"
+                      min="0" max="999999.99"
+                      required
+                      placeholder="0.00"
+                      value={formData.price}
+                      onChange={(e) =>
+                        setFormData((current) => ({ ...current, price: e.target.value }))
+                      }
+                      aria-invalid={Boolean(formErrors.price)}
+                    />
+                    {formErrors.price && <small className={styles.fieldError}>{formErrors.price}</small>}
+                  </div>
+
+                  <div className={styles.inputGroup}>
+                    <label htmlFor="prod-cat">{t("category")} *</label>
+                    <select
+                      id="prod-cat"
+                      required
+                      value={formData.categoryId}
+                      onChange={(e) =>
+                        setFormData((current) => ({ ...current, categoryId: e.target.value }))
+                      }
+                      aria-invalid={Boolean(formErrors.categoryId)}
+                    >
+                      <option value="" disabled>
+                        {isRtl ? "اختر تصنيفاً..." : "Select a category..."}
+                      </option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {isRtl
+                            ? c.nameAr || c.name || c.nameEn
+                            : c.nameEn || c.name || c.nameAr}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.categoryId && <small className={styles.fieldError}>{formErrors.categoryId}</small>}
+                  </div>
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label htmlFor="prod-name-en">{t("nameEn")}</label>
-                  <input
-                    id="prod-name-en"
-                    type="text"
-                    dir="ltr"
-                    placeholder="e.g. Classic Flat White"
-                    value={formData.nameEn}
-                    onChange={(e) =>
-                      setFormData((current) => ({ ...current, nameEn: e.target.value }))
-                    }
-                    maxLength={120}
-                    aria-invalid={Boolean(formErrors.nameEn)}
-                  />
-                  {formErrors.nameEn && <small className={styles.fieldError}>{formErrors.nameEn}</small>}
-                </div>
-              </div>
-
-              <div className={styles.twoCol}>
-                <div className={styles.inputGroup}>
-                  <label htmlFor="prod-price">
-                    {t("price")} ({tCommon("currency")}) *
+                  <label htmlFor="prod-calories">
+                    {isRtl ? "السعرات الحرارية (اختياري)" : "Calories (optional)"}
                   </label>
                   <input
-                    id="prod-price"
+                    id="prod-calories"
                     type="number"
-                    step="0.25"
-                    min="0" max="999999.99"
-                    required
-                    placeholder="0.00"
-                    value={formData.price}
+                    min="0"
+                    max="100000"
+                    step="1"
+                    placeholder={isRtl ? "مثال: 180" : "e.g. 180"}
+                    value={formData.calories}
                     onChange={(e) =>
-                      setFormData((current) => ({ ...current, price: e.target.value }))
+                      setFormData((current) => ({ ...current, calories: e.target.value }))
                     }
-                    aria-invalid={Boolean(formErrors.price)}
+                    aria-invalid={Boolean(formErrors.calories)}
                   />
-                  {formErrors.price && <small className={styles.fieldError}>{formErrors.price}</small>}
+                  {formErrors.calories && <small className={styles.fieldError}>{formErrors.calories}</small>}
+                </div>
+              </div>
+
+              {/* Section 2: Descriptions */}
+              <div className={styles.formSection}>
+                <div className={styles.sectionHeader}>
+                  <h3 className={styles.sectionTitle}>
+                    <span className={styles.sectionIcon}><FileText size={15} /></span>
+                    <span>{isRtl ? "الوصف والتقديم" : "Descriptions & Presentation"}</span>
+                  </h3>
+                  <span className={styles.sectionBadge}>
+                    {isRtl ? "اختياري" : "Optional"}
+                  </span>
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label htmlFor="prod-cat">{t("category")} *</label>
-                  <select
-                    id="prod-cat"
-                    required
-                    value={formData.categoryId}
-                    onChange={(e) =>
-                      setFormData((current) => ({ ...current, categoryId: e.target.value }))
-                    }
-                    aria-invalid={Boolean(formErrors.categoryId)}
-                  >
-                    {categories.length === 0 && (
-                      <option value="">{tCommon("all")}</option>
-                    )}
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {isRtl
-                          ? c.nameAr || c.name || c.nameEn
-                          : c.nameEn || c.name || c.nameAr}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.categoryId && <small className={styles.fieldError}>{formErrors.categoryId}</small>}
-                </div>
-              </div>
-
-              <div className={styles.inputGroup}>
-                <label htmlFor="prod-calories">
-                  {isRtl ? "السعرات الحرارية (اختياري)" : "Calories (optional)"}
-                </label>
-                <input
-                  id="prod-calories"
-                  type="number"
-                  min="0"
-                  max="100000"
-                  step="1"
-                  value={formData.calories}
-                  onChange={(e) =>
-                    setFormData((current) => ({ ...current, calories: e.target.value }))
-                  }
-                  aria-invalid={Boolean(formErrors.calories)}
-                />
-                {formErrors.calories && <small className={styles.fieldError}>{formErrors.calories}</small>}
-              </div>
-              {[
-                {
-                  keys: INGREDIENT_KEYS,
-                  field: "ingredientTags" as const,
-                  title: isRtl ? "مكونات بارزة" : "Ingredient highlights",
-                },
-                {
-                  keys: ALLERGEN_KEYS,
-                  field: "allergens" as const,
-                  title: isRtl
-                    ? "مسببات الحساسية — يحتوي على"
-                    : "Allergens — contains",
-                },
-                {
-                  keys: DIETARY_KEYS,
-                  field: "dietaryTags" as const,
-                  title: isRtl ? "معلومات الطبق" : "Dietary labels",
-                },
-              ].map(({ keys, field, title }) => (
-                <fieldset key={field} className={styles.inputGroup}>
-                  <legend>{title}</legend>
-                  <p className={styles.fieldHint}>{field === "allergens" ? (isRtl ? "اختر فقط مسببات الحساسية المؤكدة. يظهر الاسم دائماً بجانب الرمز." : "Select confirmed allergens only. The name always appears beside its symbol.") : (isRtl ? "معلومات اختيارية تساعد الضيف على فهم الطبق." : "Optional details that help guests understand the dish.")}</p>
-                  <div className={styles.foodOptionGrid}>
-                    {keys.map((key) => {
-                      const entry =
-                        FOOD_LABELS[key as keyof typeof FOOD_LABELS];
-                      const Icon = entry.icon;
-                      return (
-                        <label
-                          key={key}
-                          className={styles.foodOption}
-                          data-selected={String(formData[field].includes(key))}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData[field].includes(key)}
-                            onChange={(e) =>
-                              setFormData((current) => ({
-                                ...current,
-                                [field]: e.target.checked
-                                  ? [...current[field], key]
-                                  : current[field].filter((v) => v !== key),
-                              }))
-                            }
-                            style={{ width: 18, height: 18 }}
-                          />
-                          <Icon size={17} aria-hidden="true" />
-                          {isRtl ? entry.ar : entry.en}
-                        </label>
-                      );
-                    })}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label htmlFor="prod-desc-ar">{t("descAr")}</label>
+                    <span className={styles.charCount}>{formData.descriptionAr.length}/1000</span>
                   </div>
-                </fieldset>
-              ))}
-              <div className={styles.inputGroup}>
-                <label htmlFor="prod-desc-ar">{t("descAr")}</label>
-                <textarea
-                  id="prod-desc-ar"
-                  placeholder={
-                    isRtl
-                      ? "مزيج متوازن من الإسبريسو الفاخر مع حليب مبخر بقوام مخملي…"
-                      : "Balanced artisan espresso with velvety steamed milk…"
-                  }
-                  value={formData.descriptionAr}
-                  onChange={(e) =>
-                    setFormData((current) => ({
-                      ...current,
-                      descriptionAr: e.target.value,
-                    }))
-                  }
-                  maxLength={1000}
-                />
-              </div>
+                  <textarea
+                    id="prod-desc-ar"
+                    placeholder={
+                      isRtl
+                        ? "مزيج متوازن من الإسبريسو الفاخر مع حليب مبخر بقوام مخملي…"
+                        : "Balanced artisan espresso with velvety steamed milk…"
+                    }
+                    value={formData.descriptionAr}
+                    onChange={(e) =>
+                      setFormData((current) => ({
+                        ...current,
+                        descriptionAr: e.target.value,
+                      }))
+                    }
+                    maxLength={1000}
+                  />
+                </div>
 
-              <div className={styles.inputGroup}>
-                <label htmlFor="prod-desc-en">{t("descEn")}</label>
-                <textarea
-                  id="prod-desc-en"
-                  dir="ltr"
-                  placeholder="Rich espresso balanced with velvety steamed milk…"
-                  value={formData.descriptionEn}
-                  onChange={(e) =>
-                    setFormData((current) => ({
-                      ...current,
-                      descriptionEn: e.target.value,
-                    }))
-                  }
-                  maxLength={1000}
-                />
-              </div>
-
-              {attributes.length > 0 && (
                 <div className={styles.inputGroup}>
-                  <label>{t("attributesTitle")}</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <label htmlFor="prod-desc-en">{t("descEn")}</label>
+                    <span className={styles.charCount}>{formData.descriptionEn.length}/1000</span>
+                  </div>
+                  <textarea
+                    id="prod-desc-en"
+                    dir="ltr"
+                    placeholder="Rich espresso balanced with velvety steamed milk…"
+                    value={formData.descriptionEn}
+                    onChange={(e) =>
+                      setFormData((current) => ({
+                        ...current,
+                        descriptionEn: e.target.value,
+                      }))
+                    }
+                    maxLength={1000}
+                  />
+                </div>
+              </div>
+
+              {/* Section 3: Dietary, Allergens & Highlights */}
+              <div className={styles.formSection}>
+                <div className={styles.sectionHeader}>
+                  <h3 className={styles.sectionTitle}>
+                    <span className={styles.sectionIcon}><Sparkles size={15} /></span>
+                    <span>{isRtl ? "المكونات والمحاذير الصحية" : "Dietary, Allergens & Highlights"}</span>
+                  </h3>
+                  <span className={styles.sectionBadge}>
+                    {isRtl ? "شفافية للضيوف" : "Guest transparency"}
+                  </span>
+                </div>
+
+                {[
+                  {
+                    keys: ALLERGEN_KEYS,
+                    field: "allergens" as const,
+                    variant: "allergen" as const,
+                    title: isRtl
+                      ? "مسببات الحساسية — يحتوي على"
+                      : "Allergens — contains",
+                  },
+                  {
+                    keys: DIETARY_KEYS,
+                    field: "dietaryTags" as const,
+                    variant: "dietary" as const,
+                    title: isRtl ? "معلومات الطبق" : "Dietary labels",
+                  },
+                  {
+                    keys: INGREDIENT_KEYS,
+                    field: "ingredientTags" as const,
+                    variant: "ingredient" as const,
+                    title: isRtl ? "مكونات بارزة" : "Ingredient highlights",
+                  },
+                ].map(({ keys, field, variant, title }) => (
+                  <fieldset key={field} className={styles.inputGroup} style={{ border: 0, padding: 0, margin: 0 }}>
+                    <legend style={{ fontSize: "0.82rem", fontWeight: 700, color: "#dfd2eb", marginBottom: 3 }}>
+                      {title}
+                    </legend>
+                    <p className={styles.fieldHint}>
+                      {field === "allergens"
+                        ? (isRtl ? "اختر فقط مسببات الحساسية المؤكدة. يظهر الاسم دائماً بجانب الرمز." : "Select confirmed allergens only. The name always appears beside its symbol.")
+                        : (isRtl ? "معلومات اختيارية تساعد الضيف على فهم الطبق." : "Optional details that help guests understand the dish.")}
+                    </p>
+                    <div className={styles.foodOptionGrid}>
+                      {keys.map((key) => {
+                        const entry =
+                          FOOD_LABELS[key as keyof typeof FOOD_LABELS];
+                        const Icon = entry.icon;
+                        const isSelected = formData[field].includes(key);
+                        return (
+                          <label
+                            key={key}
+                            className={styles.foodOption}
+                            data-variant={variant}
+                            data-selected={String(isSelected)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) =>
+                                setFormData((current) => ({
+                                  ...current,
+                                  [field]: e.target.checked
+                                    ? [...current[field], key]
+                                    : current[field].filter((v) => v !== key),
+                                }))
+                              }
+                            />
+                            <Icon size={17} aria-hidden="true" style={{ flexShrink: 0 }} />
+                            <span>{isRtl ? entry.ar : entry.en}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                ))}
+              </div>
+
+              {/* Section 4: Attributes Selection */}
+              {attributes.length > 0 && (
+                <div className={styles.formSection}>
+                  <div className={styles.sectionHeader}>
+                    <h3 className={styles.sectionTitle}>
+                      <span className={styles.sectionIcon}><SlidersHorizontal size={15} /></span>
+                      <span>{t("attributesTitle")}</span>
+                    </h3>
+                    <span className={styles.sectionBadge}>
+                      {selectedAttrIds.length} {isRtl ? "محددة" : "selected"}
+                    </span>
+                  </div>
+
+                  <p className={styles.fieldHint}>
+                    {isRtl
+                      ? "اختر السمات والخيارات الإضافية المتاحة لهذا الصنف (مثل الحجم، نوع الحليب)."
+                      : "Select custom options available for this item (e.g. Size, Milk type)."}
+                  </p>
+
                   <div className={styles.attrSelectionGrid}>
                     {attributes.map((attr) => {
                       const isSelected = selectedAttrIds.includes(attr.id);
@@ -1070,7 +1185,7 @@ export default function MenuManagementPage() {
                           data-selected={String(isSelected)}
                           onClick={() => toggleAttributeSelection(attr.id)}
                         >
-                          {isSelected && <Check size={13} />}
+                          {isSelected && <Check size={14} />}
                           <span>
                             {isRtl
                               ? attr.labelAr || attr.labelEn
@@ -1083,31 +1198,33 @@ export default function MenuManagementPage() {
                 </div>
               )}
 
-              <div className={styles.dialogActions}>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={closeProductEditor}
-                  disabled={isSubmitting}
-                >
-                  {tCommon("cancel")}
-                </button>
-                <button
-                  type="submit"
-                  className={styles.primaryButton}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>{tCommon("loading")}</span>
-                    </>
-                  ) : (
-                    <span>{editingProductId ? tCommon("save") : (isRtl ? "إضافة المنتج" : "Add product")}</span>
-                  )}
-                </button>
-              </div>
             </form>
+
+            <div className={styles.dialogActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={closeProductEditor}
+                disabled={isSubmitting}
+              >
+                {tCommon("cancel")}
+              </button>
+              <button
+                type="submit"
+                form="product-form"
+                className={styles.primaryButton}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>{tCommon("loading")}</span>
+                  </>
+                ) : (
+                  <span>{editingProductId ? tCommon("save") : (isRtl ? "إضافة المنتج" : "Add product")}</span>
+                )}
+              </button>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>

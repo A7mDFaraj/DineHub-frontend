@@ -133,9 +133,9 @@ export function ImageUploader({
 
   return (
     <div className={cn("space-y-3 w-full max-w-full min-w-0 box-border", className)}>
-      {label && (
+      {(label || description) && (
         <div className="flex items-center justify-between flex-wrap gap-1">
-          <label className="text-xs sm:text-sm font-semibold text-zinc-300">{label}</label>
+          {label && <label className="text-xs sm:text-sm font-semibold text-zinc-300">{label}</label>}
           {description && (
             <span className="text-xs text-zinc-500">{description}</span>
           )}
@@ -144,16 +144,16 @@ export function ImageUploader({
 
       {/* Existing Image Preview */}
       {value ? (
-        <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 p-2.5 flex items-center gap-3 group max-w-full">
+        <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 p-2.5 flex items-center gap-3 group max-w-full shadow-inner">
           <div
             className={cn(
-              "rounded-xl overflow-hidden bg-neutral-900 border border-white/5 relative shrink-0",
+              "rounded-xl overflow-hidden bg-neutral-900 border border-white/10 relative shrink-0 shadow-sm ring-1 ring-white/5",
               aspectRatio === "banner" ? "w-28 h-18 sm:w-32 sm:h-20" : "w-16 h-16 sm:w-20 sm:h-20"
             )}
           >
             <Image
               src={value}
-              alt={isRtl ? "معاينة الشعار" : "Logo preview"}
+              alt={isRtl ? "معاينة صورة الصنف" : "Item image preview"}
               fill
               sizes="128px"
               className="object-cover"
@@ -171,7 +171,7 @@ export function ImageUploader({
           <button
             type="button"
             onClick={handleClear}
-            className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors shrink-0"
+            className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-all active:scale-[0.96] shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center"
             title={isRtl ? "حذف الصورة" : "Delete image"}
             aria-label={isRtl ? "حذف الصورة" : "Delete image"}
           >
@@ -181,7 +181,7 @@ export function ImageUploader({
       ) : (
         <div className="space-y-2.5 w-full max-w-full min-w-0">
           {/* Tab buttons */}
-          <div className="flex items-center gap-1 bg-black/30 border border-white/10 p-1 rounded-xl w-full sm:w-fit max-w-full">
+          <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-1 rounded-xl w-full sm:w-fit max-w-full">
             <button
               type="button"
               onClick={() => {
@@ -189,9 +189,9 @@ export function ImageUploader({
                 setError("")
               }}
               className={cn(
-                "flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors",
+                "flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.96]",
                 activeTab === "file"
-                  ? "bg-primary-500 text-black shadow-sm"
+                  ? "bg-[rgba(71,170,161,0.22)] text-[#8cd1ca] border border-[rgba(71,170,161,0.4)] shadow-sm"
                   : "text-zinc-400 hover:text-white"
               )}
             >
@@ -205,9 +205,9 @@ export function ImageUploader({
                 setError("")
               }}
               className={cn(
-                "flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors",
+                "flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-[0.96]",
                 activeTab === "url"
-                  ? "bg-primary-500 text-black shadow-sm"
+                  ? "bg-[rgba(71,170,161,0.22)] text-[#8cd1ca] border border-[rgba(71,170,161,0.4)] shadow-sm"
                   : "text-zinc-400 hover:text-white"
               )}
             >
@@ -224,10 +224,10 @@ export function ImageUploader({
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
               className={cn(
-                "border-2 border-dashed rounded-2xl p-5 sm:p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 max-w-full box-border",
+                "border-2 border-dashed rounded-2xl p-5 sm:p-7 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 max-w-full box-border",
                 isDragging
-                  ? "border-primary-500 bg-primary-500/10 scale-[1.01]"
-                  : "border-white/15 bg-black/20 hover:border-white/30 hover:bg-white/[0.02]"
+                  ? "border-[rgba(71,170,161,0.8)] bg-[rgba(71,170,161,0.12)] scale-[1.01]"
+                  : "border-white/15 bg-black/25 hover:border-white/30 hover:bg-white/[0.03]"
               )}
             >
               <input
@@ -240,14 +240,14 @@ export function ImageUploader({
 
               {isUploading ? (
                 <div className="flex flex-col items-center gap-2 py-2">
-                  <Loader2 className="w-7 h-7 animate-spin text-primary-400" />
-                  <p className="text-xs text-primary-300 font-semibold">
+                  <Loader2 className="w-7 h-7 animate-spin text-[#8cd1ca]" />
+                  <p className="text-xs text-[#a9ded8] font-semibold">
                     {isRtl ? "جارٍ رفع الصورة إلى الخادم…" : "Uploading image to server…"}
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-primary-400 shadow-inner">
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8cd1ca] shadow-inner">
                     <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
                   <div>
@@ -275,14 +275,14 @@ export function ImageUploader({
                 dir="ltr"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://example.com/logo.png"
-                className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary-500/50 min-w-0"
+                placeholder="https://example.com/item.jpg"
+                className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[rgba(71,170,161,0.6)] min-w-0"
               />
               <button
                 type="button"
                 onClick={handleUrlApply}
                 disabled={!urlInput.trim()}
-                className="px-4 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-40 text-black font-bold rounded-xl text-xs transition-colors shrink-0 w-full sm:w-auto"
+                className="px-4 py-2.5 bg-[var(--admin-teal,#47aaa1)] hover:bg-[#3d9890] disabled:opacity-40 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.96] shrink-0 w-full sm:w-auto shadow-sm"
               >
                 {isRtl ? "تطبيق" : "Apply"}
               </button>
